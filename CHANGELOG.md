@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.3]
+
 - **Costs and token counts are hidden by default**, so people passing by don't see what projects spend: the line under the
   team is gone, and the project's usage shows `•••`. Turn them on in Settings → **Costs and tokens** (kept in this browser).
   While hidden, the price simulator doesn't fill in your real usage.

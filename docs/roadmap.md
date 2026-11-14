@@ -6,7 +6,7 @@ welcome (open an issue). Items marked *(good first contribution)* are small and 
 
 ## Now
 
-- **Costs hidden by default, and the disk check fixed.** Done for the next release.
+Nothing in progress; the top of Next is what comes up.
 
 ## Next
 
@@ -116,6 +116,8 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.14.3** — Costs and token counts hidden by default; the daily disk check measures helpers' build outputs
+  correctly.
 - **0.14.2** — Your own helpers (create one from the team list and talk to it directly); the price simulator
   for core and helpers separately.
 - **0.14** — Models for core and for helpers (crowns and core-only locks), select all / none; working agents
