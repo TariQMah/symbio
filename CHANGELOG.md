@@ -5,6 +5,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Costs and token counts are hidden by default**, so people passing by don't see what projects spend: the line under the
+  team is gone, and the project's usage shows `•••`. Turn them on in Settings → **Costs and tokens** (kept in this browser).
+  While hidden, the price simulator doesn't fill in your real usage.
+- Fixed: the daily check measured helpers' build outputs far too low (87 GB counted as under 4 GB on a real project), so it
+  never warned that their folders were filling the disk, and "freed" amounts after cleaning were understated.
+
 ## [0.14.2]
 
 (0.14.1 was never published: its release stopped on a test. Same content.)

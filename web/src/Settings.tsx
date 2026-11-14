@@ -4,7 +4,7 @@ import { ArrowLeft, Check, Pencil, Plug, Plus, ShieldCheck, Trash2, X } from "lu
 import { api, type ConnectionView, type FtpSecurity } from "./api";
 import { ConnIcon } from "./ConnectionsPicker";
 import { ProvidersSection } from "./Providers";
-import { PricesSection } from "./Usage";
+import { CostsSection, PricesSection } from "./Usage";
 import { RemoteSection } from "./Remote";
 import { UpdatesSection } from "./Updates";
 import { Dialog, EmptyState } from "./ui";
@@ -171,6 +171,8 @@ export function Settings() {
       </section>
 
       <ProvidersSection />
+
+      <CostsSection />
 
       <PricesSection />
 

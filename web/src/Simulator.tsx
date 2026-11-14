@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Price, type PriceInfo } from "./api";
+import { useCostsShown } from "./privacy";
 
 // Settings → Model prices → Simulate: what models would cost at your usage. One model for all
 // tokens, or core and helpers apart (core usually runs on a dearer model), with each one's cost and
@@ -45,6 +46,8 @@ export function dailyCost(p: Prices, t: Tokens): number | null {
 const totalTokens = (t: Tokens) => TOKEN_FIELDS.reduce((a, f) => a + (Number.isFinite(num(t[f.key])) ? num(t[f.key]) : 0), 0);
 
 export function Simulator({ prices }: { prices: Record<string, PriceInfo> | null }) {
+  // While costs and tokens are hidden, your real usage isn't filled in or named: type amounts instead.
+  const shown = useCostsShown();
   const [split, setSplit] = useState(false);
   const [average, setAverage] = useState<Average | null>(null);
   // One model for everything.
@@ -57,6 +60,14 @@ export function Simulator({ prices }: { prices: Record<string, PriceInfo> | null
   const [helperTokens, setHelperTokens] = useState<Tokens | null>(null);
 
   useEffect(() => {
+    if (!shown) {
+      const blank: Tokens = { input: "", cacheRead: "", cacheWrite: "", output: "" };
+      setAverage(null);
+      setAllTokens(blank);
+      setCoreTokens(blank);
+      setHelperTokens(blank);
+      return;
+    }
     api
       .usageAverage()
       .then((a) => {
@@ -70,9 +81,13 @@ export function Simulator({ prices }: { prices: Record<string, PriceInfo> | null
         setCoreTokens(tokensOf());
         setHelperTokens(tokensOf());
       });
-  }, []);
+  }, [shown]);
 
-  const note = average && (
+  const note = !shown ? (
+    <div className="small subtle simulator-note">
+      Your usage is hidden (Settings → Costs and tokens), so it isn't filled in: type the amounts, or turn it on to use your average.
+    </div>
+  ) : average && (
     <div className="small subtle simulator-note">
       {average.projects.length
         ? `Your average since each project started: ${average.projects.map((p) => `${p.name} ${millions(p.tokensPerDay)}M/day over ${p.days} day${p.days === 1 ? "" : "s"}`).join(", ")}. Idle days count, so a busy week runs higher. Change the numbers to try other amounts.`

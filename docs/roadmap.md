@@ -6,7 +6,7 @@ welcome (open an issue). Items marked *(good first contribution)* are small and 
 
 ## Now
 
-Nothing in progress; the top of Next is what comes up.
+- **Costs hidden by default, and the disk check fixed.** Done for the next release.
 
 ## Next
 

@@ -224,3 +224,27 @@ test("the human creates a helper from the team list and talks to it directly; co
   await page.locator("button", { hasText: "Stop agent" }).click();
   await until("ideas to stop", async () => (await symbio.call("GET", `/projects/${project.id}`)).agents.find((a: any) => a.name === "ideas").status === "stopped");
 });
+
+test("costs and token counts are hidden until the human turns them on", async () => {
+  const { project, core } = await projectWithCore(symbio, "Private costs");
+  await symbio.call("POST", `/projects/${project.id}/agents/${core.id}/messages`, { text: "@core say working" });
+  await idle(symbio, project.id);
+  const { page } = await openPage(symbio);
+  await page.goto(`${symbio.base}/#/p/${project.id}`);
+  await page.locator(".side .agent-row").first().waitFor();
+  // Hidden by default: no usage line under the team, numbers masked in the project's settings.
+  assert.equal(await page.locator(".usage-line").count(), 0);
+  await page.locator("button.tab", { hasText: "Settings" }).click();
+  const usage = page.locator("#usage");
+  await usage.locator("p", { hasText: "Hidden" }).waitFor();
+  assert.ok((await usage.locator(".usage-table tfoot").innerText()).includes("•••"));
+  assert.equal(await usage.locator(".usage-total .subtle").innerText(), "••• tokens");
+
+  // Turned on in Settings: the line shows, the numbers too.
+  await page.goto(`${symbio.base}/#/settings`);
+  await page.locator(".section", { hasText: "Costs and tokens" }).locator("input[type=checkbox]").check();
+  await page.goto(`${symbio.base}/#/p/${project.id}`);
+  await page.locator(".usage-line", { hasText: "tokens" }).waitFor();
+  await page.locator("button.tab", { hasText: "Settings" }).click();
+  assert.ok(!(await page.locator("#usage .usage-table tfoot").innerText()).includes("•••"));
+});

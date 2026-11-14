@@ -1,4 +1,5 @@
 import { Simulator } from "./Simulator";
+import { MASK, setCostsShown, useCostsShown } from "./privacy";
 import { useEffect, useRef, useState } from "react";
 import { Coins } from "lucide-react";
 import { api, formatTokens, subscribe, type Price, type PriceInfo, type Project, type ProjectUsage } from "./api";
@@ -32,7 +33,8 @@ export function useProjectUsage(projectId: string): ProjectUsage | null {
 /** Sidebar footer: everything the project's agents used, and what it probably cost. */
 export function UsageLine({ project, onOpen }: { project: Project; onOpen: () => void }) {
   const usage = useProjectUsage(project.id);
-  if (!usage || usage.tokens === 0) return null;
+  const shown = useCostsShown();
+  if (!shown || !usage || usage.tokens === 0) return null;
   const detail = usage.agents
     .filter((a) => a.tokens > 0)
     .map((a) => `${a.name}: ${formatTokens(a.tokens)}${a.cost > 0 ? ` · ≈ ${usd(a.cost)}` : ""}`)
@@ -49,6 +51,9 @@ export function UsageLine({ project, onOpen }: { project: Project; onOpen: () =>
 /** Project settings: usage per agent and model, with the estimate. */
 export function UsageSection({ project }: { project: Project }) {
   const usage = useProjectUsage(project.id);
+  const shown = useCostsShown();
+  const tokens = (n: number) => (shown ? formatTokens(n) : MASK);
+  const money = (n: number) => (shown ? usd(n) : MASK);
   return (
     <section className="section" id="usage">
       <div className="section-head">
@@ -57,12 +62,13 @@ export function UsageSection({ project }: { project: Project }) {
           <p>
             Tokens used by every agent of this project, including stopped ones and earlier sessions. The cost is an estimate from the
             prices in Settings → Model prices.
+            {!shown && " Hidden: turn on Show costs and token counts in Settings to see them."}
           </p>
         </div>
         {usage && usage.tokens > 0 && (
           <div className="usage-total">
-            <strong className="tnum">{usage.cost > 0 ? `≈ ${usd(usage.cost)}` : "—"}</strong>
-            <span className="subtle small tnum">{formatTokens(usage.tokens)} tokens</span>
+            <strong className="tnum">{usage.cost > 0 ? `≈ ${money(usage.cost)}` : "—"}</strong>
+            <span className="subtle small tnum">{tokens(usage.tokens)} tokens</span>
           </div>
         )}
       </div>
@@ -90,11 +96,11 @@ export function UsageSection({ project }: { project: Project }) {
                   <tr key={`${a.id}-${m.model}`} className={a.status === "stopped" ? "muted" : ""}>
                     <td>{i === 0 ? `${a.name}${a.status === "stopped" ? " (stopped)" : ""}${a.sessions > 1 ? ` · ${a.sessions} sessions` : ""}` : ""}</td>
                     <td className="mono small">{m.model}</td>
-                    <td className="num tnum">{formatTokens(m.usage.input)}</td>
-                    <td className="num tnum">{formatTokens(m.usage.output + m.usage.reasoning)}</td>
-                    <td className="num tnum">{formatTokens(m.usage.cacheRead)}</td>
-                    <td className="num tnum">{formatTokens(m.usage.cacheWrite)}</td>
-                    <td className="num tnum">{m.cost === null ? "no price" : usd(m.cost)}</td>
+                    <td className="num tnum">{tokens(m.usage.input)}</td>
+                    <td className="num tnum">{tokens(m.usage.output + m.usage.reasoning)}</td>
+                    <td className="num tnum">{tokens(m.usage.cacheRead)}</td>
+                    <td className="num tnum">{tokens(m.usage.cacheWrite)}</td>
+                    <td className="num tnum">{m.cost === null ? "no price" : money(m.cost)}</td>
                   </tr>
                 )),
               )}
@@ -102,11 +108,11 @@ export function UsageSection({ project }: { project: Project }) {
             <tfoot>
               <tr>
                 <td colSpan={2}>Total</td>
-                <td className="num tnum">{formatTokens(usage.total.input)}</td>
-                <td className="num tnum">{formatTokens(usage.total.output + usage.total.reasoning)}</td>
-                <td className="num tnum">{formatTokens(usage.total.cacheRead)}</td>
-                <td className="num tnum">{formatTokens(usage.total.cacheWrite)}</td>
-                <td className="num tnum">{usd(usage.cost)}</td>
+                <td className="num tnum">{tokens(usage.total.input)}</td>
+                <td className="num tnum">{tokens(usage.total.output + usage.total.reasoning)}</td>
+                <td className="num tnum">{tokens(usage.total.cacheRead)}</td>
+                <td className="num tnum">{tokens(usage.total.cacheWrite)}</td>
+                <td className="num tnum">{money(usage.cost)}</td>
               </tr>
             </tfoot>
           </table>
@@ -230,3 +236,27 @@ function PriceRow({ model, info, onSaved }: { model: string; info: PriceInfo; on
   );
 }
 
+
+/** Settings: whether costs and token counts are shown at all (hidden by default, in this browser). */
+export function CostsSection() {
+  const shown = useCostsShown();
+  return (
+    <section className="section">
+      <div className="section-head">
+        <div>
+          <h2>Costs and tokens</h2>
+          <p>
+            What projects spend and how many tokens they use: hidden unless you turn it on, so people passing by don't see it. The
+            choice is kept in this browser, so other computers and phones start hidden too.
+          </p>
+        </div>
+      </div>
+      <div className="section-body" style={{ padding: "10px 16px 14px" }}>
+        <label className="check">
+          <input type="checkbox" checked={shown} onChange={(e) => setCostsShown(e.target.checked)} />
+          Show costs and token counts
+        </label>
+      </div>
+    </section>
+  );
+}

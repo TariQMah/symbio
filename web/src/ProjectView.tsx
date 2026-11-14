@@ -18,6 +18,7 @@ import {
   Plus,
 } from "lucide-react";
 import { UsageLine } from "./Usage";
+import { useCostsShown } from "./privacy";
 import { api, formatTokens, subscribe, usageTokens, type Agent, type Asset, type Plan, type Project } from "./api";
 import { Chat } from "./Chat";
 import { Docs } from "./Docs";
@@ -354,6 +355,7 @@ export function ProjectView({ projectId }: { projectId: string }) {
 }
 
 function AgentRow({ agent: a, active, onClick }: { agent: Agent; active: boolean; onClick: () => void }) {
+  const costs = useCostsShown();
   const sub = a.problem ? "Needs attention" : a.status === "idle" ? (a.purpose ?? (a.role === "coordinator" ? "Coordinates the team" : "Idle")) : statusText(a.status);
   const subClass = a.problem ? "problem" : a.status === "busy" ? "working" : a.status === "waiting" ? "waiting" : "";
   return (
@@ -364,7 +366,7 @@ function AgentRow({ agent: a, active, onClick }: { agent: Agent; active: boolean
       exit={{ opacity: 0 }}
       className={`agent-row ${active ? "active" : ""}`}
       onClick={onClick}
-      title={[a.purpose, a.model, a.usage && `${formatTokens(usageTokens(a.usage))} tokens`].filter(Boolean).join("\n")}
+      title={[a.purpose, a.model, costs && a.usage && `${formatTokens(usageTokens(a.usage))} tokens`].filter(Boolean).join("\n")}
     >
       <Avatar name={a.name} status={a.problem ? "error" : a.status} />
       <span className="grow">
