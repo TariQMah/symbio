@@ -4,7 +4,8 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { bus, type UiEvent } from "./bus.js";
 import type { OpencodeRuntime } from "./opencode/runtime.js";
-import type { RuntimeKind } from "./runtime/types.js";
+import type { AgentRuntime, RuntimeKind } from "./runtime/types.js";
+import { CopilotRuntime } from "./copilot/runtime.js";
 import type { CoreMode, ReviewBy, Store, Project, DocsLocation, HelperWorkspace, ProjectConnection } from "./store.js";
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
@@ -125,19 +126,54 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   api.get("/runtime", (c) => c.json(runtimeInfo()));
 
-  // Every agent runtime Symbio can use, for choosing one (a project's runtime).
-  api.get("/runtimes", (c) =>
-    c.json(
-      [...team.runtimes.values()].map((r) => ({
-        kind: r.kind,
-        label: r.label,
-        state: r.state,
-        version: r.version,
-        error: r.lastError,
-        login: (r as { login?: string | null }).login ?? null,
-      })),
-    ),
-  );
+  // Every agent runtime Symbio can use, for choosing one (a project's runtime), and Copilot's sign-in.
+  const runtimeView = (r: AgentRuntime) => {
+    const copilot = r instanceof CopilotRuntime ? r : null;
+    return {
+      kind: r.kind,
+      label: r.label,
+      state: r.state,
+      version: r.version,
+      error: r.lastError,
+      login: copilot?.login ?? null,
+      signIn: copilot?.pendingSignIn ?? null,
+      signInError: copilot?.signInError ?? null,
+    };
+  };
+  api.get("/runtimes", (c) => c.json([...team.runtimes.values()].map(runtimeView)));
+
+  const copilotRuntime = () => {
+    const r = team.runtimes.get("copilot");
+    if (!(r instanceof CopilotRuntime)) throw new HttpError(404, "GitHub Copilot CLI isn't available in this Symbio.");
+    return r;
+  };
+  // Starts Copilot (it otherwise starts with the first project that uses it) and reads its sign-in.
+  api.post("/runtimes/copilot/check", async (c) => {
+    const r = copilotRuntime();
+    try {
+      await team.runtimeFor({ runtime: "copilot" });
+      await r.checkLogin();
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 503);
+    }
+    return c.json(runtimeView(r));
+  });
+  // Signing in to GitHub with a device code: the code to enter on GitHub; it completes in the background.
+  api.post("/runtimes/copilot/sign-in", async (c) => {
+    const r = copilotRuntime();
+    try {
+      await team.runtimeFor({ runtime: "copilot" });
+      await r.beginSignIn();
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    return c.json(runtimeView(r));
+  });
+  api.delete("/runtimes/copilot/sign-in", async (c) => {
+    const r = copilotRuntime();
+    await r.cancelSignIn();
+    return c.json(runtimeView(r));
+  });
 
   api.post("/runtime/restart", async (c) => {
     await runtime.restart();

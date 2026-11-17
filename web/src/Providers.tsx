@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { ArrowLeft, Bot, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
-import { api, type ConnectedProvider, type OauthAttempt, type ProviderCatalogEntry, type ProviderFormField } from "./api";
+import { ArrowLeft, Bot, ExternalLink, Loader2, LogIn, Plus, Search, SquareTerminal, Trash2 } from "lucide-react";
+import { api, type ConnectedProvider, type OauthAttempt, type ProviderCatalogEntry, type ProviderFormField, type RuntimeView } from "./api";
 import { Dialog } from "./ui";
 
 /** Settings section: the model providers OpenCode is connected to. */
@@ -99,6 +99,119 @@ export function ProvidersSection() {
           />
         )}
       </AnimatePresence>
+    </section>
+  );
+}
+
+/**
+ * Settings section: GitHub Copilot CLI, the other runtime agents can run on. Shows who it's signed in
+ * as, and signs in with a device code (enter the code on GitHub; Symbio waits for the approval).
+ */
+export function CopilotSection() {
+  const [view, setView] = useState<RuntimeView | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = () =>
+    api
+      .runtimes()
+      .then((list) => setView(list.find((r) => r.kind === "copilot") ?? null))
+      .catch((e) => setError(e.message));
+  useEffect(() => {
+    void load();
+  }, []);
+  // While a sign-in waits for the human's approval on GitHub, watch for it to complete.
+  useEffect(() => {
+    if (!view?.signIn) return;
+    const timer = setInterval(() => void load(), 2000);
+    return () => clearInterval(timer);
+  }, [view?.signIn?.userCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const run = async (action: () => Promise<RuntimeView>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setView(await action());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!view) return null;
+  const running = view.state === "running";
+  return (
+    <section className="section copilot-section">
+      <div className="section-head">
+        <div>
+          <h2>GitHub Copilot CLI</h2>
+          <p>
+            A project's agents can run on GitHub Copilot CLI instead of OpenCode (chosen in New project), with your Copilot subscription and
+            its models. Symbio keeps their sessions apart from your own Copilot history.
+          </p>
+        </div>
+      </div>
+      <div className="section-body">
+        <div className="list-row">
+          <span className="conn-icon">
+            <SquareTerminal size={16} />
+          </span>
+          <div className="grow">
+            {!running ? (
+              <>
+                <div className="list-title">Not started</div>
+                <div className="list-sub">It starts when a project uses it.</div>
+              </>
+            ) : view.login ? (
+              <>
+                <div className="list-title copilot-login">
+                  <span className="dot busy" /> Signed in as {view.login}
+                </div>
+                <div className="list-sub">{view.version ? `Copilot CLI ${view.version}` : ""}</div>
+              </>
+            ) : (
+              <>
+                <div className="list-title">Not signed in</div>
+                <div className="list-sub">Sign in with the GitHub account that has your Copilot subscription.</div>
+              </>
+            )}
+          </div>
+          {!running ? (
+            <button className="btn sm" onClick={() => run(api.checkCopilot)} disabled={busy}>
+              {busy ? "Starting…" : "Check sign-in"}
+            </button>
+          ) : !view.login && !view.signIn ? (
+            <button className="btn sm primary" onClick={() => run(api.copilotSignIn)} disabled={busy}>
+              <LogIn size={13} />
+              {busy ? "Starting…" : "Sign in with GitHub"}
+            </button>
+          ) : null}
+        </div>
+        {view.signIn && (
+          <div className="sign-in-code">
+            <div className="small">On GitHub, enter this code:</div>
+            <code className="device-code">{view.signIn.userCode}</code>
+            <div className="row" style={{ gap: 8 }}>
+              <a className="btn sm primary" href={view.signIn.verificationUri} target="_blank" rel="noreferrer">
+                <ExternalLink size={13} />
+                Open GitHub
+              </a>
+              <button className="btn sm ghost" onClick={() => run(api.cancelCopilotSignIn)} disabled={busy}>
+                Cancel
+              </button>
+              <span className="subtle small row" style={{ gap: 6 }}>
+                <Loader2 size={13} className="spin" /> Waiting for your approval on GitHub…
+              </span>
+            </div>
+          </div>
+        )}
+        {(error || view.signInError) && (
+          <div style={{ padding: "0 12px 12px" }}>
+            <div className="error">{error ?? view.signInError}</div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

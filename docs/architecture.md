@@ -142,7 +142,7 @@ costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
 
 ## Reliability
 
-- **Supervisor.** If `opencode serve` exits, Symbio restarts it, re-registers tools and briefs, and
+- **Supervisor.** If `opencode serve` (or the Copilot runtime) exits, Symbio restarts it, re-registers tools and briefs, and
   tells each agent that was working to continue.
 - **Tool re-registration.** OpenCode unloads a folder's services after a while idle, which drops
   in-memory MCP registrations. Before starting any agent's turn, Symbio checks the folder still
@@ -154,7 +154,7 @@ costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
   every allowed model except the core-only ones) and is told why. Retries count: four failed retries, or two
   when they timed out (each timeout already costs minutes of waiting). If every allowed model failed recently,
   the agent stops with a visible problem; adding a model resumes it.
-- **Memory recycling.** OpenCode's memory is measured (the whole process tree). Above
+- **Memory recycling.** Each runtime's memory is measured (the whole process tree). Above
   `SYMBIO_RECYCLE_MB` it is restarted once every agent is idle; above `SYMBIO_RECYCLE_HARD_MB` it
   is restarted anyway and agents resume.
 - **Loop guard.** Conversational messages between the same two agents are limited per 30 minutes

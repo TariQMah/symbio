@@ -70,9 +70,11 @@ its own permission rules. The server exits when Symbio does.
 Projects can run their agents on GitHub Copilot CLI instead of OpenCode. Symbio starts it through the
 Copilot SDK over stdio (no network port), with its own data folder (`~/.symbio/copilot`), signed in
 with the user's own GitHub login: Symbio points that folder at the login in `~/.copilot/config.json`;
-the token stays in the OS credential store and is never copied. Copilot asks its host before every
-tool call, so the rules below are applied by Symbio itself (`guard.ts`'s `evaluate`) for each shell
-command, file write and read, the same rules as for OpenCode.
+the token stays in the OS credential store and is never copied; or the human signs in from Settings
+with a GitHub device code. Copilot asks its host before running commands and writing files, so the
+rules below are applied by Symbio itself (`guard.ts`'s `evaluate`); reads inside the working folder
+don't ask, so Symbio checks every file read in a hook that runs before each tool. The same rules as
+for OpenCode.
 
 ## What agents can't do
 

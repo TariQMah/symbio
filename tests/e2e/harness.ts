@@ -64,8 +64,15 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
 
   const base = `http://127.0.0.1:${port}`;
   const tokenFile = path.join(root, "home", "ui-token");
-  await until("Symbio to start", () => existsSync(tokenFile), 30_000, () => log);
-  const token = readFileSync(tokenFile, "utf8").trim();
+  // A started Symbio that never answers would keep the test file from ending: stop it.
+  const fail = (err: unknown) => {
+    if (proc.exitCode === null) proc.kill();
+    throw err;
+  };
+  // The file can exist a moment before the key is written into it.
+  const readToken = () => (existsSync(tokenFile) ? readFileSync(tokenFile, "utf8").trim() : "");
+  await until("Symbio to start", () => readToken() !== "", 30_000, () => log).catch(fail);
+  const token = readToken();
   const call = async (method: string, route: string, body?: unknown) => {
     const res = await fetch(`${base}/api${route}`, {
       method,
@@ -76,7 +83,7 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
     if (!res.ok) throw new Error(`${method} ${route} → ${res.status}: ${JSON.stringify(data)}`);
     return data;
   };
-  await until("OpenCode (stand-in) to run", async () => (await call("GET", "/runtime").catch(() => null))?.state === "running", 30_000, () => log);
+  await until("OpenCode (stand-in) to run", async () => (await call("GET", "/runtime").catch(() => null))?.state === "running", 30_000, () => log).catch(fail);
 
   return {
     base,

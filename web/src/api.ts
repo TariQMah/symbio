@@ -275,6 +275,19 @@ export interface RuntimeInfo {
   memoryMB?: number | null;
 }
 
+/** An agent runtime as Settings shows it (GET /runtimes), with GitHub Copilot's sign-in. */
+export interface RuntimeView {
+  kind: RuntimeKind;
+  label: string;
+  state: RuntimeInfo["state"];
+  version: string | null;
+  error: string | null;
+  login: string | null;
+  /** A GitHub sign-in in progress: the code to enter on GitHub. */
+  signIn: { userCode: string; verificationUri: string; expiresAt: number } | null;
+  signInError: string | null;
+}
+
 export type UiEvent =
   | ({ type: "runtime" } & RuntimeInfo)
   | { type: "project.updated"; projectId: string }
@@ -556,6 +569,10 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   runtime: () => call<RuntimeInfo>("GET", "/runtime"),
+  runtimes: () => call<RuntimeView[]>("GET", "/runtimes"),
+  checkCopilot: () => call<RuntimeView>("POST", "/runtimes/copilot/check"),
+  copilotSignIn: () => call<RuntimeView>("POST", "/runtimes/copilot/sign-in"),
+  cancelCopilotSignIn: () => call<RuntimeView>("DELETE", "/runtimes/copilot/sign-in"),
   models: (runtime?: RuntimeKind) => call<ModelInfo[]>("GET", `/models${runtime ? `?runtime=${runtime}` : ""}`),
   projects: () => call<Project[]>("GET", "/projects"),
   project: (id: string) => call<Project>("GET", `/projects/${id}`),

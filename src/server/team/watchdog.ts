@@ -1,8 +1,8 @@
 // Recovering from hangs and restarts: agents silent for too long are interrupted and told why;
-// OpenCode is restarted before its memory makes it crash; agents interrupted by a crash or
-// restart are woken once OpenCode is back.
+// a runtime (OpenCode, Copilot) is restarted before its memory makes it crash; agents interrupted by
+// a crash or restart are woken once their runtime is back.
 
-import { runtimeOf, type RuntimeKind } from "../runtime/types.js";
+import { runtimeOf, type AgentRuntime, type RuntimeKind } from "../runtime/types.js";
 import type { Agent, Project } from "../store.js";
 import { active, type TeamCore } from "./core.js";
 
@@ -17,7 +17,7 @@ export class Watchdog {
   private stuckTimer: NodeJS.Timeout | null = null;
   private memoryTimer: NodeJS.Timeout | null = null;
   private recycling = false;
-  private lastRecycle = 0;
+  private lastRecycle = new Map<RuntimeKind, number>();
   /** Agents to wake once OpenCode is running again, and why they stopped. */
   private interrupted = new Map<string, { reason: string; wasWaiting: boolean; kind: RuntimeKind }>();
 
@@ -75,36 +75,43 @@ export class Watchdog {
   }
 
   /**
-   * OpenCode's memory grows over long sessions until it crashes. Restart it before that: above
-   * the soft limit only when every agent is idle (nobody notices); above the hard limit regardless
-   * (interrupted agents are told to continue).
+   * A runtime's memory grows over long sessions until it crashes (seen with OpenCode). Restart it
+   * before that: above the soft limit only when every agent on it is idle (nobody notices); above the
+   * hard limit regardless (interrupted agents are told to continue).
    */
   private async checkMemory() {
-    const runtime = this.team.runtime;
-    if (runtime.state !== "running" || this.recycling) return;
+    if (this.recycling) return;
+    for (const runtime of this.team.runtimes.values()) {
+      if (runtime.state === "running") await this.checkRuntimeMemory(runtime);
+    }
+  }
+
+  private async checkRuntimeMemory(runtime: AgentRuntime) {
     const bytes = await runtime.memoryUsage();
     if (!bytes) return;
     const mb = Math.round(bytes / 1024 / 1024);
-    const everyoneIdle = this.team.store.list().every((p) => p.agents.every((a) => a.status === "idle" || a.status === "stopped" || a.status === "error"));
+    const onIt = (a: Agent) => runtimeOf(a) === runtime.kind;
+    const projects = this.team.store.list().filter((p) => p.agents.some((a) => onIt(a) && a.status !== "stopped"));
+    const everyoneIdle = projects.every((p) => p.agents.filter(onIt).every((a) => a.status === "idle" || a.status === "stopped" || a.status === "error"));
     const quiet = everyoneIdle && this.openPermissions() === 0 && this.team.pendingQuestion.size === 0;
-    // Quiet restarts at most every 10 minutes, in case the limit is set below OpenCode's baseline.
-    const softAllowed = Date.now() - this.lastRecycle > 10 * 60_000;
+    // Quiet restarts at most every 10 minutes, in case the limit is set below the runtime's baseline.
+    const softAllowed = Date.now() - (this.lastRecycle.get(runtime.kind) ?? 0) > 10 * 60_000;
     const reason = mb >= MEMORY_HARD_MB ? "hard" : mb >= MEMORY_SOFT_MB && quiet && softAllowed ? "soft" : null;
     if (!reason) return;
     this.recycling = true;
-    this.lastRecycle = Date.now();
-    console.warn(`[recycle] OpenCode uses ${mb} MB (${reason} limit) — restarting it`);
+    this.lastRecycle.set(runtime.kind, Date.now());
+    console.warn(`[recycle] ${runtime.label} uses ${mb} MB (${reason} limit) — restarting it`);
     try {
       await runtime.restart(); // stopped → markInterrupted; running → refresh → recover
-      for (const project of this.team.store.list().filter((p) => p.agents.some((a) => a.status !== "stopped"))) {
+      for (const project of projects) {
         await this.team.log(project, {
           from: "symbio",
           to: "human",
           kind: "system",
           text:
             reason === "soft"
-              ? `Restarted OpenCode while everyone was idle to free memory (it was using ${mb} MB).`
-              : `OpenCode was using ${mb} MB, close to crashing, so it was restarted. Agents that were working were told to continue.`,
+              ? `Restarted ${runtime.label} while everyone was idle to free memory (it was using ${mb} MB).`
+              : `${runtime.label} was using ${mb} MB, close to crashing, so it was restarted. Agents that were working were told to continue.`,
         });
       }
     } catch (err) {

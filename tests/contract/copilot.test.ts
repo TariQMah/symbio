@@ -75,6 +75,19 @@ test("the runtime starts, signed in, and lists models with their prices", async 
   assert.ok(models.length > 0);
   assert.ok(models.every((m) => m.providerID === "copilot" && m.id && m.id !== "auto"));
   assert.ok(models.some((m) => m.raw?.billing?.tokenPrices), "models carry token prices");
+  const priced = models.find((m) => m.raw?.cost);
+  assert.ok(priced && priced.raw.cost.input > 0 && priced.raw.cost.input < 100, "prices in dollars per million tokens");
+});
+
+test("signing in starts a GitHub device-code flow, and can be cancelled", async (t) => {
+  if (skip) return t.skip(skip);
+  const code = await runtime.beginSignIn();
+  assert.match(code.userCode, /^\w{4}-\w{4}$/);
+  assert.match(code.verificationUri, /^https:\/\/github\.com\/login\/device/);
+  assert.equal(runtime.pendingSignIn?.userCode, code.userCode);
+  await runtime.cancelSignIn();
+  assert.equal(runtime.pendingSignIn, null);
+  assert.ok(await runtime.checkLogin(), "still signed in");
 });
 
 test("a session in its folder: a turn on a missing model fails at once, as Symbio expects", async (t) => {
@@ -104,6 +117,7 @@ test("queue, changes, usage and model switches answer on a live session", async 
   assert.deepEqual(await runtime.queued(id), []);
   assert.equal(await runtime.cancelQueued(id, promptId!), false, "already delivered");
   assert.ok(Array.isArray(await runtime.changes(id, promptId!, promptId!)));
+  assert.deepEqual(await runtime.shells(work), [], "background processes (none here)");
   const usage = await runtime.sessionUsage(id);
   assert.ok(usage && typeof usage.input === "number");
   const [model] = await runtime.listModels();

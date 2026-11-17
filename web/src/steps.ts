@@ -31,7 +31,8 @@ export const fileName = (p: unknown) => s(p).replace(/^["']|["']$/g, "").split(/
 
 /** One step → its label(s). A code-mode step that called several tools gets one label per call. */
 export function stepLabels(name: string, input: unknown, calls?: ToolCall[]): StepLabel[] {
-  const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  // Some tools take plain text (Copilot's apply_patch takes the patch itself).
+  const i = (input && typeof input === "object" ? input : typeof input === "string" ? { patch: input } : {}) as Record<string, unknown>;
   if (name === "execute" || typeof i.code === "string") {
     const list = calls?.length ? calls : callsFromCode(s(i.code));
     if (list.length) return list.map((c) => toolLabel(c.tool.replace(/^symbio\./, ""), c.input ?? {}));
@@ -146,16 +147,19 @@ function toolLabel(tool: string, i: Record<string, unknown>): StepLabel {
       const method = s(i.method).toUpperCase() || "GET";
       return { label: `${tool === "github_api" ? "GitHub" : "Azure DevOps"}: ${method === "GET" ? "looked up" : "changed"} ${firstLine(i.path, 60)}`, weight: method === "GET" ? 1 : 3 };
     }
-    // OpenCode's own tools
+    // The runtimes' own tools (OpenCode's, and GitHub Copilot CLI's: view, create, str_replace…)
     case "read":
+    case "view":
       return { label: `Read ${fileName(i.path ?? i.filePath)}`, weight: 1 };
     case "write":
+    case "create":
       return { label: `Wrote ${fileName(i.path ?? i.filePath)}`, weight: 3 };
     case "edit":
     case "multiedit":
     case "patch":
+    case "str_replace":
     case "apply_patch":
-      return { label: `Edited ${fileName(i.path ?? i.filePath) || "files"}`, weight: 3 };
+      return { label: `Edited ${fileName(i.path ?? i.filePath ?? patchedFile(i)) || "files"}`, weight: 3 };
     case "grep":
     case "search":
       return { label: `Searched for "${firstLine(i.pattern ?? i.query, 50)}"`, weight: 1 };
@@ -179,9 +183,18 @@ function toolLabel(tool: string, i: Record<string, unknown>): StepLabel {
     case "bash":
     case "powershell":
       return commandLabel(s(i.command));
+    case "read_powershell":
+    case "read_bash":
+      return { label: "Checked a running command", weight: 1 };
     default:
       return { label: tool.replace(/_/g, " "), weight: 2 };
   }
+}
+
+/** Copilot's apply_patch takes the patch itself as its input: the first file it touches. */
+function patchedFile(input: Record<string, unknown>): string {
+  const text = typeof input.patch === "string" ? input.patch : "";
+  return text.match(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/m)?.[1]?.trim() ?? "";
 }
 
 function host(url: string): string {

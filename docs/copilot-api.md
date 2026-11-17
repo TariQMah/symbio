@@ -83,6 +83,12 @@ Per-session MCP servers: `mcpServers: { symbio: { type: "http", url, headers, to
 Tool calls carry `_meta["com.github.copilot/toolCallId"]` but **not the session**, so Symbio gives
 each session its own header (or URL) to know who is calling. The headers arrived on every call.
 
+## Instructions
+
+`AGENTS.md` in the working folder is loaded as instructions by itself:
+`session.rpc.instructions.getSources()` lists it (`{ id: "model-agents-md", sourcePath: "AGENTS.md",
+type: "model", location: "repository" }`).
+
 ## Permissions and questions
 
 - `onPermissionRequest(request)` is called before each tool runs, with `kind` (`shell`, `write`,
@@ -91,7 +97,30 @@ each session its own header (or URL) to know who is calling. The headers arrived
   `{ kind: "reject", feedback }` refuses it, and the model sees the feedback ("The user rejected
   this tool call. User feedback: …") and acts on it. So Symbio applies its own rules (`guard.ts`)
   here and holds "ask" ones for the human.
+- **Reading a file inside the working folder doesn't ask** (no permission request for the `view`
+  tool there). The `hooks.onPreToolUse(input)` hook runs before every tool, with `toolName`,
+  `toolArgs` (`view`: `{ path }`, absolute) and `toolCallId`; returning `{ permissionDecision: "deny",
+  permissionDecisionReason }` refuses it, and the model sees the reason (it then said to use
+  `view_image`). Symbio applies its read rules (secrets, images, PDFs) there.
 - `onUserInputRequest({ question, choices, allowFreeform })` → `{ answer, wasFreeform }`.
+
+## Background processes
+
+A long command can run in the background (the agent asks for it, or Copilot moves it there).
+`session.rpc.tasks.list()` → `{ tasks: [{ type: "shell", id: "0", command, description, status:
+"running", attachmentMode: "detached", pid, startedAt, logPath }] }` (ids are per session);
+`session.rpc.tasks.cancel({ id })` → `{ cancelled: true }`, and the process is gone (checked with
+`tasklist`). Symbio's `list_processes` / `stop_process` use these.
+
+## Signing in
+
+`session.rpc.accounts.login.begin({ kind: "githubDotCom", method: "device-code" })` →
+`{ flowId, step: { kind: "device-code", userCode: "XXXX-XXXX", verificationUri:
+"https://github.com/login/device", expiresIn, interval } }`; `advance({ flowId })` returns once the
+user has authorized the device (`{ kind: "completed", result: { status, login } }`), and
+`cancel({ flowId })` ends it. It needs a session, but works signed out (a scratch session, no
+model). `method: "web"` gives an `open-url` step instead. Symbio's Settings → GitHub Copilot CLI uses
+the device code.
 
 ## Usage and cost
 
@@ -99,6 +128,10 @@ each session its own header (or URL) to know who is calling. The headers arrived
   tokenDetails: { input, cache_read, cache_write, output }, modelMetrics: { <model>: { requests:
   { count, cost }, usage } }, codeChanges }`. After 7 prompts: `totalUserRequests: 7`,
   `totalPremiumRequestCost: 7`: every prompt Symbio sends counts as a request.
+- `listModels()` gives each model's `billing.tokenPrices` in **AI credits per million tokens**
+  (1 AI credit = $0.01, docs.github.com → Models and pricing for GitHub Copilot: GPT-6 Luna's
+  `inputPrice: 10` is $0.10). Checked against a session's `totalNanoAiu`: tokens × price × 1000.
+  Symbio shows them as dollars per million tokens, like OpenCode's prices.
 
 ## Changes
 
@@ -135,9 +168,13 @@ only, so it costs nothing.
 | Questions to the human | `onUserInputRequest` → a form with one `answer` field |
 | Events and history | translated into OpenCode's vocabulary (`runtime/types.ts`); a quick turn's events wait until the prompt call has returned |
 | A task's changes | the session's diff, kept to the files the task's turns edited (`fileEdits` of edit steps) |
-| Signing in | its own `COPILOT_HOME` (given by Symbio) pointed at the user's GitHub login |
+| Signing in | its own `COPILOT_HOME` (given by Symbio) pointed at the user's GitHub login, or a device-code sign-in from Settings |
+| Read rules | the `onPreToolUse` hook for `view` (and `read`, `read_file`) |
+| Background processes | `rpc.tasks.list` / `rpc.tasks.cancel`, ids `<session>:<task>` |
+| Prices | `billing.tokenPrices` / 100, as dollars per million tokens |
+| Briefs | Symbio's tools named as Copilot shows them (`symbio-<name>`) |
 
-Not there yet: background processes (`list_processes` / `stop_process` return nothing), memory
-measurement (the SDK doesn't give the process id), prices from Copilot's model list, signing in from
-Symbio (today: `copilot login` in a terminal), and briefs worded for Copilot (they describe
-OpenCode's code mode).
+| Memory, crashes | the runtime process (`copilot-runtime.exe --headless --stdio`, the client's `cliProcess`, not public API) measured like OpenCode's and recycled by the watchdog; `processExitPromise` marks it crashed and starts it again |
+
+Verified live: killing the runtime process (by its PID) → crashed → started again (`restarts: 1`,
+a new process); about 50 MB when idle.

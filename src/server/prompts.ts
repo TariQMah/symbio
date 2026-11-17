@@ -6,6 +6,7 @@ import path from "node:path";
 import { docsPaths } from "./docs.js";
 import { PROCESS_RULES } from "./guard.js";
 import { listRepositories, projectRepositoriesSync } from "./repos.js";
+import { runtimeOf, type RuntimeKind } from "./runtime/types.js";
 import { modelsFor, type Agent, type CoreMode, type Project } from "./store.js";
 
 // Seen live: a coordinator read eight 2–4 MB images, its conversation reached 25 MB and the
@@ -20,15 +21,25 @@ const KEEP_CONVERSATION_SMALL = `- Keep your conversation small: whatever you re
   them with the tools above. They're kept in the project, so you can come back
   to them later.`;
 
-// OpenCode's code mode posts "tool catalog changed" notices that list only its own tools and
-// say the catalog is complete; Symbio's tools still work (seen live: a coordinator kept using
-// them after such a notice, another gave up without trying).
-const FINDING_TOOLS = `These tools come from the "symbio" tool server. In OpenCode's code mode you call
+/**
+ * Where Symbio's tools are, in the runtime's own terms. OpenCode's code mode posts "tool catalog
+ * changed" notices that list only its own tools and say the catalog is complete; Symbio's tools
+ * still work (seen live: a coordinator kept using them after such a notice, another gave up without
+ * trying). GitHub Copilot CLI lists them as "symbio-<name>" (docs/copilot-api.md).
+ */
+function findingTools(runtime: RuntimeKind): string {
+  if (runtime === "copilot") {
+    return `These tools come from the "symbio" tool server; in your tool list they are named
+\`symbio-<name>\` (\`symbio-send_message\`, \`symbio-update_task\`…). Never conclude they
+are gone without calling one; if a call really fails, tell the human what the error said.`;
+  }
+  return `These tools come from the "symbio" tool server. In OpenCode's code mode you call
 them inside \`execute\` as \`tools.symbio.<name>(…)\`, and \`search({ namespace: "symbio" })\`
 finds them. OpenCode's tool catalog notices may list only its own tools, even
 when they say the catalog is complete: Symbio's tools are still there. Never
 conclude they are gone without calling one; if a call really fails, tell the
 human what the error said.`;
+}
 
 export function coordinatorBrief(project: Project, connections = ""): string {
   return `# You are "core", the coordinator of a Symbio project
@@ -122,10 +133,10 @@ ${helperFolders(project)}
   chat, played or displayed in place, or with a download button. Paths of project
   files you mention in replies become links to them, so write them out in full.
 
-${FINDING_TOOLS}
+${findingTools(project.runtime ?? "opencode")}
 
-Team members are created with \`spawn_agent\` only. OpenCode's built-in subagent
-tool is fine for quick, read-only lookups, but never use it to do project work:
+Team members are created with \`spawn_agent\` only. Your built-in sub-agent tool
+is fine for quick, read-only lookups, but never use it to do project work:
 Symbio can't see, coordinate or merge what built-in subagents do.
 
 Messages from other agents arrive in your conversation starting with
@@ -368,8 +379,8 @@ docs to every agent automatically.`;
 Keep documentation that helps agents (and humans) work on this project:
 
 - ${entry} — the short entry point: what the project is, goals, conventions,
-  how things are organized, where to find more. OpenCode loads AGENTS.md into
-  every agent automatically, so keep it short, accurate and current.
+  how things are organized, where to find more. Every agent gets AGENTS.md
+  automatically, so keep it short, accurate and current.
 - ${folder} — details: an overview, decisions and their reasons, how-tos.
 
 If these already exist, extend them; don't delete or rewrite content others
@@ -451,7 +462,7 @@ page), share it with \`share_file\`: it shows in the chat, instead of a path the
 must go and find. Paths of project files in your guides and reports become links,
 so write them out (relative to your working folder or absolute).
 
-${FINDING_TOOLS}
+${findingTools(runtimeOf(agent))}
 
 Tasks from the plan arrive as "Task T3: …". When you finish one, ${isolated ? "commit and " : ""}call
 \`update_task("T3", "review", <summary of what you did>)\` — that **is** your

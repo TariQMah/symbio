@@ -931,3 +931,7 @@ tr.file-view-target > td, tr.file-view-target > th { background: rgba(212, 160, 
 /* New project: which runtime the agents run on, side by side. */
 .runtime-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 @media (max-width: 640px) { .runtime-choice { grid-template-columns: 1fr; } }
+/* Settings → GitHub Copilot CLI: signing in with a device code. */
+.copilot-login { display: inline-flex; align-items: center; gap: 8px; }
+.sign-in-code { display: flex; flex-direction: column; gap: 8px; padding: 4px 12px 12px 56px; }
+.device-code { font-size: 22px; letter-spacing: 3px; color: var(--text); }

@@ -14,6 +14,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { emptyUsage, type Usage } from "../costs.js";
 import { evaluate, type PermissionRule } from "../guard.js";
+import { processTreeMemory } from "../opencode/runtime.js";
 import type {
   AgentRuntime,
   BackgroundShell,
@@ -28,7 +29,17 @@ import type {
 
 /** Models are stored as "<provider>/<id>"; Copilot's own ids have no provider. */
 export const COPILOT_PROVIDER = "copilot";
+const NOT_SIGNED_IN = "Not signed in to GitHub Copilot. Sign in from Settings → GitHub Copilot CLI.";
+
+/** A device code to enter on GitHub while signing in. */
+export interface SignInCode {
+  userCode: string;
+  verificationUri: string;
+  expiresAt: number;
+}
 const NOTES_OPEN = "<symbio-notes>";
+/** Copilot's file-reading tools, and where their path is (`toolArgs.path`, verified for `view`). */
+const READ_TOOLS = new Set(["view", "read", "read_file"]);
 const NOTES_CLOSE = "</symbio-notes>";
 
 // What Symbio uses of the SDK, so tests can stand in for it.
@@ -119,6 +130,12 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
   private toolsByFolder = new Map<string, string>();
   private questions = new Map<string, OpenQuestion>();
   private permissionRequests = new Map<string, OpenPermission>();
+  /** Tool calls whose read the pre-tool hook already let through. */
+  private readsDecided = new Set<string>();
+  /** A GitHub sign-in in progress (device code), and the scratch session it runs in. */
+  private signIn: { session: SdkSession; flowId: string; code: SignInCode } | null = null;
+  /** How the last sign-in ended, when it didn't work. */
+  signInError: string | null = null;
 
   /**
    * @param home Copilot's data folder for Symbio's sessions (COPILOT_HOME), kept apart from the
@@ -141,11 +158,10 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       seedLogin(this.home);
       const client = await this.factory({ baseDirectory: this.home });
       await client.start();
+      this.watchExit(client);
       this.version = (await client.getStatus().catch(() => ({}) as { version?: string })).version ?? null;
-      const auth = await client.getAuthStatus().catch(() => null);
-      this.login = auth?.isAuthenticated ? (auth.login ?? null) : null;
-      this.lastError = auth?.isAuthenticated ? null : "Not signed in to GitHub Copilot: run `copilot login` in a terminal, then restart the runtime.";
       this.client = client;
+      await this.checkLogin();
       this.setState("running");
     } catch (err) {
       this.lastError = (err as Error).message;
@@ -155,6 +171,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
   }
 
   async stop(): Promise<void> {
+    await this.cancelSignIn();
     const client = this.client;
     this.client = null;
     for (const { off, session } of this.open.values()) {
@@ -180,14 +197,68 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     this.emit("restarted");
   }
 
+  private recentCrashes: number[] = [];
+
+  /**
+   * If the runtime process dies on its own, sessions are gone from memory: mark it crashed (the team
+   * marks its agents interrupted) and start it again, backing off if it keeps dying, like OpenCode's.
+   */
+  private watchExit(client: SdkClient) {
+    const exited: Promise<unknown> | undefined = (client as any).processExitPromise;
+    if (!exited?.then) return;
+    void exited.then(
+      () => this.onExit(client),
+      () => this.onExit(client),
+    );
+  }
+
+  private onExit(client: SdkClient) {
+    if (this.client !== client || this.state !== "running") return; // stopped on purpose
+    this.client = null;
+    this.open.clear();
+    this.opening.clear();
+    for (const p of this.permissionRequests.values()) p.resolve({ kind: "user-not-available" });
+    this.permissionRequests.clear();
+    for (const q of this.questions.values()) q.resolve({ answer: "", wasFreeform: true });
+    this.questions.clear();
+    for (const s of this.sessions.values()) s.busy = false;
+    this.signIn = null;
+    this.lastError = "The GitHub Copilot CLI runtime exited.";
+    console.error(`[copilot] ${this.lastError}`);
+    this.setState("crashed");
+    const now = Date.now();
+    this.recentCrashes = [...this.recentCrashes.filter((t) => now - t < 5 * 60_000), now];
+    if (this.recentCrashes.length > 5) return;
+    setTimeout(() => {
+      if (this.state !== "crashed") return;
+      this.start()
+        .then(() => {
+          this.restarts++;
+          this.emit("restarted");
+        })
+        .catch((err) => console.error("[copilot] restart failed:", err.message));
+    }, 1000 * 2 ** (this.recentCrashes.length - 1));
+  }
+
+  /** The runtime process the SDK started (`cliProcess`: not public API, so it may go away; then null). */
+  private get pid(): number | null {
+    const pid = (this.client as any)?.cliProcess?.pid;
+    return typeof pid === "number" ? pid : null;
+  }
+
   async memoryUsage(): Promise<number | null> {
-    // The SDK doesn't expose the runtime's process id.
-    return null;
+    const pid = this.pid;
+    if (!pid) return null;
+    const bytes = await processTreeMemory(pid);
+    if (bytes !== null) this.lastMemory = bytes;
+    return bytes;
   }
 
   // ---------------------------------------------------------------- models
 
   async listModels(): Promise<RuntimeModel[]> {
+    if (!this.login) await this.checkLogin();
+    if (!this.login) throw new Error(NOT_SIGNED_IN);
     const models = await this.api().listModels();
     return models
       .filter((m: any) => m?.id && m.id !== "auto")
@@ -199,8 +270,9 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
           ...m,
           providerID: COPILOT_PROVIDER,
           id: String(m.id),
-          // Shaped like OpenCode's records where Symbio reads them (api.ts: vision).
+          // Shaped like OpenCode's records where Symbio reads them (api.ts: vision; costs.ts: prices).
           capabilities: { ...m.capabilities, input: m.capabilities?.supports?.vision ? ["text", "image"] : ["text"] },
+          ...(priceOf(m) ? { cost: priceOf(m) } : {}),
         },
       }));
   }
@@ -321,6 +393,79 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     this.emitEvent(sessionId, "permission.replied", { requestID: requestId });
   }
 
+  // ---------------------------------------------------------------- signing in
+
+  /** Reads who the runtime is signed in as. */
+  async checkLogin(): Promise<string | null> {
+    // Also while starting (before "running").
+    const auth = this.client ? await this.client.getAuthStatus().catch(() => null) : null;
+    this.login = auth?.isAuthenticated ? (auth.login ?? "GitHub") : null;
+    this.lastError = this.login ? null : NOT_SIGNED_IN;
+    return this.login;
+  }
+
+  /** The sign-in in progress: the code to enter on GitHub. */
+  get pendingSignIn(): SignInCode | null {
+    return this.signIn?.code ?? null;
+  }
+
+  /**
+   * Starts signing in to GitHub with a device code (verified: `rpc.accounts.login`, docs/copilot-api.md).
+   * The human enters the code on GitHub; the sign-in completes in the background.
+   */
+  async beginSignIn(): Promise<SignInCode> {
+    if (this.signIn) return this.signIn.code;
+    this.signInError = null;
+    // Signing in happens through a session; a scratch one, with no model turn and no tools.
+    const session = await this.api().createSession({
+      clientName: "symbio",
+      workingDirectory: this.home,
+      onPermissionRequest: () => ({ kind: "reject", feedback: "Not for this session." }),
+    });
+    try {
+      const begun = await session.rpc.accounts.login.begin({ kind: "githubDotCom", method: "device-code" });
+      const step = begun?.step;
+      if (step?.kind !== "device-code") throw new Error(step?.kind === "error" ? step.message : "GitHub didn't give a sign-in code.");
+      const code: SignInCode = { userCode: String(step.userCode), verificationUri: String(step.verificationUri), expiresAt: Date.now() + Number(step.expiresIn ?? 900) * 1000 };
+      this.signIn = { session, flowId: begun.flowId, code };
+      void this.finishSignIn(this.signIn);
+      return code;
+    } catch (err) {
+      await this.dropScratch(session);
+      throw err;
+    }
+  }
+
+  async cancelSignIn(): Promise<void> {
+    const flow = this.signIn;
+    if (!flow) return;
+    this.signIn = null;
+    await flow.session.rpc.accounts.login.cancel({ flowId: flow.flowId }).catch(() => {});
+    await this.dropScratch(flow.session);
+  }
+
+  /** `advance` returns once the human has authorized the device (or the code expired). */
+  private async finishSignIn(flow: NonNullable<CopilotRuntime["signIn"]>) {
+    try {
+      const step = await flow.session.rpc.accounts.login.advance({ flowId: flow.flowId });
+      if (this.signIn !== flow) return; // cancelled meanwhile
+      if (step?.kind === "error") this.signInError = String(step.message ?? "The sign-in failed.");
+      else if (step?.kind !== "completed") this.signInError = "The sign-in didn't complete.";
+    } catch (err) {
+      if (this.signIn === flow) this.signInError = (err as Error).message;
+    }
+    if (this.signIn !== flow) return;
+    this.signIn = null;
+    await this.dropScratch(flow.session);
+    if (this.state === "running") await this.checkLogin();
+    if (this.login) this.signInError = null;
+  }
+
+  private async dropScratch(session: SdkSession) {
+    await session.disconnect().catch(() => {});
+    await this.client?.deleteSession(session.sessionId).catch(() => {});
+  }
+
   // ---------------------------------------------------------------- history, usage, changes
 
   async history(sessionId: string): Promise<any[]> {
@@ -390,13 +535,37 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     for (const [id, state] of this.sessions) if (state.directory === directory && this.open.has(id)) state.stale = true;
   }
 
-  async shells(): Promise<BackgroundShell[]> {
-    // Not verified for Copilot yet (docs/copilot-api.md).
-    return [];
+  /**
+   * Background shells are Copilot tasks, listed per session (verified: `rpc.tasks.list`, then
+   * `rpc.tasks.cancel` ends the process). Ids are "<session>:<task>", task ids being per session.
+   */
+  async shells(directory: string): Promise<BackgroundShell[]> {
+    const out: BackgroundShell[] = [];
+    for (const [sessionId, live] of this.open) {
+      const dir = this.sessions.get(sessionId)?.directory;
+      if (!dir || path.resolve(dir).toLowerCase() !== path.resolve(directory).toLowerCase()) continue;
+      const list = await live.session.rpc.tasks.list().catch(() => null);
+      for (const t of list?.tasks ?? []) {
+        if (t?.type !== "shell") continue;
+        out.push({
+          id: `${sessionId}:${t.id}`,
+          command: String(t.command ?? t.description ?? ""),
+          pid: typeof t.pid === "number" ? t.pid : undefined,
+          started: Date.parse(t.startedAt) || 0,
+          running: t.status === "running",
+          sessionId,
+        });
+      }
+    }
+    return out;
   }
 
-  async stopShell(): Promise<void> {
-    throw new Error("Stopping background processes isn't available with GitHub Copilot CLI yet.");
+  async stopShell(_directory: string, id: string): Promise<void> {
+    const at = id.lastIndexOf(":");
+    const live = at > 0 ? this.open.get(id.slice(0, at)) : undefined;
+    if (!live) throw new Error(`No background process "${id}".`);
+    const res = await live.session.rpc.tasks.cancel({ id: id.slice(at + 1) });
+    if (!res?.cancelled) throw new Error(`Couldn't stop "${id}" (it may have ended already).`);
   }
 
   // ---------------------------------------------------------------- internals
@@ -440,6 +609,8 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       mcpServers: url ? { symbio: { type: "http", url, headers: { "x-symbio-session": sessionId }, tools: ["*"] } } : {},
       onPermissionRequest: (request: any) => this.onPermission(sessionId, request),
       onUserInputRequest: (request: any) => this.onQuestion(sessionId, request),
+      // Reads inside the working folder don't ask permission (verified): rules on reading are applied here.
+      hooks: { onPreToolUse: (input: any) => this.onPreToolUse(sessionId, input) },
     };
   }
 
@@ -557,20 +728,37 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     }
   }
 
-  /** Copilot asks before each tool call: Symbio's rules decide, or the human does. */
-  private onPermission(sessionId: string, request: any): any {
+  /** Copilot asks before tool calls that leave the folder or change things: Symbio's rules decide, or the human does. */
+  private async onPermission(sessionId: string, request: any): Promise<any> {
+    // A read the pre-tool hook already decided (outside the folder, Copilot asks again).
+    if (request?.toolCallId && this.readsDecided.delete(request.toolCallId)) return { kind: "approve-once" };
     const call = permissionCall(request);
     if (!call) return { kind: "approve-once" };
+    const decision = await this.decide(sessionId, call);
+    return decision.allow ? { kind: "approve-once" } : { kind: "reject", ...(decision.reason ? { feedback: decision.reason } : {}) };
+  }
+
+  /** Before every tool: file reads (the view tool) go through Symbio's read rules. */
+  private async onPreToolUse(sessionId: string, input: any): Promise<any> {
+    const target = READ_TOOLS.has(String(input?.toolName)) ? input?.toolArgs?.path : undefined;
+    if (typeof target !== "string" || !target) return undefined;
+    const decision = await this.decide(sessionId, { action: "read", resources: [target] });
+    if (!decision.allow) return { permissionDecision: "deny", permissionDecisionReason: decision.reason ?? "Symbio blocks reading this file." };
+    if (input?.toolCallId) this.readsDecided.add(String(input.toolCallId));
+    return undefined;
+  }
+
+  /** The rules' answer for a call; "ask" waits for the human (or Symbio answers for them, permissions.ts). */
+  private async decide(sessionId: string, call: { action: string; resources: string[] }): Promise<{ allow: boolean; reason?: string }> {
     const { effect } = evaluate(this.state_(sessionId).permissions, call.action, call.resources);
-    if (effect === "allow") return { kind: "approve-once" };
-    if (effect === "deny") {
-      return { kind: "reject", feedback: `Symbio blocks this (${call.action}: ${call.resources.join("; ")}). Your instructions say what to do instead.` };
-    }
+    if (effect === "allow") return { allow: true };
+    if (effect === "deny") return { allow: false, reason: `Symbio blocks this (${call.action}: ${call.resources.join("; ")}). Your instructions say what to do instead.` };
     const id = randomUUID();
-    return new Promise((resolve) => {
+    const answer: any = await new Promise((resolve) => {
       this.permissionRequests.set(id, { sessionId, resolve });
       this.emitEvent(sessionId, "permission.asked", { id, action: call.action, resources: call.resources, save: [] });
     });
+    return answer?.kind === "approve-once" ? { allow: true } : { allow: false, reason: answer?.feedback };
   }
 
   /** The agent's ask_user: a form the human answers in the chat. */
@@ -593,6 +781,18 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     this.state = state;
     this.emit("state", state);
   }
+}
+
+/**
+ * A model's price in USD per million tokens, OpenCode-style (costs.ts). Copilot lists prices in AI
+ * credits per million tokens, and 1 AI credit = $0.01 (docs.github.com, Models and pricing; checked
+ * against a session's totalNanoAiu, docs/copilot-api.md).
+ */
+export function priceOf(model: any): { input: number; output: number; cache: { read: number; write: number } } | null {
+  const p = model?.billing?.tokenPrices;
+  if (!p || typeof p.inputPrice !== "number") return null;
+  const usd = (credits: unknown) => (typeof credits === "number" ? credits / 100 : 0);
+  return { input: usd(p.inputPrice), output: usd(p.outputPrice), cache: { read: usd(p.cacheReadPrice), write: usd(p.cacheWritePrice) } };
 }
 
 /** "copilot/gpt-6-luna" → "gpt-6-luna". */

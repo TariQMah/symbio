@@ -143,29 +143,9 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
   async memoryUsage(): Promise<number | null> {
     const pid = this.proc?.pid;
     if (!pid) return null;
-    try {
-      let bytes: number;
-      if (process.platform === "win32") {
-        // List every process once ("pid parent bytes" per line) and sum the opencode tree here.
-        const { stdout } = await execFileAsync(
-          "powershell.exe",
-          [
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.WorkingSetSize)\" }",
-          ],
-          { encoding: "utf8", windowsHide: true, timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
-        );
-        bytes = sumProcessTree(stdout, pid);
-      } else {
-        const { stdout } = await execFileAsync("ps", ["-o", "rss=", "-p", String(pid)], { encoding: "utf8" });
-        bytes = Number(stdout.trim()) * 1024;
-      }
-      this.lastMemory = bytes || null;
-      return this.lastMemory;
-    } catch {
-      return null;
-    }
+    const bytes = await processTreeMemory(pid);
+    if (bytes !== null) this.lastMemory = bytes;
+    return bytes;
   }
 
   // ---------------------------------------------------------------- AgentRuntime (sessions)
@@ -477,6 +457,25 @@ async function waitFor(check: () => Promise<boolean>, timeoutMs: number) {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Memory of a process and its descendants, in bytes (Windows/Linux/macOS best effort); null when unknown. */
+export async function processTreeMemory(pid: number): Promise<number | null> {
+  try {
+    if (process.platform === "win32") {
+      // List every process once ("pid parent bytes" per line) and sum the tree here.
+      const { stdout } = await execFileAsync(
+        "powershell.exe",
+        ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.WorkingSetSize)\" }"],
+        { encoding: "utf8", windowsHide: true, timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
+      );
+      return sumProcessTree(stdout, pid) || null;
+    }
+    const { stdout } = await execFileAsync("ps", ["-o", "rss=", "-p", String(pid)], { encoding: "utf8" });
+    return Number(stdout.trim()) * 1024 || null;
+  } catch {
+    return null;
+  }
+}
 
 /** Sums the memory of a process and all its descendants from "pid parent bytes" lines. */
 export function sumProcessTree(listing: string, root: number): number {

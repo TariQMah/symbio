@@ -59,3 +59,15 @@ test("a run of steps is summed up by what matters most", () => {
   assert.equal(summarize(stepLabels("read", { path: "a.md" })), "Read a.md");
   assert.equal(summarize([]), "");
 });
+
+test("GitHub Copilot CLI's own tools read in plain words too", () => {
+  const one = (name: string, input: unknown) => stepLabels(name, input).map((l) => l.label);
+  assert.deepEqual(one("view", { path: "C:\\work\\notes.md" }), ["Read notes.md"]);
+  assert.deepEqual(one("create", { path: "C:\\work\\draft.md", file_text: "x" }), ["Wrote draft.md"]);
+  assert.deepEqual(one("str_replace", { path: "chapters/02.md", old_str: "a", new_str: "b" }), ["Edited 02.md"]);
+  assert.deepEqual(one("apply_patch", "*** Begin Patch\n*** Add File: hello.txt\n+hi\n*** End Patch\n"), ["Edited hello.txt"]);
+  assert.deepEqual(one("read_powershell", { shellId: "3" }), ["Checked a running command"]);
+  // Symbio's tools as Copilot names them, once translated (symbio-send_message → symbio_send_message).
+  assert.deepEqual(one("symbio_send_message", { to: "core", message: "Done" }), ["Message to core"]);
+});
+

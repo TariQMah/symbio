@@ -30,6 +30,9 @@ const MODELS = [
 
 /** Sessions outlive a client, like Copilot's stored sessions (a runtime restart resumes them). */
 const sessions = new Map();
+/** Signed in to GitHub, unless SYMBIO_FAKE_COPILOT_SIGNED_OUT=1 (then a device-code sign-in signs in). */
+const logins = new Map();
+const auth = { login: process.env.SYMBIO_FAKE_COPILOT_SIGNED_OUT === "1" ? null : "e2e" };
 
 export function createClient() {
   return new FakeClient();
@@ -42,9 +45,10 @@ class FakeClient {
     return { version: "1.0.112-fake", protocolVersion: 3 };
   }
   async getAuthStatus() {
-    return { isAuthenticated: true, authType: "user", login: "e2e" };
+    return auth.login ? { isAuthenticated: true, authType: "user", login: auth.login } : { isAuthenticated: false, statusMessage: "Not authenticated" };
   }
   async listModels() {
+    if (!auth.login) throw new Error("Not authenticated. Please authenticate first.");
     return MODELS;
   }
   async createSession(config) {
@@ -136,6 +140,31 @@ function view(state) {
       },
       workspaces: {
         diff: async () => ({ requestedMode: "session", mode: "session", isFallback: false, changes: sessionChanges(state) }),
+      },
+      tasks: {
+        list: async () => ({ tasks: [] }),
+        cancel: async () => ({ cancelled: false }),
+      },
+      // Signing in with a device code: approved on "GitHub" a moment after it starts.
+      accounts: {
+        login: {
+          begin: async ({ method }) => {
+            const flowId = randomUUID();
+            logins.set(flowId, { cancelled: false });
+            return { flowId, step: method === "device-code" ? { kind: "device-code", userCode: "FAKE-1234", verificationUri: "https://github.com/login/device", expiresIn: 900, interval: 5 } : { kind: "open-url", url: "https://github.com/login/oauth/authorize" } };
+          },
+          advance: async ({ flowId }) => {
+            await new Promise((r) => setTimeout(r, 1500));
+            const flow = logins.get(flowId);
+            if (!flow || flow.cancelled) return { kind: "error", message: "The sign-in was cancelled." };
+            auth.login = "e2e";
+            return { kind: "completed", result: { status: "success", host: "https://github.com", login: "e2e" } };
+          },
+          cancel: async ({ flowId }) => {
+            const flow = logins.get(flowId);
+            if (flow) flow.cancelled = true;
+          },
+        },
       },
     },
   };

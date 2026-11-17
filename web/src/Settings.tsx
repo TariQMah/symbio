@@ -3,7 +3,7 @@ import { AnimatePresence } from "motion/react";
 import { ArrowLeft, Check, Pencil, Plug, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import { api, type ConnectionView, type FtpSecurity } from "./api";
 import { ConnIcon } from "./ConnectionsPicker";
-import { ProvidersSection } from "./Providers";
+import { CopilotSection, ProvidersSection } from "./Providers";
 import { CostsSection, PricesSection } from "./Usage";
 import { RemoteSection } from "./Remote";
 import { UpdatesSection } from "./Updates";
@@ -171,6 +171,8 @@ export function Settings() {
       </section>
 
       <ProvidersSection />
+
+      <CopilotSection />
 
       <CostsSection />
 

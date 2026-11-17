@@ -208,7 +208,9 @@ function PriceRow({ model, info, onSaved }: { model: string; info: PriceInfo; on
     info.source === "yours"
       ? "Your price"
       : info.source === "opencode"
-        ? "From OpenCode"
+        ? model.startsWith("copilot/")
+          ? "From GitHub Copilot"
+          : "From OpenCode"
         : info.source === "suggested"
           ? `Suggested from ${info.from} — not saved yet`
           : "No price";

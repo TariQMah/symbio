@@ -6,10 +6,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - **GitHub Copilot CLI as an agent runtime** (preview): in New project → Models, choose whether the agents run on
-  OpenCode or on GitHub Copilot CLI, with its own models and your Copilot subscription (sign in once with
-  `copilot login`; Symbio keeps its sessions apart from your own Copilot history). Symbio's rules still apply to every
-  command and file an agent touches. Not there yet with Copilot: listing and stopping agents' background processes,
-  prices, and signing in from Symbio.
+  OpenCode or on GitHub Copilot CLI, with its own models and your Copilot subscription. Symbio uses your existing
+  Copilot login (`copilot login`), or you sign in from Settings → **GitHub Copilot CLI** with a code on GitHub; it keeps
+  its sessions apart from your own Copilot history. Symbio's rules still apply to every command an agent runs and every
+  file it reads or writes; background processes, model prices and the chat's steps work as with OpenCode.
 
 ## [0.14.3]
 

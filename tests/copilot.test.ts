@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { CopilotRuntime, editedBetween, seedLogin, splitNotes, toHistory, type SdkClient, type SdkSession } from "../src/server/copilot/runtime.js";
+import { CopilotRuntime, editedBetween, priceOf, seedLogin, splitNotes, toHistory, type SdkClient, type SdkSession } from "../src/server/copilot/runtime.js";
 import { AGENT_PERMISSIONS } from "../src/server/guard.js";
 
 /** A fake SDK: records the configs sessions are created and opened with, and lets the test play events. */
@@ -17,6 +17,7 @@ function fakeSdk() {
   const configs = new Map<string, any>();
   /** Runs inside `send`, before it returns (events can arrive before the caller gets the id). */
   const hooks: { onSend?: (sessionId: string, id: string) => void } = {};
+  const cancelled: string[] = [];
   const session = (sessionId: string, config: any): SdkSession => {
     configs.set(sessionId, config);
     return {
@@ -36,6 +37,19 @@ function fakeSdk() {
       },
       disconnect: async () => {},
       rpc: {
+        tasks: {
+          list: async () => ({
+            tasks: [
+              { type: "shell", id: "0", command: "npm run dev", status: "running", startedAt: "2026-11-17T02:34:09.766Z", pid: 4242 },
+              { type: "shell", id: "1", command: "npm test", status: "completed", startedAt: "2026-11-17T02:30:00.000Z" },
+              { type: "agent", id: "2", description: "a sub-agent" },
+            ],
+          }),
+          cancel: async ({ id }: { id: string }) => {
+            cancelled.push(`${sessionId}:${id}`);
+            return { cancelled: true };
+          },
+        },
         queue: {
           pendingItems: async () => ({ items: [] }),
           withdrawMessage: async ({ messageId }: { messageId: string }) => ({ removed: messageId.startsWith("msg_"), interrupted: false }),
@@ -61,7 +75,7 @@ function fakeSdk() {
     getSessionMetadata: async () => null,
   };
   const play = (sessionId: string, type: string, data: any = {}) => handlers.get(sessionId)!({ id: `ev_${Math.random()}`, type, data });
-  return { client, created, resumed, sent, configs, play, hooks };
+  return { client, created, resumed, sent, configs, play, hooks, cancelled };
 }
 
 async function setup() {
@@ -267,3 +281,45 @@ test("a queued prompt taken back mid-turn leaves its notes for the next prompt",
   await runtime.prompt(sessionId, "@core say noted", "queue");
   assert.deepEqual(splitNotes(sdk.sent.at(-1)!.prompt).notes, ["Symbio: the human answered writer's question."]);
 });
+
+test("file reads (which Copilot doesn't ask about inside the folder) go through Symbio's read rules", async () => {
+  const { sdk, runtime, events, sessionId } = await setup();
+  const pre = sdk.configs.get(sessionId).hooks.onPreToolUse;
+  assert.equal(await pre({ toolName: "view", toolArgs: { path: "C:\\work\\book\\notes.md" }, toolCallId: "t1" }), undefined, "allowed");
+  const secret = await pre({ toolName: "view", toolArgs: { path: "C:\\Users\\me\\.ssh\\id_rsa" }, toolCallId: "t2" });
+  assert.equal(secret.permissionDecision, "deny");
+  assert.match(secret.permissionDecisionReason, /Symbio blocks this/);
+  // An image is an "ask" rule: Symbio answers it (permissions.ts refuses it with a pointer to view_image).
+  const image = pre({ toolName: "view", toolArgs: { path: "C:\\work\\book\\cover.png" }, toolCallId: "t3" });
+  const asked = events.find((e) => e.type === "permission.asked");
+  assert.deepEqual(asked.data.resources, ["C:\\work\\book\\cover.png"]);
+  assert.equal(asked.data.action, "read");
+  await runtime.answerPermission(sessionId, asked.data.id, "reject", "Use view_image.");
+  assert.deepEqual(await image, { permissionDecision: "deny", permissionDecisionReason: "Use view_image." });
+  assert.equal(await pre({ toolName: "powershell", toolArgs: { command: "ls" } }), undefined, "other tools aren't reads");
+});
+
+test("an agent's background processes are its session's shell tasks, and stopping one cancels it", async () => {
+  const { sdk, runtime, sessionId } = await setup();
+  const shells = await runtime.shells("C:/work/book");
+  assert.deepEqual(
+    shells.map((s) => [s.id, s.command, s.running, s.pid, s.sessionId]),
+    [
+      [`${sessionId}:0`, "npm run dev", true, 4242, sessionId],
+      [`${sessionId}:1`, "npm test", false, undefined, sessionId],
+    ],
+  );
+  assert.deepEqual(await runtime.shells("C:/elsewhere"), [], "only the folder's");
+  await runtime.stopShell("C:/work/book", `${sessionId}:0`);
+  assert.deepEqual(sdk.cancelled, [`${sessionId}:0`]);
+});
+
+test("Copilot's prices (AI credits per million tokens) in dollars", () => {
+  assert.deepEqual(priceOf({ billing: { tokenPrices: { inputPrice: 10, outputPrice: 50, cacheReadPrice: 1, cacheWritePrice: 12.5 } } }), {
+    input: 0.1,
+    output: 0.5,
+    cache: { read: 0.01, write: 0.125 },
+  });
+  assert.equal(priceOf({ id: "auto" }), null);
+});
+
