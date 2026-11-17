@@ -3,6 +3,7 @@
 import { bus } from "../bus.js";
 import { accountChildUsage, accountUsage } from "../costs.js";
 import type { Agent, Project } from "../store.js";
+import { runtimeOf } from "../runtime/types.js";
 import type { TeamCore } from "./core.js";
 
 export class Usage {
@@ -43,7 +44,8 @@ export class Usage {
     const now = Date.now();
     if (now - (this.childrenCheckedAt.get(agent.id) ?? 0) < 60_000) return; // at most once a minute
     this.childrenCheckedAt.set(agent.id, now);
-    const queue = [agent.sessionId, ...(agent.previousSessions ?? []).map((s) => s.sessionId)];
+    // Only sessions in the agent's runtime now (earlier ones elsewhere were counted before it switched).
+    const queue = [agent.sessionId, ...(agent.previousSessions ?? []).filter((s) => (s.runtime ?? runtimeOf(agent)) === runtimeOf(agent)).map((s) => s.sessionId)];
     const visited = new Set<string>();
     while (queue.length) {
       const parent = queue.shift()!;

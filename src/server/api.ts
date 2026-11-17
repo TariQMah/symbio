@@ -516,6 +516,58 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   api.get("/projects/:id", (c) => c.json(withProject(c.req.param("id"))));
 
+  // ---- moving a project to another agent runtime (team/switch.ts)
+  api.get("/projects/:id/switch-runtime", (c) => c.json(team.switches.get(withProject(c.req.param("id")).id)));
+  // Starts the switch and returns at once: its progress comes as runtime.switch events (and from the GET).
+  api.post("/projects/:id/switch-runtime", async (c) => {
+    const project = withProject(c.req.param("id"));
+    const body = await c.req.json<{
+      to?: RuntimeKind;
+      allowedModels?: string[];
+      coordinatorModel?: string;
+      coreModels?: string[];
+      coreOnlyModels?: string[];
+      askHandoffs?: boolean;
+    }>();
+    const target = body.to ? team.runtimes.get(body.to) : undefined;
+    if (!body.to || !target) return c.json({ error: `Unknown runtime "${body.to}".` }, 400);
+    if (!isInstalled(body.to)) return c.json({ error: new NotInstalledError(body.to).message }, 400);
+    if (team.switches.running(project.id)) return c.json({ error: "This project is already switching runtimes." }, 409);
+    try {
+      team.checkSwitch(project, body.to);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    const allowedModels = [...new Set(body.allowedModels ?? [])];
+    const coordinatorModel = body.coordinatorModel ?? "";
+    if (!allowedModels.length || !allowedModels.includes(coordinatorModel)) return c.json({ error: `Choose the project's models on ${target.label}, and core's.` }, 400);
+    let roles: ReturnType<typeof modelRoles>;
+    try {
+      roles = modelRoles({ allowedModels, coordinatorModel }, body.coreModels, body.coreOnlyModels);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    // The models must be the new runtime's own.
+    try {
+      const known = new Set((await (await team.runtimeFor({ runtime: body.to })).listModels()).map((m) => `${m.providerID}/${m.id}`));
+      const unknown = allowedModels.filter((m) => !known.has(m));
+      if (unknown.length) return c.json({ error: `${target.label} doesn't have ${unknown.join(", ")}.` }, 400);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 503);
+    }
+    const busy = project.agents.filter((a) => a.status === "busy" || a.status === "waiting" || a.status === "stuck").map((a) => a.name);
+    const start = team.switchRuntime(project, {
+      to: body.to,
+      allowedModels,
+      coordinatorModel,
+      coreModels: roles.coreModels,
+      coreOnlyModels: roles.coreOnlyModels,
+      askHandoffs: body.askHandoffs !== false,
+    });
+    start.catch((err) => console.error(`[switch] ${project.name}:`, err.message));
+    return c.json({ progress: team.switches.get(project.id), interrupted: busy }, 202);
+  });
+
   api.patch("/projects/:id", async (c) => {
     const project = withProject(c.req.param("id"));
     const body = await c.req.json<{

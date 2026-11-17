@@ -47,8 +47,11 @@ export interface Agent {
   usageSeen?: NonNullable<Agent["usage"]>;
   /** Usage of earlier sessions, for agents that predate usageByModel. */
   pastUsage?: NonNullable<Agent["usage"]>;
-  /** Sessions this agent used before its session was renewed, oldest first. */
-  previousSessions?: { sessionId: string; endedAt: number }[];
+  /**
+   * Sessions this agent used before its session was renewed, oldest first. `runtime`: where that
+   * session lives, when it isn't the agent's runtime now (the project switched runtimes since).
+   */
+  previousSessions?: { sessionId: string; endedAt: number; runtime?: RuntimeKind }[];
   /** Sub-agent sessions it started, with the totals already counted (see costs.ts). */
   childSessions?: Record<string, { model: string; seen: NonNullable<Agent["usage"]> }>;
   /** Earlier names (after a rename), still accepted when other agents address it. */

@@ -34,6 +34,7 @@ import { Processes } from "./team/processes.js";
 import { QuietHelpers } from "./team/quiet-helpers.js";
 import { Usage } from "./team/usage.js";
 import { Watchdog } from "./team/watchdog.js";
+import { handoffRequest, Switches, type SwitchOptions } from "./team/switch.js";
 import { NotInstalledError } from "./runtime/install.js";
 import { describeOuterRepository, listRepositories, projectRepositories, repoRoot, resolveRepository, swallowedRepositories } from "./repos.js";
 import { changedFiles, createWorkspace, inProjectFolder, isGitRepo, leaveWorkspace, mergeWorkspace, reattachWorkspace, removeWorkspace, restoreWorkspace, syncWorkspace } from "./workspaces.js";
@@ -91,6 +92,8 @@ export class Team implements TeamCore {
   readonly housekeeper = new Housekeeper(this);
   readonly fallback = new ModelFallback(this);
   readonly usage = new Usage(this);
+  /** Runtime switches under way (and the last one's outcome), per project. */
+  readonly switches = new Switches();
   readonly quiet = new QuietHelpers(this);
   readonly sharedAssets = new SharedAssets(this);
   readonly reviews = new Reviews(this);
@@ -685,6 +688,8 @@ export class Team implements TeamCore {
       agent.base = workspace.base;
       agent.workSince = Date.now();
     }
+    // Stopped when the project switched runtimes: it continues in a new session on the project's one.
+    const handoff = runtimeOf(agent) !== (project.runtime ?? "opencode") ? await this.moveToProjectRuntime(project, agent) : null;
     await this.rt(agent).ensureTools(agent.directory, this.toolsUrl(project, agent.directory), true);
     if (!modelsFor(project, agent.role).includes(agent.model)) await this.setModel(project, agent, defaultModel(project, agent.role));
     agent.status = "idle";
@@ -692,6 +697,7 @@ export class Team implements TeamCore {
     agent.lastActivity = Date.now();
     await this.store.update(project);
     await this.refreshInstructions(project, agent);
+    if (handoff) await this.rt(agent).setInstruction(agent.sessionId, "symbio-handoff", handoff);
     await this.log(project, { from: "symbio", to: "human", kind: "system", text: `${agent.name} restarted by the human` });
     bus.publish({ type: "project.updated", projectId: project.id });
 
@@ -732,7 +738,7 @@ export class Team implements TeamCore {
 
     // Count everything the old session used before leaving it.
     await this.usage.refresh(project, agent).catch(() => {});
-    const handoff = await this.handoffNote(project, agent, oldSession, opts.moved);
+    const handoff = await this.handoffNote(project, agent, oldSession, { moved: opts.moved });
 
     const sessionId = await runtime.createSession({
       title: `${project.name} · ${agent.name}`,
@@ -741,7 +747,7 @@ export class Team implements TeamCore {
       permissions: this.permissionsFor(project, agent),
       toolsUrl: this.toolsUrl(project, agent.directory),
     });
-    agent.previousSessions = [...(agent.previousSessions ?? []), { sessionId: oldSession, endedAt: Date.now() }];
+    agent.previousSessions = [...(agent.previousSessions ?? []), { sessionId: oldSession, endedAt: Date.now(), runtime: runtimeOf(agent) }];
     agent.sessionId = sessionId;
     accountUsage(agent, agent.usage ?? emptyUsage());
     agent.usage = emptyUsage();
@@ -810,8 +816,236 @@ export class Team implements TeamCore {
     return `${agent.name} now works in the project folder, in a fresh session with a handoff note. Its own copy was removed.`;
   }
 
+  /**
+   * Moves the project to another agent runtime (team/switch.ts): pauses the team, optionally asks
+   * each active agent for its own handoff on the old runtime, stops background processes, creates
+   * every agent's new session on the new one (all or nothing), then switches the project and its
+   * models, resumes, and tells core. Agents keep their name, folder, branch, tasks and assets.
+   */
+  async switchRuntime(project: Project, opts: SwitchOptions): Promise<void> {
+    const { target, moving } = this.checkSwitch(project, opts.to);
+    const from = project.runtime ?? "opencode";
+    const fromKind = moving[0] ? runtimeOf(moving[0]) : from;
+    const fromLabel = this.runtimes.get(fromKind)?.label ?? fromKind;
+    const working = moving.filter(active);
+    const progress = this.switches.begin(project.id, fromKind, opts.to, 3 + (opts.askHandoffs ? working.length : 0) + moving.length);
+    const created: { agent: Agent; sessionId: string; model: string; handoff: string }[] = [];
+    const wasPaused = !!project.paused;
+    const own = new Map<string, string>();
+    try {
+      // 1. Nobody works while the team moves; messages between agents wait.
+      this.switches.step(progress, "Pausing the team");
+      if (!wasPaused) await this.pause(project);
+      await this.log(project, { from: "symbio", to: "human", kind: "system", text: `Moving the project from ${fromLabel} to ${target.label}…` });
+      // Questions and permission requests belong to the old sessions.
+      for (const agent of moving) {
+        this.pendingQuestion.delete(agent.id);
+        this.permissions.clear((id) => id === agent.id);
+      }
+      this.switches.advance(progress);
+
+      // 2. Each active agent's own handoff, in a last turn where it still has its memory.
+      if (opts.askHandoffs && working.length) {
+        const old = await this.runtimeFor({ runtime: fromKind }).catch(() => null);
+        for (const agent of working) {
+          this.switches.step(progress, `Asking ${agent.name} for its handoff`);
+          const text = old
+            ? await this.lastWords(project, agent, handoffRequest(fromLabel, target.label)).catch((err) => {
+                console.error(`[switch] ${project.name}: no handoff from ${agent.name}:`, err.message);
+                return "";
+              })
+            : "";
+          if (text) own.set(agent.id, text);
+          else progress.withoutHandoff.push(agent.name);
+          this.switches.advance(progress);
+        }
+      }
+
+      // 3. Processes started through the old runtime: the new one can't see or stop them.
+      this.switches.step(progress, "Stopping background processes");
+      for (const agent of moving) await this.processes.stopAll(project, agent).catch(() => {});
+      this.switches.advance(progress);
+
+      // 4. Every agent's new session.
+      const next = { allowedModels: opts.allowedModels, coordinatorModel: opts.coordinatorModel, coreModels: opts.coreModels, coreOnlyModels: opts.coreOnlyModels };
+      await this.runtimeFor({ runtime: opts.to });
+      for (const agent of moving) {
+        this.switches.step(progress, `Starting ${agent.name} on ${target.label}`);
+        await this.usage.refresh(project, agent).catch(() => {});
+        const handoff = await this.handoffNote(project, agent, agent.sessionId, {
+          switched: { from: fromLabel, to: target.label, own: own.get(agent.id) ?? null },
+        });
+        const model = agent.role === "coordinator" ? opts.coordinatorModel : defaultModel(next, agent.role);
+        const sessionId = await target.createSession({
+          title: `${project.name} · ${agent.name}`,
+          directory: agent.directory,
+          model,
+          permissions: this.permissionsFor(project, agent),
+          toolsUrl: this.toolsUrl(project, agent.directory),
+        });
+        created.push({ agent, sessionId, model, handoff });
+        this.switches.advance(progress);
+      }
+    } catch (err) {
+      for (const c of created) await target.deleteSession(c.sessionId).catch(() => {});
+      if (!wasPaused) await this.resume(project).catch(() => {});
+      const message = (err as Error).message;
+      this.switches.finish(progress, message);
+      await this.log(project, {
+        from: "symbio",
+        to: "human",
+        kind: "system",
+        text: `Moving to ${target.label} failed (${message}). Nothing changed: the project still runs on ${fromLabel}.`,
+      });
+      throw err;
+    }
+
+    // 5. The switch itself: no step from here can fail halfway in a way that leaves agents split.
+    this.switches.step(progress, "Switching the project");
+    for (const { agent, sessionId, model } of created) {
+      const was = runtimeOf(agent);
+      accountUsage(agent, agent.usage ?? emptyUsage());
+      agent.previousSessions = [
+        ...(agent.previousSessions ?? []).map((s) => ({ ...s, runtime: s.runtime ?? was })),
+        { sessionId: agent.sessionId, endedAt: Date.now(), runtime: was },
+      ];
+      agent.runtime = opts.to;
+      agent.sessionId = sessionId;
+      agent.model = model;
+      agent.usage = emptyUsage();
+      agent.usageSeen = emptyUsage();
+      if (active(agent)) agent.status = "idle";
+      agent.problem = null;
+      agent.lastActivity = Date.now();
+      this.inbox.delete(agent.id);
+      this.docsSynced.delete(agent.id);
+    }
+    project.runtime = opts.to;
+    project.allowedModels = opts.allowedModels;
+    project.coordinatorModel = opts.coordinatorModel;
+    if (opts.coreModels) project.coreModels = opts.coreModels;
+    else delete project.coreModels;
+    if (opts.coreOnlyModels) project.coreOnlyModels = opts.coreOnlyModels;
+    else delete project.coreOnlyModels;
+    await this.store.update(project);
+    bus.publish({ type: "project.updated", projectId: project.id });
+
+    const trouble: string[] = [];
+    for (const { agent, handoff } of created) {
+      try {
+        await this.ensureTools(project, agent, true);
+        await this.refreshInstructions(project, agent);
+        await this.rt(agent).setInstruction(agent.sessionId, "symbio-handoff", handoff);
+      } catch (err) {
+        trouble.push(agent.name);
+        agent.problem = `Its new session on ${target.label} isn't fully set up (${(err as Error).message}). Use New session in its chat.`;
+      }
+    }
+    if (trouble.length) await this.store.update(project);
+    this.switches.advance(progress);
+
+    // 6. Back to work, and core hears what happened.
+    this.switches.step(progress, "Resuming the team");
+    await this.log(project, {
+      from: "symbio",
+      to: "human",
+      kind: "system",
+      text:
+        `The project moved from ${fromLabel} to ${target.label}: every agent continues in a new session there, from a handoff note. ` +
+        `Their earlier conversations are still readable in their chats${progress.withoutHandoff.length ? `. Without their own handoff (Symbio's note only): ${progress.withoutHandoff.join(", ")}` : ""}.`,
+    });
+    if (!wasPaused) await this.resume(project);
+    const coordinator = this.coordinator(project);
+    if (coordinator && active(coordinator)) {
+      const helpers = project.agents.filter((a) => a.role !== "coordinator" && active(a)).map((a) => a.name);
+      await this.system(
+        project,
+        coordinator,
+        `Symbio: the human moved this project from ${fromLabel} to ${target.label}. You and ${helpers.length ? `your helpers (${helpers.join(", ")})` : "any helpers you create"} ` +
+          `continue in new sessions there, each from a handoff note (yours is in your instructions). Agents may behave a little differently on ${target.label}. ` +
+          `Check where the plan stands and get the team going again${project.paused ? " once the human resumes the team" : ""}.`,
+      ).catch((err) => console.error("[switch] couldn't tell core:", err.message));
+    }
+    this.switches.finish(progress, null);
+  }
+
+  /** Whether the project can move to a runtime now (throws why not), and the agents that would move. */
+  checkSwitch(project: Project, to: RuntimeKind): { target: AgentRuntime; moving: Agent[] } {
+    const target = this.runtimes.get(to);
+    if (!target) throw new Error(`Unknown runtime "${to}".`);
+    if (this.switches.running(project.id)) throw new Error("This project is already switching runtimes.");
+    // Stopped helpers move when they're restarted (restartAgent): their folders may be gone by now.
+    const moving = project.agents.filter((a) => runtimeOf(a) !== to && (active(a) || a.role === "coordinator"));
+    if ((project.runtime ?? "opencode") === to && !moving.length) throw new Error(`This project already runs on ${target.label}.`);
+    return { target, moving };
+  }
+
+  /** A stopped agent left on another runtime by a switch gets a session on the project's runtime; returns its handoff note. */
+  private async moveToProjectRuntime(project: Project, agent: Agent): Promise<string> {
+    const target = await this.runtimeFor(project);
+    const was = runtimeOf(agent);
+    const handoff = await this.handoffNote(project, agent, agent.sessionId, {
+      switched: { from: this.runtimes.get(was)?.label ?? was, to: target.label, own: null },
+    });
+    const model = modelsFor(project, agent.role).includes(agent.model) ? agent.model : defaultModel(project, agent.role);
+    const sessionId = await target.createSession({
+      title: `${project.name} · ${agent.name}`,
+      directory: agent.directory,
+      model,
+      permissions: this.permissionsFor(project, agent),
+      toolsUrl: this.toolsUrl(project, agent.directory),
+    });
+    accountUsage(agent, agent.usage ?? emptyUsage());
+    agent.previousSessions = [
+      ...(agent.previousSessions ?? []).map((s) => ({ ...s, runtime: s.runtime ?? was })),
+      { sessionId: agent.sessionId, endedAt: Date.now(), runtime: was },
+    ];
+    agent.runtime = target.kind;
+    agent.sessionId = sessionId;
+    agent.model = model;
+    agent.usage = emptyUsage();
+    agent.usageSeen = emptyUsage();
+    this.docsSynced.delete(agent.id);
+    await this.store.update(project);
+    return handoff;
+  }
+
+  /**
+   * One more turn for an agent, answered as text (its handoff before a runtime switch): sent even
+   * while the team is paused, and waited for (up to 5 minutes, then interrupted).
+   */
+  private async lastWords(project: Project, agent: Agent, request: string): Promise<string> {
+    await this.prepare(project, agent);
+    const runtime = this.rt(agent);
+    await this.log(project, { from: "symbio", to: agent.id, kind: "system", text: request });
+    await runtime.prompt(agent.sessionId, request, "queue");
+    this.setStatus(project, agent, "busy");
+    const end = Date.now() + 5 * 60_000;
+    // The status follows the session's events (busy → idle); a question to the human ends it too.
+    await new Promise((r) => setTimeout(r, 1000));
+    while (agent.status === "busy" && Date.now() < end) await new Promise((r) => setTimeout(r, 500));
+    if (agent.status !== "idle") {
+      await runtime.interrupt(agent.sessionId).catch(() => {});
+      this.setStatus(project, agent, "idle");
+    }
+    // Its answer: the text of the assistant messages after the request.
+    const { messages } = await runtime.historyPage(agent.sessionId, 20);
+    const after = messages.slice(messages.findLastIndex((m: any) => m.type === "user") + 1);
+    return after
+      .filter((m: any) => m.type === "assistant")
+      .flatMap((m: any) => (m.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text))
+      .join("\n")
+      .trim();
+  }
+
   /** What an agent needs to carry on in a fresh session, from Symbio's own records. */
-  private async handoffNote(project: Project, agent: Agent, oldSession: string, moved = false): Promise<string> {
+  private async handoffNote(
+    project: Project,
+    agent: Agent,
+    oldSession: string,
+    opts: { moved?: boolean; switched?: { from: string; to: string; own: string | null } } = {},
+  ): Promise<string> {
+    const { moved, switched } = opts;
     const plan = (await this.plan(project)).plan;
     const reg = await this.assets(project);
     const mine = plan.tasks.filter((t) => t.assignee === agent.id);
@@ -821,8 +1055,9 @@ export class Team implements TeamCore {
     const held = reg.list().filter((a) => a.holder === agent.id).map((a) => a.name);
     const log = (await this.store.readMessages(project)).filter((m) => m.from === agent.id || m.to === agent.id).slice(-8);
     const nameOf = (id: string) => (id === "human" ? "human" : id === "symbio" ? "Symbio" : this.agentName(project, id) ?? id);
-    const lastText = await this.rt(agent)
-      .historyPage(oldSession, 30)
+    // The old session's runtime may be gone (a switch away from an uninstalled one): the note still works.
+    const lastText = await Promise.resolve()
+      .then(() => this.rt(agent).historyPage(oldSession, 30))
       .then(({ messages }) => {
         const last = messages.filter((m) => m.type === "assistant" && (m.content ?? []).some((c: any) => c.type === "text" && c.text)).at(-1);
         return (last?.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
@@ -832,10 +1067,14 @@ export class Team implements TeamCore {
 
     const parts = [
       `# Handoff: you are continuing as ${agent.name} in a fresh session`,
-      (moved
-        ? `You now work in the project folder itself instead of your own copy, so Symbio started a new session there. ` +
-          `Nothing else about your role changed. `
-        : `Your previous session had grown long, so Symbio started a new one. Nothing about your role changed. `) +
+      (switched
+        ? `The human moved this project from ${switched.from} to ${switched.to}, so you continue in a new session on ${switched.to}. ` +
+          `Nothing about your role changed, but your tools may be named and behave a little differently here: check before relying on habits. ` +
+          `Background processes you had running were stopped; start again the ones you need. `
+        : moved
+          ? `You now work in the project folder itself instead of your own copy, so Symbio started a new session there. ` +
+            `Nothing else about your role changed. `
+          : `Your previous session had grown long, so Symbio started a new one. Nothing about your role changed. `) +
         `This note is what carries over; the project's docs (AGENTS.md, docs/) hold the durable knowledge, ` +
         `and your work is in your folder.`,
       agent.purpose ? `**Your purpose:** ${agent.purpose}` : "",
@@ -851,7 +1090,11 @@ export class Team implements TeamCore {
       done.length ? `**Recently finished:**\n${done.map((t) => `- ${t.id} ${t.title}${lastNote(t) ? ` — ${cut(lastNote(t)!, 300)}` : ""}`).join("\n")}` : "",
       held.length ? `**Shared assets you hold:** ${held.join(", ")} (release them when done).` : "",
       log.length ? `**Latest messages:**\n${log.map((m) => `- ${nameOf(m.from)} → ${nameOf(m.to)} (${m.kind}): ${cut(m.text.replace(/\s+/g, " "), 400)}`).join("\n")}` : "",
-      lastText ? `**Your last answer in the previous session:**\n${cut(lastText, 2500)}` : "",
+      switched?.own
+        ? `**Your own handoff, written at the end of your previous session:**\n${cut(switched.own, 6000)}`
+        : lastText
+          ? `**Your last answer in the previous session:**\n${cut(lastText, 2500)}`
+          : "",
     ];
     return parts.filter(Boolean).join("\n\n");
   }
@@ -1030,7 +1273,9 @@ export class Team implements TeamCore {
     for (const agent of project.agents) {
       if (agent.status !== "busy" && agent.status !== "stuck" && agent.status !== "waiting") continue;
       project.pausedAgents.push(agent.id);
-      await this.rt(agent).interrupt(agent.sessionId).catch(() => {});
+      await Promise.resolve()
+        .then(() => this.rt(agent).interrupt(agent.sessionId))
+        .catch(() => {});
       this.setStatus(project, agent, "idle");
     }
     await this.store.update(project);
@@ -1100,9 +1345,10 @@ export class Team implements TeamCore {
 
   /** One page of an agent's conversation (for long chats), oldest first. */
   historyPage(agent: Agent, limit: number, before?: string, sessionId?: string) {
-    // Earlier sessions (after a renewal) stay readable, but only the agent's own.
-    const session = sessionId && agent.previousSessions?.some((s) => s.sessionId === sessionId) ? sessionId : agent.sessionId;
-    return this.rt(agent).historyPage(session, limit, before);
+    // Earlier sessions (after a renewal) stay readable, but only the agent's own, in the runtime each lives in.
+    const earlier = sessionId ? agent.previousSessions?.find((s) => s.sessionId === sessionId) : undefined;
+    if (earlier) return this.rt({ runtime: earlier.runtime ?? runtimeOf(agent) }).historyPage(earlier.sessionId, limit, before);
+    return this.rt(agent).historyPage(agent.sessionId, limit, before);
   }
 
   /** Open interactive questions (the runtime's question tool) the agent is waiting on. */
@@ -1143,7 +1389,7 @@ export class Team implements TeamCore {
 
   /** Starts the runtimes a project's agents (and its new agents) run on, if they aren't running: its page needs them. */
   async startRuntimesOf(project: Project): Promise<void> {
-    const kinds = new Set<RuntimeKind>([project.runtime ?? "opencode", ...project.agents.map((a) => runtimeOf(a))]);
+    const kinds = new Set<RuntimeKind>([project.runtime ?? "opencode", ...project.agents.filter(active).map((a) => runtimeOf(a))]);
     if (!project.agents.length) return; // nothing to show yet; New project / start bring its runtime up
     for (const kind of kinds) {
       await this.runtimeFor({ runtime: kind }).catch((err) => {

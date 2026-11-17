@@ -931,6 +931,13 @@ tr.file-view-target > td, tr.file-view-target > th { background: rgba(212, 160, 
 /* New project: which runtime the agents run on, side by side. */
 .runtime-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 @media (max-width: 640px) { .runtime-choice { grid-template-columns: 1fr; } }
+/* Project settings → Agent runtime: moving a project to another runtime. */
+.switch-status { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--text-2); }
+.switch-status.done { color: var(--green); }
+.switch-track { height: 6px; border-radius: 6px; background: var(--surface-hover); overflow: hidden; }
+.switch-fill { height: 100%; border-radius: 6px; background: var(--accent); transition: width 0.3s; }
+.switch-warning { line-height: 1.5; margin-bottom: 4px; }
+
 /* Agent runtimes (Settings, and the first run): one card each, installed or not. */
 .runtime-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
 .runtime-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); min-width: 0; }

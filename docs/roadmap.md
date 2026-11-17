@@ -11,7 +11,8 @@ layer, the Copilot runtime, choosing it per project in New project, signing in f
 background processes, prices, briefs worded for each runtime, and every end-to-end test on both
 runtimes, memory recycling and crash recovery for Copilot too, and no bundled runtime: the human
 installs the ones they use (first-run cards, Settings → Agent runtimes), so a machine can have only
-Copilot or only OpenCode. Left: merging into `next`.
+Copilot or only OpenCode, and moving an existing project from one runtime to the other (Project
+settings → Agent runtime). Left: a beta, trying the move on a real project, then merging into `next`.
 
 ## Next
 

@@ -214,7 +214,9 @@ const installer = new RuntimeInstaller();
   // installs the ones they use (Settings → Runtimes). One that projects use but that isn't installed
   // (Symbio used to ship OpenCode) is installed now, so those projects keep working.
   const projects = store.list();
-  const usedBy = (kind: RuntimeKind) => projects.filter((p) => (p.runtime ?? "opencode") === kind || p.agents.some((a) => runtimeOf(a) === kind));
+  // Stopped agents don't count: after a project switched runtimes, they move when restarted.
+  const usedBy = (kind: RuntimeKind) =>
+    projects.filter((p) => (p.runtime ?? "opencode") === kind || p.agents.some((a) => runtimeOf(a) === kind && a.status !== "stopped"));
   const active = (kind: RuntimeKind) => projects.some((p) => p.agents.some((a) => runtimeOf(a) === kind && a.status !== "stopped"));
   for (const r of [runtime, copilot]) {
     const label = RUNTIME_PACKAGES[r.kind].label;

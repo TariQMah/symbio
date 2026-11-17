@@ -315,8 +315,24 @@ export interface RuntimeView {
   signInError: string | null;
 }
 
+/** A project moving to another agent runtime (Project settings → Agent runtime). */
+export interface SwitchProgress {
+  projectId: string;
+  from: RuntimeKind;
+  to: RuntimeKind;
+  status: "running" | "done" | "failed";
+  step: string;
+  done: number;
+  total: number;
+  error: string | null;
+  withoutHandoff: string[];
+  startedAt: number;
+  finishedAt: number | null;
+}
+
 export type UiEvent =
   | ({ type: "runtime" } & RuntimeInfo)
+  | { type: "runtime.switch"; projectId: string; progress: SwitchProgress }
   | { type: "project.updated"; projectId: string }
   | { type: "prices.updated" }
   | { type: "remote.updated" }
@@ -712,6 +728,11 @@ export const api = {
   log: (projectId: string) => call<LoggedMessage[]>("GET", `/projects/${projectId}/log`),
   assets: (projectId: string) => call<Asset[]>("GET", `/projects/${projectId}/assets`),
   retryModels: (projectId: string) => call<{ resumed: string[] }>("POST", `/projects/${projectId}/retry-models`),
+  switchState: (projectId: string) => call<SwitchProgress | null>("GET", `/projects/${projectId}/switch-runtime`),
+  switchRuntime: (
+    projectId: string,
+    body: { to: RuntimeKind; allowedModels: string[]; coordinatorModel: string; coreModels: string[]; coreOnlyModels: string[]; askHandoffs: boolean },
+  ) => call<{ progress: SwitchProgress; interrupted: string[] }>("POST", `/projects/${projectId}/switch-runtime`, body),
   pauseTeam: (projectId: string) => call<Project>("POST", `/projects/${projectId}/pause`),
   resumeTeam: (projectId: string) => call<Project>("POST", `/projects/${projectId}/resume`),
   pauseAll: () => call<{ paused: string[] }>("POST", "/pause-all"),

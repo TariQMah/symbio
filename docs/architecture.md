@@ -76,6 +76,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `team.ts` | The heart: creating, stopping, restarting and renewing agents, delivering messages, status, the plan, pause/resume, routing the runtime's events. Its parts live in `team/` and use only the `TeamCore` interface (`team/core.ts`) |
 | `team/asset-protocol.ts` | The shared-asset protocol: request (free ones granted at once), grant, deny, release |
 | `team/watchdog.ts` | Hung agents interrupted and told why, OpenCode restarted before its memory makes it crash, interrupted agents woken after a restart |
+| `team/switch.ts` | Moving a project to another runtime: progress (the `runtime.switch` event), the handoff request |
 | `team/fallback.ts` | Failing providers: switch to the next allowed model, a fresh session when the conversation is too large, resuming stuck agents |
 | `team/review.ts` | The human's review of finished tasks (`reviewBy`): the gate on done, approve, send back |
 | `team/questions.ts` | The team's open questions for the human: asking (repeats refused), answering several at once, setting aside |
@@ -175,6 +176,15 @@ costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
   folder, tasks and assets, and starts from a handoff note Symbio builds from the plan, the asset
   register and the message log. Old sessions stay readable. This keeps each step cheaper (every
   step re-reads the conversation), avoids repeated compactions, and keeps OpenCode's memory down.
+- **Switching runtimes** (Project settings → Agent runtime, `team/switch.ts`, `Team.switchRuntime`).
+  Nothing is converted between runtimes: what the team knows is Symbio's (plan, tasks, messages,
+  assets, docs) or git's (folders, branches), so a switch is a fresh session for every agent, on the
+  other runtime. Symbio pauses the team, optionally gives each active agent a last turn on the old
+  runtime to write its own handoff, stops background processes, creates every new session (all or
+  nothing: if one fails, they're deleted and the project is unchanged), then switches the project's
+  runtime and models (carried over by model name in the dialog), resumes and tells core. Earlier
+  sessions keep their runtime (`previousSessions[].runtime`) and stay readable while it's installed.
+  Stopped helpers move when restarted. Any runtime to any other works the same way.
 - **Housekeeping.** Every day Symbio backs up each project's `.symbio` folder and its own small files
   to `~/.symbio/backups/<date>` (the last 7 days; `SYMBIO_BACKUP_DAYS`), and checks each project for
   commits that no remote has (the project's branch and helpers' `symbio/*` branches) and for build

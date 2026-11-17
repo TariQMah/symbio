@@ -7,6 +7,7 @@ import { ModelPicker, choiceBody, choiceOf } from "./ModelPicker";
 import { RemoveDialog } from "./ProjectMenu";
 import { UsageSection } from "./Usage";
 import { HousekeepingSection } from "./Housekeeping";
+import { RuntimeSection } from "./SwitchRuntime";
 
 /** Project configuration: name, connections, models, remembered permissions, removal. */
 export function ProjectSettings({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
@@ -16,6 +17,7 @@ export function ProjectSettings({ project, onChanged }: { project: Project; onCh
       <div className="settings-inner">
         <General project={project} onChanged={onChanged} />
         <Connections project={project} onChanged={onChanged} />
+        <RuntimeSection project={project} />
         <Models project={project} onChanged={onChanged} />
         <Team project={project} onChanged={onChanged} />
         <UsageSection project={project} />
