@@ -9,11 +9,23 @@ import { createServer } from "node:net";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
-import { OpencodeClient, type OpencodeEvent } from "./client.js";
+import { OpencodeClient, parseModel } from "./client.js";
+import { sessionUsage, type Usage } from "../costs.js";
+import type { PermissionRule } from "../guard.js";
+import type {
+  AgentRuntime,
+  BackgroundShell,
+  ChildSession,
+  FileChange,
+  NewSession,
+  RuntimeEvents,
+  RuntimeModel,
+  RuntimeState,
+} from "../runtime/types.js";
 
 const execFileAsync = promisify(execFile);
 
-export type RuntimeState = "stopped" | "starting" | "running" | "crashed";
+export type { RuntimeState };
 
 // Environment that keeps agent shell commands from waiting on input forever.
 const NON_INTERACTIVE_ENV = {
@@ -23,13 +35,9 @@ const NON_INTERACTIVE_ENV = {
   PIP_NO_INPUT: "1",
 };
 
-export interface RuntimeEvents {
-  state: [RuntimeState];
-  event: [OpencodeEvent];
-  restarted: [];
-}
-
-export class OpencodeRuntime extends EventEmitter<RuntimeEvents> {
+export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements AgentRuntime {
+  readonly kind = "opencode";
+  readonly label = "OpenCode";
   state: RuntimeState = "stopped";
   client: OpencodeClient | null = null;
   version: string | null = null;
@@ -158,6 +166,158 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> {
     } catch {
       return null;
     }
+  }
+
+  // ---------------------------------------------------------------- AgentRuntime (sessions)
+
+  /** The client; throws when OpenCode isn't running. */
+  private api(): OpencodeClient {
+    if (!this.client) throw new Error(`OpenCode is not running (${this.state})`);
+    return this.client;
+  }
+
+  async listModels(): Promise<RuntimeModel[]> {
+    const models = await this.api().listModels();
+    return models.map((m: any) => ({ providerID: String(m.providerID), id: String(m.id), name: String(m.name ?? m.id), raw: m }));
+  }
+
+  async createSession(opts: NewSession): Promise<string> {
+    await this.ensureTools(opts.directory, opts.toolsUrl, true);
+    const session = await this.api().createSession({
+      title: opts.title,
+      directory: opts.directory,
+      model: parseModel(opts.model),
+      permissions: opts.permissions,
+    });
+    return session.id;
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.api().request("DELETE", `/api/session/${sessionId}`);
+  }
+
+  async setPermissions(sessionId: string, rules: PermissionRule[]): Promise<void> {
+    await this.api().setPermissions(sessionId, rules);
+  }
+
+  async setInstruction(sessionId: string, key: string, value: string | null): Promise<void> {
+    if (value === null) await this.api().removeInstruction(sessionId, key);
+    else await this.api().setInstruction(sessionId, key, value);
+  }
+
+  async prompt(sessionId: string, text: string, delivery: "queue" | "steer"): Promise<string | undefined> {
+    const res: any = await this.api().prompt(sessionId, text, delivery);
+    // OpenCode gives the queued item the id of the user message it becomes (verified).
+    return res?.data?.id;
+  }
+
+  async note(sessionId: string, text: string): Promise<void> {
+    await this.api().synthetic(sessionId, text, false);
+  }
+
+  async interrupt(sessionId: string): Promise<void> {
+    await this.api().interrupt(sessionId);
+  }
+
+  async switchModel(sessionId: string, model: string): Promise<void> {
+    await this.api().switchModel(sessionId, parseModel(model));
+  }
+
+  async queued(sessionId: string): Promise<string[]> {
+    const res = await this.api().request("GET", `/api/session/${sessionId}/inbox`);
+    return (res?.data ?? []).map((i: any) => String(i.id));
+  }
+
+  async cancelQueued(sessionId: string, id: string): Promise<boolean> {
+    return this.api()
+      .request("DELETE", `/api/session/${sessionId}/inbox/${id}`)
+      .then(
+        () => true,
+        () => false,
+      );
+  }
+
+  async forms(sessionId: string): Promise<any[]> {
+    const res = await this.api().request("GET", `/api/session/${sessionId}/form`);
+    return res?.data ?? [];
+  }
+
+  async answerForm(sessionId: string, formId: string, answer: Record<string, unknown>): Promise<void> {
+    await this.api().request("POST", `/api/session/${sessionId}/form/${formId}/reply`, { answer });
+  }
+
+  async answerPermission(sessionId: string, requestId: string, decision: "once" | "reject", message?: string | null): Promise<void> {
+    await this.api().request("POST", `/api/session/${sessionId}/permission/${requestId}/reply`, {
+      decision,
+      ...(message !== undefined ? { message } : {}),
+    });
+  }
+
+  history(sessionId: string): Promise<any[]> {
+    return this.api().messages(sessionId);
+  }
+
+  historyPage(sessionId: string, limit: number, before?: string) {
+    return this.api().messagePage(sessionId, limit, before);
+  }
+
+  async sessionUsage(sessionId: string): Promise<Usage | null> {
+    const res = await this.api().request("GET", `/api/session/${sessionId}`);
+    return sessionUsage(res?.data ?? res);
+  }
+
+  async childSessions(sessionId: string): Promise<ChildSession[]> {
+    const res = await this.api().request("GET", `/api/session?parentID=${encodeURIComponent(sessionId)}&limit=100`);
+    return (res?.data ?? []).map((child: any) => ({
+      id: String(child.id),
+      model: child.model?.providerID && child.model?.id ? `${child.model.providerID}/${child.model.id}` : null,
+      usage: sessionUsage(child),
+    }));
+  }
+
+  async changes(sessionId: string, from: string, to: string): Promise<FileChange[]> {
+    const res = await this.api().request(
+      "GET",
+      `/api/session/${sessionId}/diff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&context=3`,
+    );
+    return (res?.data ?? []).map((f: any) => ({
+      file: String(f.file),
+      status: f.status === "added" || f.status === "deleted" ? f.status : "modified",
+      additions: Number(f.additions) || 0,
+      deletions: Number(f.deletions) || 0,
+      patch: String(f.patch ?? ""),
+    }));
+  }
+
+  /**
+   * Registers Symbio's MCP server for a folder. Registrations live in OpenCode's memory and are
+   * dropped when it restarts or unloads an idle folder, so this checks first unless `force`.
+   */
+  async ensureTools(directory: string, url: string, force = false): Promise<void> {
+    const where = `location%5Bdirectory%5D=${encodeURIComponent(directory)}`;
+    if (!force) {
+      const res = await this.api()
+        .request<{ data?: { name: string; status?: { status?: string } }[] }>("GET", `/api/mcp?${where}`)
+        .catch(() => null);
+      if (res?.data?.some((s) => s.name === "symbio" && s.status?.status === "connected")) return;
+    }
+    await this.api().request("PUT", `/api/experimental/mcp/symbio?${where}`, { config: { type: "remote", url } });
+  }
+
+  async shells(directory: string): Promise<BackgroundShell[]> {
+    return (await this.api().shells(directory)).map((s: any) => ({
+      id: String(s.id),
+      command: String(s.command ?? ""),
+      pid: s.pid ?? undefined,
+      started: Number(s.time?.started) || 0,
+      running: s.status === "running",
+      // OpenCode records the session that started a shell (verified 2.1.4).
+      sessionId: s.metadata?.sessionID ?? undefined,
+    }));
+  }
+
+  async stopShell(directory: string, id: string): Promise<void> {
+    await this.api().stopShell(directory, id);
   }
 
   private scheduleRestart() {

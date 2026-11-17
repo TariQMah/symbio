@@ -10,8 +10,7 @@ import { AGENT_PERMISSIONS, PLAN_MODE_PERMISSIONS } from "./guard.js";
 import { bus } from "./bus.js";
 import { privateDocsInstruction } from "./docs.js";
 import type { McpResolver } from "./mcp.js";
-import { parseModel, type OpencodeClient, type OpencodeEvent } from "./opencode/client.js";
-import type { OpencodeRuntime } from "./opencode/runtime.js";
+import type { AgentRuntime, RuntimeEvent } from "./runtime/types.js";
 import { PlanStore, type TaskInput, type TaskStatus } from "./plan.js";
 import type { RemoteOps } from "./remote.js";
 import { coordinatorBrief, kickoffMessage, modeNote, workerBrief } from "./prompts.js";
@@ -100,7 +99,7 @@ export class Team implements TeamCore {
 
   constructor(
     readonly store: Store,
-    readonly runtime: OpencodeRuntime,
+    readonly runtime: AgentRuntime,
     private readonly mcpBaseUrl: string,
   ) {
     runtime.on("event", (e) => this.onEvent(e));
@@ -237,7 +236,7 @@ export class Team implements TeamCore {
     await this.store.update(project);
     const core = this.coordinator(project);
     if (core && core.status !== "stopped") {
-      await this.client()
+      await this.rt(core)
         .setPermissions(core.sessionId, this.permissionsFor(project, core))
         .catch((err) => console.error("[mode]", err.message));
     }
@@ -494,20 +493,19 @@ export class Team implements TeamCore {
     const existing = this.coordinator(project);
     if (existing) return existing;
 
-    const client = this.client();
-    await this.registerTools(project, project.directory);
-    const session = await client.createSession({
+    const sessionId = await this.rt().createSession({
       title: `${project.name} · core`,
       directory: project.directory,
-      model: parseModel(project.coordinatorModel),
+      model: project.coordinatorModel,
       permissions: this.permissionsFor(project, { role: "coordinator" }),
+      toolsUrl: this.toolsUrl(project, project.directory),
     });
 
     const agent: Agent = {
       id: newId("agt"),
       name: "core",
       role: "coordinator",
-      sessionId: session.id,
+      sessionId,
       directory: project.directory,
       branch: null,
       model: project.coordinatorModel,
@@ -574,20 +572,19 @@ export class Team implements TeamCore {
       );
     }
     const workspace = await createWorkspace(project, name, mode, repo);
-    const client = this.client();
-    await this.registerTools(project, workspace.directory);
-    const session = await client.createSession({
+    const sessionId = await this.rt().createSession({
       title: `${project.name} · ${name}`,
       directory: workspace.directory,
-      model: parseModel(model),
+      model,
       permissions: AGENT_PERMISSIONS,
+      toolsUrl: this.toolsUrl(project, workspace.directory),
     });
     const agent: Agent = {
       id: newId("agt"),
       name,
       role: "worker",
       purpose: opts.purpose,
-      sessionId: session.id,
+      sessionId,
       directory: workspace.directory,
       ...(repo ? { repo } : {}),
       branch: workspace.branch,
@@ -628,7 +625,7 @@ export class Team implements TeamCore {
 
   async stopAgent(project: Project, agent: Agent, reason: string): Promise<string> {
     this.quiet.reported(agent);
-    await this.client()
+    await this.rt(agent)
       .interrupt(agent.sessionId)
       .catch(() => {});
     const reg = await this.assets(project);
@@ -665,7 +662,7 @@ export class Team implements TeamCore {
       agent.base = workspace.base;
       agent.workSince = Date.now();
     }
-    await this.registerTools(project, agent.directory);
+    await this.rt(agent).ensureTools(agent.directory, this.toolsUrl(project, agent.directory), true);
     if (!modelsFor(project, agent.role).includes(agent.model)) await this.setModel(project, agent, defaultModel(project, agent.role));
     agent.status = "idle";
     agent.problem = null;
@@ -707,22 +704,22 @@ export class Team implements TeamCore {
       throw new Error(`${agent.name} is working; renew its session when it's idle.`);
     }
     if (agent.status === "stopped") throw new Error(`${agent.name} is stopped.`);
-    const client = this.client();
+    const runtime = this.rt(agent);
     const oldSession = agent.sessionId;
 
     // Count everything the old session used before leaving it.
     await this.usage.refresh(project, agent).catch(() => {});
     const handoff = await this.handoffNote(project, agent, oldSession, opts.moved);
 
-    await this.registerTools(project, agent.directory);
-    const session = await client.createSession({
+    const sessionId = await runtime.createSession({
       title: `${project.name} · ${agent.name}`,
       directory: agent.directory,
-      model: parseModel(agent.model),
+      model: agent.model,
       permissions: this.permissionsFor(project, agent),
+      toolsUrl: this.toolsUrl(project, agent.directory),
     });
     agent.previousSessions = [...(agent.previousSessions ?? []), { sessionId: oldSession, endedAt: Date.now() }];
-    agent.sessionId = session.id;
+    agent.sessionId = sessionId;
     accountUsage(agent, agent.usage ?? emptyUsage());
     agent.usage = emptyUsage();
     agent.usageSeen = emptyUsage();
@@ -732,7 +729,7 @@ export class Team implements TeamCore {
     this.pendingQuestion.delete(agent.id);
     await this.store.update(project);
     await this.refreshInstructions(project, agent);
-    await client.setInstruction(agent.sessionId, "symbio-handoff", handoff);
+    await runtime.setInstruction(agent.sessionId, "symbio-handoff", handoff);
     await this.log(project, {
       from: "symbio",
       to: "human",
@@ -801,8 +798,8 @@ export class Team implements TeamCore {
     const held = reg.list().filter((a) => a.holder === agent.id).map((a) => a.name);
     const log = (await this.store.readMessages(project)).filter((m) => m.from === agent.id || m.to === agent.id).slice(-8);
     const nameOf = (id: string) => (id === "human" ? "human" : id === "symbio" ? "Symbio" : this.agentName(project, id) ?? id);
-    const lastText = await this.client()
-      .messagePage(oldSession, 30)
+    const lastText = await this.rt(agent)
+      .historyPage(oldSession, 30)
       .then(({ messages }) => {
         const last = messages.filter((m) => m.type === "assistant" && (m.content ?? []).some((c: any) => c.type === "text" && c.text)).at(-1);
         return (last?.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
@@ -906,15 +903,14 @@ export class Team implements TeamCore {
       await this.hold(project, to, body);
       return undefined;
     }
-    const res = await this.client().prompt(to.sessionId, body, kind === "urgent" ? "steer" : "queue");
-    // Track it until OpenCode delivers it, so it can be handed over mid-turn (see takeInbox).
-    const inboxId: string | undefined = res?.data?.id;
+    const inboxId = await this.rt(to).prompt(to.sessionId, body, kind === "urgent" ? "steer" : "queue");
+    // Track it until the runtime delivers it, so it can be handed over mid-turn (see takeInbox).
     if (inboxId && kind !== "urgent") {
       if (!this.inbox.has(to.id)) this.inbox.set(to.id, new Map());
       this.inbox.get(to.id)!.set(inboxId, body);
     }
     this.setStatus(project, to, "busy");
-    // OpenCode gives the queued item the id of the user message it becomes (verified).
+    // The queued item's id is also the id of the user message it becomes.
     return inboxId;
   }
 
@@ -931,19 +927,14 @@ export class Team implements TeamCore {
   async takeInbox(agent: Agent): Promise<string[]> {
     const pending = this.inbox.get(agent.id);
     if (!pending?.size) return [];
-    const client = this.client();
-    // Re-check against OpenCode right before taking them, to keep the race window tiny.
-    const res = await client.request("GET", `/api/session/${agent.sessionId}/inbox`).catch(() => null);
-    const stillQueued = new Set<string>((res?.data ?? []).map((i: any) => i.id));
+    const runtime = this.rt(agent);
+    // Re-check right before taking them, to keep the race window tiny.
+    const stillQueued = new Set(await runtime.queued(agent.sessionId).catch(() => [] as string[]));
     const taken: string[] = [];
     for (const [id, body] of pending) {
       pending.delete(id);
       if (!stillQueued.has(id)) continue; // already delivered (or about to be)
-      const ok = await client.request("DELETE", `/api/session/${agent.sessionId}/inbox/${id}`).then(
-        () => true,
-        () => false,
-      );
-      if (ok) taken.push(body);
+      if (await runtime.cancelQueued(agent.sessionId, id)) taken.push(body);
     }
     return taken;
   }
@@ -955,7 +946,7 @@ export class Team implements TeamCore {
     await this.prepare(project, agent);
     // The coordinator talks with the human directly (in the chat mode they chose); for helpers, say who is speaking.
     const body = agent.role === "coordinator" ? text + modeNote(project.coreMode) : `[from: human · ${urgent ? "urgent" : "chat"}]\n${text}`;
-    await this.client().prompt(agent.sessionId, body, urgent ? "steer" : "queue");
+    await this.rt(agent).prompt(agent.sessionId, body, urgent ? "steer" : "queue");
     this.setStatus(project, agent, "busy");
   }
 
@@ -981,14 +972,14 @@ export class Team implements TeamCore {
    * data. Branches the helpers created stay in the repository.
    */
   async removeProject(project: Project, deleteData: boolean): Promise<void> {
-    const client = this.runtime.client;
     for (const agent of project.agents) {
-      if (client) {
-        await client.interrupt(agent.sessionId).catch(() => {});
+      const runtime = this.runtime.state === "running" ? this.runtime : null;
+      if (runtime) {
+        await runtime.interrupt(agent.sessionId).catch(() => {});
         await this.processes.stopAll(project, agent).catch(() => {});
       }
       if (agent.branch) await removeWorkspace(project, agent).catch(() => {});
-      if (deleteData && client) await client.request("DELETE", `/api/session/${agent.sessionId}`).catch(() => {});
+      if (deleteData && runtime) await runtime.deleteSession(agent.sessionId).catch(() => {});
       this.watchdog.forget(agent.id);
       this.inbox.delete(agent.id);
     }
@@ -1012,11 +1003,10 @@ export class Team implements TeamCore {
     if (project.paused) return;
     project.paused = true;
     project.pausedAgents = [];
-    const client = this.client();
     for (const agent of project.agents) {
       if (agent.status !== "busy" && agent.status !== "stuck" && agent.status !== "waiting") continue;
       project.pausedAgents.push(agent.id);
-      await client.interrupt(agent.sessionId).catch(() => {});
+      await this.rt(agent).interrupt(agent.sessionId).catch(() => {});
       this.setStatus(project, agent, "idle");
     }
     await this.store.update(project);
@@ -1038,13 +1028,12 @@ export class Team implements TeamCore {
     project.heldMessages = [];
     project.pausedAgents = [];
     await this.store.update(project);
-    const client = this.client();
     const woken = new Set<string>();
     for (const m of held) {
       const agent = project.agents.find((a) => a.id === m.agentId && active(a));
       if (!agent) continue;
-      await this.ensureTools(project, agent.directory);
-      await client.prompt(agent.sessionId, m.text, "queue").catch((err) => console.error("[resume]", err.message));
+      await this.ensureTools(project, agent);
+      await this.rt(agent).prompt(agent.sessionId, m.text, "queue").catch((err) => console.error("[resume]", err.message));
       this.setStatus(project, agent, "busy");
       woken.add(agent.id);
     }
@@ -1069,12 +1058,12 @@ export class Team implements TeamCore {
   // ---------------------------------------------------------------- misc agent ops
 
   async interrupt(project: Project, agent: Agent) {
-    await this.client().interrupt(agent.sessionId);
+    await this.rt(agent).interrupt(agent.sessionId);
     this.setStatus(project, agent, "idle");
   }
 
   async setModel(project: Project, agent: Agent, model: string) {
-    await this.client().switchModel(agent.sessionId, parseModel(model));
+    await this.rt(agent).switchModel(agent.sessionId, model);
     agent.model = model;
     if (agent.role === "coordinator") project.coordinatorModel = model;
     await this.store.update(project);
@@ -1082,24 +1071,23 @@ export class Team implements TeamCore {
   }
 
   history(agent: Agent) {
-    return this.client().messages(agent.sessionId);
+    return this.rt(agent).history(agent.sessionId);
   }
 
   /** One page of an agent's conversation (for long chats), oldest first. */
   historyPage(agent: Agent, limit: number, before?: string, sessionId?: string) {
     // Earlier sessions (after a renewal) stay readable, but only the agent's own.
     const session = sessionId && agent.previousSessions?.some((s) => s.sessionId === sessionId) ? sessionId : agent.sessionId;
-    return this.client().messagePage(session, limit, before);
+    return this.rt(agent).historyPage(session, limit, before);
   }
 
-  /** Open interactive questions (OpenCode forms) the agent is waiting on. */
-  async forms(agent: Agent): Promise<any[]> {
-    const res = await this.client().request("GET", `/api/session/${agent.sessionId}/form`);
-    return res?.data ?? [];
+  /** Open interactive questions (the runtime's question tool) the agent is waiting on. */
+  forms(agent: Agent): Promise<any[]> {
+    return this.rt(agent).forms(agent.sessionId);
   }
 
   async answerForm(project: Project, agent: Agent, formId: string, answer: Record<string, unknown>, summary: string) {
-    await this.client().request("POST", `/api/session/${agent.sessionId}/form/${formId}/reply`, { answer });
+    await this.rt(agent).answerForm(agent.sessionId, formId, answer);
     // Logged as a human reply, which also closes the question in the Messages tab.
     await this.log(project, { from: "human", to: agent.id, kind: "chat", text: summary });
   }
@@ -1111,59 +1099,46 @@ export class Team implements TeamCore {
       agent.role === "coordinator"
         ? coordinatorBrief(project, connections)
         : workerBrief(project, agent, this.coordinator(project)?.name ?? "coordinator", connections);
-    const client = this.client();
-    await client.setInstruction(agent.sessionId, "symbio-role", brief);
+    const runtime = this.rt(agent);
+    await runtime.setInstruction(agent.sessionId, "symbio-role", brief);
     // Also covers sessions created before the guard existed.
-    await client.setPermissions(agent.sessionId, this.permissionsFor(project, agent));
+    await runtime.setPermissions(agent.sessionId, this.permissionsFor(project, agent));
     this.docsSynced.delete(agent.id);
     await this.syncPrivateDocs(project, agent);
   }
 
   // ---------------------------------------------------------------- internals
 
-  client(): OpencodeClient {
-    const client = this.runtime.client;
-    if (!client) throw new Error(`OpenCode is not running (${this.runtime.state})`);
-    return client;
+  /** The runtime an agent's session lives in; throws when it isn't running. */
+  rt(_agent?: Agent): AgentRuntime {
+    if (this.runtime.state !== "running") throw new Error(`${this.runtime.label} is not running (${this.runtime.state})`);
+    return this.runtime;
   }
 
-  /** Registers Symbio's MCP tool server for a working folder (in-memory in OpenCode). */
-  private async registerTools(project: Project, directory: string) {
-    let token = [...this.mcpTokens.entries()].find(
-      ([, t]) => t.projectId === project.id && t.directory === directory,
-    )?.[0];
+  /** The URL of Symbio's MCP tool server for a working folder (a token per folder, for this run). */
+  private toolsUrl(project: Project, directory: string): string {
+    let token = [...this.mcpTokens.entries()].find(([, t]) => t.projectId === project.id && t.directory === directory)?.[0];
     if (!token) {
       token = randomBytes(18).toString("base64url");
       this.mcpTokens.set(token, { projectId: project.id, directory });
     }
-    await this.client().request(
-      "PUT",
-      `/api/experimental/mcp/symbio?location%5Bdirectory%5D=${encodeURIComponent(directory)}`,
-      { config: { type: "remote", url: `${this.mcpBaseUrl}/mcp/${token}` } },
-    );
+    return `${this.mcpBaseUrl}/mcp/${token}`;
   }
 
   /**
-   * OpenCode unloads a folder after a while idle, which also drops our tool server
-   * (registrations are in memory). Re-register before waking an agent if it's gone.
+   * A runtime can lose an agent's tool server (OpenCode unloads idle folders, and registrations
+   * live in its memory). Make sure it's there before waking the agent.
    */
-  private async ensureTools(project: Project, directory: string) {
-    const res = await this.client()
-      .request<{ data?: { name: string; status?: { status?: string } }[] }>(
-        "GET",
-        `/api/mcp?location%5Bdirectory%5D=${encodeURIComponent(directory)}`,
-      )
-      .catch(() => null);
-    if (res?.data?.some((s) => s.name === "symbio" && s.status?.status === "connected")) return;
-    await this.registerTools(project, directory).catch((err) =>
-      console.error(`[team] could not register tools for ${project.name} (${directory}):`, err.message),
-    );
+  private async ensureTools(project: Project, agent: Agent, force = false) {
+    await this.rt(agent)
+      .ensureTools(agent.directory, this.toolsUrl(project, agent.directory), force)
+      .catch((err) => console.error(`[team] could not register tools for ${project.name} (${agent.directory}):`, err.message));
   }
 
   /** Before starting an agent's turn: make sure its tools and private docs are in place. */
   private async prepare(project: Project, agent: Agent) {
     await this.reattach(project, agent);
-    await this.ensureTools(project, agent.directory);
+    await this.ensureTools(project, agent);
     await this.syncPrivateDocs(project, agent);
   }
 
@@ -1185,11 +1160,12 @@ export class Team implements TeamCore {
   private async refreshAll() {
     for (const project of this.store.list()) {
       for (const agent of project.agents.filter(active)) await this.reattach(project, agent);
-      const dirs = new Set(project.agents.filter(active).map((a) => a.directory));
-      for (const dir of dirs) {
-        await this.registerTools(project, dir).catch((err) =>
-          console.error(`[team] could not register tools for ${project.name} (${dir}):`, err.message),
-        );
+      // Once per folder (several agents can share one).
+      const dirs = new Set<string>();
+      for (const agent of project.agents.filter(active)) {
+        if (dirs.has(agent.directory)) continue;
+        dirs.add(agent.directory);
+        await this.ensureTools(project, agent, true);
       }
       for (const agent of project.agents.filter(active)) {
         await this.refreshInstructions(project, agent).catch((err) =>
@@ -1225,13 +1201,15 @@ export class Team implements TeamCore {
   private async syncPrivateDocs(project: Project, agent: Agent) {
     const text = await privateDocsInstruction(project);
     if (this.docsSynced.get(agent.id) === (text ?? "")) return;
-    const client = this.client();
-    if (text) await client.setInstruction(agent.sessionId, "symbio-docs", text);
-    else await client.removeInstruction(agent.sessionId, "symbio-docs").catch(() => {});
+    await this.rt(agent)
+      .setInstruction(agent.sessionId, "symbio-docs", text ?? null)
+      .catch((err) => {
+        if (text) throw err;
+      });
     this.docsSynced.set(agent.id, text ?? "");
   }
 
-  private onEvent(e: OpencodeEvent) {
+  private onEvent(e: RuntimeEvent) {
     const sessionId: string | undefined = e.data?.sessionID;
     if (!sessionId) return;
     const found = this.store.findAgentBySession(sessionId);
@@ -1318,17 +1296,19 @@ export class Team implements TeamCore {
     if (wake && project.paused) {
       await this.hold(project, agent, text);
     } else if (wake) {
-      await this.client().prompt(agent.sessionId, text, "queue");
+      await this.rt(agent).prompt(agent.sessionId, text, "queue");
       this.setStatus(project, agent, "busy");
     } else {
-      await this.client().synthetic(agent.sessionId, text, false);
+      await this.rt(agent).note(agent.sessionId, text);
     }
   }
 
   /** Adds a line to an agent's conversation without starting a turn or logging it (the caller logs). */
   async note(project: Project, agent: Agent, text: string) {
     await this.prepare(project, agent).catch(() => {});
-    await this.client().synthetic(agent.sessionId, text, false).catch(() => {});
+    await this.rt(agent)
+      .note(agent.sessionId, text)
+      .catch(() => {});
   }
 
   /** Delivers a message from Symbio to an agent and wakes it (used by connection approvals). */

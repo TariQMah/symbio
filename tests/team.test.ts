@@ -1,4 +1,4 @@
-// Team logic against a fake OpenCode: records the calls instead of running models.
+// Team logic against a fake agent runtime: records the calls instead of running models.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdtempSync } from "node:fs";
@@ -10,27 +10,44 @@ process.env.SYMBIO_HOME = mkdtempSync(path.join(os.tmpdir(), "sym-team-home-"));
 const { Store } = await import("../src/server/store.js");
 const { Team } = await import("../src/server/team.js");
 
-/** A stand-in for OpenCode: answers every call and remembers prompts (which start a turn) and notes. */
+/** A stand-in for the agent runtime: answers every call and remembers prompts (which start a turn) and notes. */
 function fakeRuntime() {
   const calls: { method: string; path: string; body?: any }[] = [];
-  const client: any = {
+  let sessions = 0;
+  const runtime: any = Object.assign(new EventEmitter(), {
+    kind: "opencode",
+    label: "OpenCode",
+    state: "running",
     calls,
-    request: async (method: string, p: string, body?: any) => {
-      calls.push({ method, path: p, body });
-      if (p.startsWith("/api/mcp")) return { data: [{ name: "symbio", status: { status: "connected" } }] };
-      return { data: { id: `inbox_${calls.length}` } };
-    },
     prompt: async (sessionId: string, text: string) => {
       calls.push({ method: "PROMPT", path: sessionId, body: text });
-      return { data: { id: `inbox_${calls.length}` } };
+      return `inbox_${calls.length}`;
     },
-    synthetic: async (sessionId: string, text: string) => calls.push({ method: "NOTE", path: sessionId, body: text }),
+    note: async (sessionId: string, text: string) => {
+      calls.push({ method: "NOTE", path: sessionId, body: text });
+    },
     setInstruction: async () => {},
-    setPermissions: async (sessionId: string, permissions: any) => calls.push({ method: "PATCH", path: `/api/session/${sessionId}`, body: { permissions } }),
-    removeInstruction: async () => {},
-  };
-  const runtime: any = Object.assign(new EventEmitter(), { client, state: "running" });
-  return { runtime, client, calls };
+    setPermissions: async (sessionId: string, permissions: any) => {
+      calls.push({ method: "PERMISSIONS", path: sessionId, body: permissions });
+    },
+    ensureTools: async () => {},
+    queued: async () => [],
+    cancelQueued: async () => true,
+    interrupt: async () => {},
+    switchModel: async () => {},
+    createSession: async () => `ses_new${++sessions}`,
+    deleteSession: async () => {},
+    historyPage: async () => ({ messages: [], hasMore: false }),
+    shells: async () => [],
+    stopShell: async () => {},
+    forms: async () => [],
+    answerForm: async () => {},
+    answerPermission: async () => {},
+    sessionUsage: async () => null,
+    childSessions: async () => [],
+    changes: async () => [],
+  });
+  return { runtime, calls };
 }
 
 async function setup() {
@@ -122,23 +139,16 @@ test("after an update, core gets the agent-facing changes once, as a note; new p
 
 test("in the shared project folder, each agent sees and stops only the processes it started", async () => {
   const { project, team, core, writer, editor } = await setup();
-  const shell = (id: string, sessionID?: string) => ({
-    id,
-    status: "running",
-    command: `run ${id}`,
-    time: { started: 0 },
-    metadata: sessionID ? { sessionID } : {},
-  });
-  // As OpenCode reports them: one list per folder; the starting session is in the metadata.
+  const shell = (id: string, sessionId?: string) => ({ id, running: true, command: `run ${id}`, started: 0, sessionId });
+  // One list per folder, with the session that started each shell when the runtime knows it.
   let shells = [shell("sh_w", "ses_writer"), shell("sh_e", "ses_editor"), shell("sh_c", "ses_core"), shell("sh_none"), shell("sh_x", "ses_gone")];
   const stopped: string[] = [];
-  const client = (team as any).runtime.client;
-  client.shells = async () => shells;
-  client.stopShell = async (_dir: string, id: string) => {
+  const runtime = (team as any).runtime;
+  runtime.shells = async () => shells;
+  runtime.stopShell = async (_dir: string, id: string) => {
     stopped.push(id);
     shells = shells.filter((s) => s.id !== id);
   };
-  client.interrupt = async () => {};
 
   assert.match(await team.processes.list(project, writer), /sh_w/);
   assert.doesNotMatch(await team.processes.list(project, writer), /sh_e|sh_c|sh_none|sh_x/);
@@ -162,12 +172,6 @@ test("where helpers work: project setting, per-helper choice, and moving a helpe
   const { project, team, calls, core } = await setup();
   writeFileSync(path.join(project.directory, "a.txt"), "1\n");
   await initRepository(project.directory);
-  const client = (team as any).runtime.client;
-  let n = 0;
-  client.createSession = async () => ({ id: `ses_new${++n}` });
-  client.messagePage = async () => ({ messages: [], hasMore: false });
-  client.shells = async () => [];
-  (team as any).registerTools = async () => {};
   team.usage.refresh = async () => {};
 
   await team.spawnWorker(project, core, { name: "branchy", purpose: "p", task: "t" });
@@ -206,11 +210,8 @@ test("where helpers work: project setting, per-helper choice, and moving a helpe
 test("a conversation too large to send gets one fresh session, then an alert instead of a loop", async () => {
   const { project, team, calls, store } = await setup();
   const writer = project.agents[1];
-  const client = (team as any).runtime.client;
   let n = 0;
-  client.createSession = async () => ({ id: `ses_fresh${++n}` });
-  client.messagePage = async () => ({ messages: [], hasMore: false });
-  client.interrupt = async () => {};
+  (team as any).runtime.createSession = async () => `ses_fresh${++n}`;
   team.usage.refresh = async () => {};
   const error = { type: "provider.error", message: "Timed out reading request body. Try again, or use a smaller request size." };
 
@@ -231,7 +232,9 @@ test("a question stays open while messages arrive, and the watchdog never interr
   const runtime = (team as any).runtime;
   // Earlier tests' projects share the data folder (and "ses_core"): this core needs its own session.
   core.sessionId = "ses_core_question";
-  runtime.client.interrupt = async (session: string) => calls.push({ method: "INTERRUPT", path: session });
+  runtime.interrupt = async (session: string) => {
+    calls.push({ method: "INTERRUPT", path: session });
+  };
   const interrupts = () => calls.filter((c) => c.method === "INTERRUPT").length;
   core.status = "busy";
   runtime.emit("event", { type: "session.tool.input.started", data: { sessionID: "ses_core_question", name: "question", id: "prt_q" } });
@@ -251,10 +254,7 @@ test("a question stays open while messages arrive, and the watchdog never interr
   assert.equal(core.status, "busy");
 
   // A question Symbio didn't see start (missed event): the watchdog finds it instead of interrupting.
-  const client = runtime.client;
-  const request = client.request;
-  client.request = async (method: string, p: string, body?: any) =>
-    p.endsWith("/form") ? { data: [{ id: "frm_1", fields: [] }] } : request(method, p, body);
+  runtime.forms = async () => [{ id: "frm_1", fields: [] }];
   core.lastActivity = Date.now() - 60 * 60_000;
   await team.watchdog.checkStuck();
   assert.equal(core.status, "waiting");
@@ -324,7 +324,7 @@ test("chat modes: Plan sets core's session rules and refuses work-starting tools
 
   const { project, team, calls, core } = await setup();
   core.sessionId = "ses_core_modes";
-  const rulesSent = () => calls.filter((c) => c.method === "PATCH" && c.path === `/api/session/${core.sessionId}`).at(-1)?.body?.permissions ?? [];
+  const rulesSent = () => calls.filter((c) => c.method === "PERMISSIONS" && c.path === core.sessionId).at(-1)?.body ?? [];
   await team.setCoreMode(project, "plan");
   assert.equal(project.coreMode, "plan");
   assert.ok(rulesSent().some((r: any) => r.action === "edit" && r.resource === "*" && r.effect === "deny"), "edits denied in core's session");

@@ -8,6 +8,7 @@ enough.
 | [architecture.md](architecture.md) | You want the big picture: how the server, OpenCode and the UI fit together, what each module does, project lifecycle, reliability, where data lives |
 | [agent-protocol.md](agent-protocol.md) | You're changing how agents behave: roles, messages, shared assets, plan and tasks, the tools they call |
 | [opencode-api.md](opencode-api.md) | You're calling OpenCode: the endpoints Symbio uses and the behaviors verified against 2.1.4 |
+| [copilot-api.md](copilot-api.md) | You're working on GitHub Copilot CLI as a runtime: the Copilot SDK as Symbio uses it, verified live |
 | [development.md](development.md) | You're setting up, running, testing or debugging Symbio, or want the code conventions |
 | [security.md](security.md) | You're touching anything around agent permissions, credentials or the local API |
 | [roadmap.md](roadmap.md) | You want to know what's being worked on, what's next in priority order, collected ideas, what's done and the known limitations |

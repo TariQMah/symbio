@@ -44,7 +44,7 @@ export class ModelFallback {
     // body", after an agent read several large images). Another model won't help; a fresh session will.
     if (status === 413 || /request body|request size|payload too large|request too large|request entity too large/i.test(message)) {
       // Still retrying the same oversized request: stop it before moving on.
-      if (interruptFirst) await this.team.client().interrupt(agent.sessionId).catch(() => {});
+      if (interruptFirst) await this.team.rt(agent).interrupt(agent.sessionId).catch(() => {});
       await this.renewOversized(project, agent, message);
       return;
     }
@@ -78,7 +78,7 @@ export class ModelFallback {
         return;
       }
       const previous = agent.model;
-      if (interruptFirst) await this.team.client().interrupt(agent.sessionId).catch(() => {});
+      if (interruptFirst) await this.team.rt(agent).interrupt(agent.sessionId).catch(() => {});
       await this.team.setModel(project, agent, next);
       await this.team.system(project, agent, `Symbio: your model (${previous}) failed — ${message}. You were switched to ${next}. Continue where you left off.`);
     } catch (err) {

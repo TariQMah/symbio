@@ -97,7 +97,7 @@ export class Reviews {
   async recordReport(project: Project, agent: Agent, taskId: string): Promise<void> {
     const plan = await this.team.plan(project);
     const task = plan.task(taskId);
-    const page = await this.team.client().messagePage(agent.sessionId, 40);
+    const page = await this.team.rt(agent).historyPage(agent.sessionId, 40);
     const users = page.messages.filter((m: any) => m.type === "user").map((m: any) => String(m.id));
     if (!users.length) return;
     const work = [...(task.work ?? [])];
@@ -108,7 +108,7 @@ export class Reviews {
   }
 
   /**
-   * What a task changed: the files its helper's turns changed, with their diffs (OpenCode's session
+   * What a task changed: the files its helper's turns changed, with their diffs (the runtime's session
    * diff, which needs git). Only the fields the browser needs are passed on.
    */
   async changes(project: Project, taskId: string): Promise<{ files: TaskChange[]; note?: string }> {
@@ -117,17 +117,14 @@ export class Reviews {
     if (!ranges.length) return { files: [], note: "Nothing recorded yet: the changes show once the helper reports the task." };
     const byFile = new Map<string, TaskChange>();
     for (const w of ranges) {
-      const res = await this.team
-        .client()
-        .request("GET", `/api/session/${w.sessionId}/diff?from=${encodeURIComponent(w.from)}&to=${encodeURIComponent(w.to!)}&context=3`)
-        .catch(() => null);
-      for (const f of res?.data ?? []) {
-        const patch = String(f.patch ?? "");
-        byFile.set(String(f.file), {
-          file: String(f.file),
-          status: f.status === "added" || f.status === "deleted" ? f.status : "modified",
-          additions: Number(f.additions) || 0,
-          deletions: Number(f.deletions) || 0,
+      const changes = await this.team
+        .rt()
+        .changes(w.sessionId, w.from, w.to!)
+        .catch(() => []);
+      for (const f of changes) {
+        const patch = f.patch;
+        byFile.set(f.file, {
+          ...f,
           patch: patch.length > MAX_PATCH ? `${patch.slice(0, MAX_PATCH)}\n… (cut: the change is too large to show here)` : patch,
         });
       }

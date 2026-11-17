@@ -59,7 +59,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `origin.ts` | Host/Origin checks on every request (against DNS rebinding and cross-site requests) |
 | `ui-token.ts` | The UI key (`~/.symbio/ui-token`) every API request must carry |
 | `store.ts` | Projects and agents on disk (`~/.symbio/config.json`, `<project>/.symbio/`) and the message log |
-| `team.ts` | The heart: creating, stopping, restarting and renewing agents, delivering messages, status, the plan, pause/resume, routing OpenCode's events. Its parts live in `team/` and use only the `TeamCore` interface (`team/core.ts`) |
+| `team.ts` | The heart: creating, stopping, restarting and renewing agents, delivering messages, status, the plan, pause/resume, routing the runtime's events. Its parts live in `team/` and use only the `TeamCore` interface (`team/core.ts`) |
 | `team/asset-protocol.ts` | The shared-asset protocol: request (free ones granted at once), grant, deny, release |
 | `team/watchdog.ts` | Hung agents interrupted and told why, OpenCode restarted before its memory makes it crash, interrupted agents woken after a restart |
 | `team/fallback.ts` | Failing providers: switch to the next allowed model, a fresh session when the conversation is too large, resuming stuck agents |
@@ -95,7 +95,8 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `self-update.ts` | Checks npm for a newer version, applies it when allowed (the team idle, remote access off) and reports the result; the install itself runs in `bin/update-runner.mjs`, a separate process that waits for Symbio to exit, installs, keeps or restores the old version on failure, and starts Symbio again |
 | `remote-access.ts` | Optional remote access: Cloudflare quick tunnel, access code, remote sessions, the remote login page |
 | `folder-picker.ts` | Native "choose a folder" dialog on the machine running Symbio |
-| `opencode/runtime.ts` | Starts, supervises and restarts `opencode serve`; measures its memory |
+| `runtime/types.ts` | `AgentRuntime`: what Symbio needs from an agent runtime (sessions, prompts, interrupts, models, instructions, permissions, questions, history, usage, changes, background shells) and the event vocabulary the team logic and the chat use. The team and the API call runtimes only through it |
+| `opencode/runtime.ts` | The OpenCode runtime: starts, supervises and restarts `opencode serve`, measures its memory, and implements `AgentRuntime` over its API |
 | `opencode/client.ts` | Typed wrapper over the OpenCode HTTP API |
 
 The UI (`web/src/`) is React + Vite with Motion for animation and lucide icons. `api.ts` is its

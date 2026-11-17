@@ -48,6 +48,7 @@
     "test:e2e": "tsx --test --test-concurrency=1 tests/e2e/*.test.ts"
   },
   "dependencies": {
+    "@github/copilot-sdk": "1.0.34",
     "@hono/node-server": "^2.1.5",
     "@napi-rs/keyring": "^2.1.2",
     "@opencode/cli": "~2.1.4",

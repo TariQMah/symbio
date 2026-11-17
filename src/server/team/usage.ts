@@ -1,7 +1,7 @@
-// Token usage and cost per agent, read from its OpenCode sessions (and their sub-agent sessions).
+// Token usage and cost per agent, read from its sessions (and their sub-agent sessions).
 
 import { bus } from "../bus.js";
-import { accountChildUsage, accountUsage, sessionUsage } from "../costs.js";
+import { accountChildUsage, accountUsage } from "../costs.js";
 import type { Agent, Project } from "../store.js";
 import type { TeamCore } from "./core.js";
 
@@ -24,13 +24,12 @@ export class Usage {
     );
   }
 
-  /** Reads the agent's cumulative token/cost totals from its OpenCode session. */
+  /** Reads the agent's cumulative token/cost totals from its session. */
   async refresh(project: Project, agent: Agent) {
-    const res = await this.team
-      .client()
-      .request("GET", `/api/session/${agent.sessionId}`)
+    const usage = await this.team
+      .rt(agent)
+      .sessionUsage(agent.sessionId)
       .catch(() => null);
-    const usage = sessionUsage(res?.data ?? res);
     if (!usage) return;
     agent.usage = usage;
     accountUsage(agent, agent.usage);
@@ -50,11 +49,8 @@ export class Usage {
       const parent = queue.shift()!;
       if (visited.has(parent) || visited.size > 200) continue;
       visited.add(parent);
-      const res = await this.team.client().request("GET", `/api/session?parentID=${encodeURIComponent(parent)}&limit=100`);
-      for (const child of res?.data ?? []) {
-        const usage = sessionUsage(child);
-        const model = child.model?.providerID && child.model?.id ? `${child.model.providerID}/${child.model.id}` : agent.model;
-        if (usage) accountChildUsage(agent, child.id, model, usage);
+      for (const child of await this.team.rt(agent).childSessions(parent)) {
+        if (child.usage) accountChildUsage(agent, child.id, child.model ?? agent.model, child.usage);
         queue.push(child.id);
       }
     }

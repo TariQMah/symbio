@@ -56,7 +56,7 @@ export class Watchdog {
         console.warn(`[watchdog] ${project.name}/${agent.name} silent for ${minutes} min, interrupting`);
         this.team.setStatus(project, agent, "stuck");
         try {
-          await this.team.client().interrupt(agent.sessionId);
+          await this.team.rt(agent).interrupt(agent.sessionId);
           await this.team.system(
             project,
             agent,

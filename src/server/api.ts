@@ -32,8 +32,8 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   const priceBookLoaded = priceBook.load();
   let catalog: { at: number; models: any[] } | null = null;
   const catalogModels = async () => {
-    if (!runtime.client) return catalog?.models ?? [];
-    if (!catalog || Date.now() - catalog.at > 10 * 60_000) catalog = { at: Date.now(), models: await runtime.client.listModels() };
+    if (runtime.state !== "running") return catalog?.models ?? [];
+    if (!catalog || Date.now() - catalog.at > 10 * 60_000) catalog = { at: Date.now(), models: (await runtime.listModels()).map((m) => m.raw) };
     return catalog.models;
   };
   const pricesFor = async (refs: string[]) => {
@@ -126,17 +126,17 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   });
 
   api.get("/models", async (c) => {
-    if (!runtime.client) return c.json({ error: "OpenCode is not running" }, 503);
-    const models = await runtime.client.listModels();
-    if (c.req.query("raw") && DEBUG) return c.json(models);
+    if (runtime.state !== "running") return c.json({ error: `${runtime.label} is not running` }, 503);
+    const models = await runtime.listModels();
+    if (c.req.query("raw") && DEBUG) return c.json(models.map((m) => m.raw));
     return c.json(
-      models.map((m: any) => ({
+      models.map((m) => ({
         ref: `${m.providerID}/${m.id}`,
         providerID: m.providerID,
         id: m.id,
-        name: m.name ?? m.id,
-        vision: modelSupportsImages(m),
-        free: isFree(m),
+        name: m.name,
+        vision: modelSupportsImages(m.raw),
+        free: isFree(m.raw),
       })),
     );
   });

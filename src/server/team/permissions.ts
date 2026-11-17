@@ -50,17 +50,18 @@ export class Permissions {
   async asked(project: Project, agent: Agent, req: any) {
     const action = String(req.action ?? "");
     const resources: string[] = Array.isArray(req.resources) ? req.resources.map(String) : [];
-    const reply = (body: unknown) => this.team.client().request("POST", `/api/session/${agent.sessionId}/permission/${req.id}/reply`, body).catch(() => {});
+    const reply = (decision: "once" | "reject", message?: string) =>
+      this.team.rt(agent).answerPermission(agent.sessionId, req.id, decision, message).catch(() => {});
     // Image files: refused at once, with what to use instead (never a question for the human).
     const refusal = readRefusal(action, resources);
     if (refusal) {
-      await reply({ decision: "reject", message: refusal });
+      await reply("reject", refusal);
       return;
     }
     // Already answered "always" for this kind of request in this project?
     const allowed = resources.length > 0 && resources.every((r) => project.allowedPatterns.some((a) => a.action === action && wildcardMatch(a.pattern, r)));
     if (allowed) {
-      await reply({ decision: "once" });
+      await reply("once");
       await this.team.log(project, { from: "symbio", to: "human", kind: "system", text: `Allowed ${agent.name} to ${action} \`${resources.join("; ")}\` (you chose “always” for this before).` });
       return;
     }
@@ -94,11 +95,10 @@ export class Permissions {
       await this.team.store.update(project);
       bus.publish({ type: "project.updated", projectId: project.id });
     }
-    await this.team.client().request("POST", `/api/session/${agent.sessionId}/permission/${requestId}/reply`, {
-      // "always" is remembered by Symbio (per project); OpenCode only needs to let this one through.
-      decision: decision === "reject" ? "reject" : "once",
-      message: note?.trim() || (decision === "reject" ? "The human denied this." : null),
-    });
+    // "always" is remembered by Symbio (per project); the runtime only needs to let this one through.
+    await this.team
+      .rt(agent)
+      .answerPermission(agent.sessionId, requestId, decision === "reject" ? "reject" : "once", note?.trim() || (decision === "reject" ? "The human denied this." : null));
     this.open.delete(requestId);
     bus.publish({ type: "approvals.updated", projectId: project.id });
   }
