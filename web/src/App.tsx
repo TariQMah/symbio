@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, ChevronDown, ChevronRight, KeyRound, LayoutList, PauseCircle, Plus, Settings as SettingsIcon } from "lucide-react";
-import { api, LOCKED_EVENT, subscribe, type Project, type RuntimeInfo } from "./api";
+import { api, LOCKED_EVENT, subscribe, type Project, type RuntimeInfo, type RuntimeKind, type RuntimeStatus } from "./api";
 import { FileViewer } from "./files";
 import { Home } from "./Home";
 import { ProjectView } from "./ProjectView";
@@ -39,13 +39,22 @@ export function App() {
   const route = useHashRoute();
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
+  // The open project's runtime: the top bar shows that one there.
+  const [projectRuntime, setProjectRuntime] = useState<RuntimeKind | null>(null);
 
   useEffect(() => {
     api.runtime().then(setRuntime).catch(() => {});
     // Memory is measured server-side every minute; refresh the indicator now and then.
     const timer = setInterval(() => api.runtime().then(setRuntime).catch(() => {}), 30_000);
     const unsubscribe = subscribe((e) => {
-      if (e.type === "runtime") setRuntime((r) => ({ ...e, memoryMB: e.memoryMB ?? r?.memoryMB ?? null }));
+      if (e.type === "runtime") {
+        // State changes don't carry memory (measured every minute): keep the last known figures.
+        setRuntime((r) => ({
+          ...e,
+          memoryMB: e.memoryMB ?? r?.memoryMB ?? null,
+          runtimes: e.runtimes?.map((x) => ({ ...x, memoryMB: x.memoryMB ?? r?.runtimes?.find((y) => y.kind === x.kind)?.memoryMB ?? null })),
+        }));
+      }
     });
     return () => {
       clearInterval(timer);
@@ -55,12 +64,18 @@ export function App() {
 
   // Breadcrumb name for the open project.
   useEffect(() => {
-    if (route.page !== "project") return setProjectName(null);
+    if (route.page !== "project") {
+      setProjectRuntime(null);
+      return setProjectName(null);
+    }
     const id = route.id;
     const load = () =>
       api
         .project(id)
-        .then((p) => setProjectName(p.name))
+        .then((p) => {
+          setProjectName(p.name);
+          setProjectRuntime(p.runtime ?? "opencode");
+        })
         .catch(() => setProjectName(null));
     void load();
     return subscribe((e) => {
@@ -134,7 +149,7 @@ export function App() {
             <span className="btn-label">Settings</span>
           </a>
           <UpdateBadge />
-          <RuntimeBadge runtime={runtime} />
+          <RuntimeBadges runtime={runtime} only={projectRuntime} />
         </div>
       </header>
       <RemoteBanner />
@@ -239,8 +254,25 @@ function SymbioVersion() {
   );
 }
 
-function RuntimeBadge({ runtime }: { runtime: RuntimeInfo | null }) {
+/**
+ * The agent runtimes' status. On a project's page, the one its agents run on; elsewhere, OpenCode
+ * (always running) and any other runtime that is running.
+ */
+function RuntimeBadges({ runtime, only }: { runtime: RuntimeInfo | null; only: RuntimeKind | null }) {
   if (!runtime) return <span className="runtime">Connecting…</span>;
+  const all: RuntimeStatus[] = runtime.runtimes ?? [{ kind: "opencode", label: "OpenCode", ...runtime }];
+  const shown = only ? all.filter((r) => r.kind === only) : all.filter((r) => r.kind === "opencode" || r.state !== "stopped");
+  return (
+    <>
+      {shown.map((r) => (
+        <RuntimeBadge key={r.kind} runtime={r} />
+      ))}
+    </>
+  );
+}
+
+function RuntimeBadge({ runtime }: { runtime: RuntimeStatus }) {
+  const name = runtime.label;
   const memory = runtime.memoryMB
     ? runtime.memoryMB >= 1024
       ? `${(runtime.memoryMB / 1024).toFixed(1)} GB`
@@ -248,14 +280,16 @@ function RuntimeBadge({ runtime }: { runtime: RuntimeInfo | null }) {
     : null;
   const label =
     runtime.state === "running"
-      ? `OpenCode ${runtime.version ?? ""}`
+      ? `${name} ${runtime.version ?? ""}`
       : runtime.state === "starting"
-        ? "Starting OpenCode…"
+        ? `Starting ${name}…`
         : runtime.state === "crashed"
-          ? "OpenCode restarting"
-          : "OpenCode stopped";
+          ? `${name} restarting`
+          : runtime.kind === "opencode"
+            ? `${name} stopped`
+            : `${name} not started`;
   return (
-    <span className="runtime" title={[runtime.error, memory && `Memory: ${memory}`].filter(Boolean).join("\n") || undefined}>
+    <span className="runtime" data-runtime={runtime.kind} title={[runtime.error, memory && `Memory: ${memory}`].filter(Boolean).join("\n") || undefined}>
       <span className={`dot ${runtime.state}`} />
       <span className="runtime-label">{label}</span>
       {memory && runtime.state === "running" && <span className="subtle tnum">{memory}</span>}

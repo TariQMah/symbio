@@ -42,6 +42,13 @@ test("a new project's agents run on GitHub Copilot CLI when chosen, with its mod
   const core = (await symbio.call("GET", `/projects/${project.id}`)).agents[0];
   assert.equal(core.runtime, "copilot", "core runs on Copilot");
   await page.locator(".msg-assistant", { hasText: "Noted (core)" }).first().waitFor();
+  // The top bar shows the runtime this project's agents run on, not OpenCode.
+  await page.locator('.topbar .runtime[data-runtime="copilot"] .runtime-label', { hasText: "GitHub Copilot CLI" }).waitFor();
+  assert.equal(await page.locator('.topbar .runtime[data-runtime="opencode"]').count(), 0);
+  // Elsewhere, every runtime that is running.
+  await page.goto(`${symbio.base}/#/`);
+  await page.locator('.topbar .runtime[data-runtime="opencode"]').waitFor();
+  await page.locator('.topbar .runtime[data-runtime="copilot"]').waitFor();
   assert.deepEqual((page as any).errors, []);
 });
 

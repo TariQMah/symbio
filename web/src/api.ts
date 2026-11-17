@@ -273,6 +273,17 @@ export interface RuntimeInfo {
   version: string | null;
   error: string | null;
   memoryMB?: number | null;
+  /** Every agent runtime's status (OpenCode's is also the fields above). */
+  runtimes?: RuntimeStatus[];
+}
+
+export interface RuntimeStatus {
+  kind: RuntimeKind;
+  label: string;
+  state: RuntimeInfo["state"];
+  version: string | null;
+  error: string | null;
+  memoryMB?: number | null;
 }
 
 /** An agent runtime as Settings shows it (GET /runtimes), with GitHub Copilot's sign-in. */

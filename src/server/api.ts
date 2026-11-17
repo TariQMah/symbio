@@ -116,13 +116,31 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   api.post("/connections/:id/test", async (c) => c.json(await connections.test(c.req.param("id"))));
 
+  const memoryMB = (r: AgentRuntime) => (r.lastMemory ? Math.round(r.lastMemory / 1024 / 1024) : null);
+  // OpenCode's status (the default runtime), plus every runtime's, for the top bar: a project's page
+  // shows the runtime its agents run on.
   const runtimeInfo = () => ({
     state: runtime.state,
     version: runtime.version,
     error: runtime.lastError,
     restarts: runtime.restarts,
-    memoryMB: runtime.lastMemory ? Math.round(runtime.lastMemory / 1024 / 1024) : null,
+    memoryMB: memoryMB(runtime),
+    runtimes: [...team.runtimes.values()].map((r) => ({
+      kind: r.kind,
+      label: r.label,
+      state: r.state,
+      version: r.version,
+      error: r.lastError,
+      memoryMB: memoryMB(r),
+    })),
   });
+  /** Calls `fn` when any runtime's state changes; returns the way to stop. */
+  const onAnyRuntimeState = (fn: () => void) => {
+    for (const r of team.runtimes.values()) r.on("state", fn);
+    return () => {
+      for (const r of team.runtimes.values()) r.off("state", fn);
+    };
+  };
 
   api.get("/runtime", (c) => c.json(runtimeInfo()));
 
@@ -1049,11 +1067,10 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       const send = (event: UiEvent) => void stream.writeSSE({ data: JSON.stringify(event) });
       send({ type: "runtime", ...runtimeInfo() });
       bus.on("ui", send);
-      const onState = () => send({ type: "runtime", ...runtimeInfo() });
-      runtime.on("state", onState);
+      const stopWatching = onAnyRuntimeState(() => send({ type: "runtime", ...runtimeInfo() }));
       stream.onAbort(() => {
         bus.off("ui", send);
-        runtime.off("state", onState);
+        stopWatching();
       });
       while (!stream.aborted) {
         await stream.sleep(15_000);
@@ -1075,7 +1092,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
         const done = () => {
           clearTimeout(timer);
           bus.off("ui", onEvent);
-          runtime.off("state", onState);
+          stopWatching();
           c.req.raw.signal.removeEventListener("abort", done);
           resolve();
         };
@@ -1086,7 +1103,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
         };
         const timer = setTimeout(done, 25_000);
         bus.on("ui", onEvent);
-        runtime.on("state", onState);
+        const stopWatching = onAnyRuntimeState(onState);
         c.req.raw.signal.addEventListener("abort", done);
       });
     }

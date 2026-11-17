@@ -3,7 +3,7 @@
 import { EventEmitter } from "node:events";
 
 export type UiEvent =
-  | { type: "runtime"; state: string; version: string | null; error: string | null }
+  | { type: "runtime"; state: string; version: string | null; error: string | null; runtimes?: unknown[] }
   | { type: "project.updated"; projectId: string }
   | { type: "prices.updated" }
   | { type: "remote.updated" }
