@@ -227,7 +227,7 @@ const installer = new RuntimeInstaller();
     };
     if (!isInstalled(r.kind)) {
       if (!usedBy(r.kind).length) continue;
-      console.log(`${label} isn't installed, and projects use it: installing it (Settings → Runtimes shows how it goes)…`);
+      console.log(`${label} isn't installed, and projects use it: installing it (Settings → Agent runtimes shows how it goes)…`);
       installer
         .install(r.kind)
         .then(() => (active(r.kind) ? start() : undefined))
