@@ -230,6 +230,29 @@ export const PROCESS_RULES = `- Never kill processes by name or PID (taskkill, S
 - Never read SSH keys or anything under ~/.ssh or Symbio's secret store —
   servers and GitHub are reached through Symbio's connection tools.`;
 
+/**
+ * The effect of a session's rules on a call, for runtimes that leave the decision to Symbio
+ * (GitHub Copilot CLI): any matching deny wins, then any ask; otherwise it's allowed. A shell
+ * command is checked whole and part by part (`a; b`, `a && b`, `a || b`, lines), as OpenCode's
+ * scanner does, so a blocked command can't hide behind another.
+ */
+export function evaluate(rules: PermissionRule[], action: string, resources: string[]): { effect: PermissionRule["effect"]; rule?: PermissionRule } {
+  const values = action === "shell" ? resources.flatMap((r) => [r, ...shellParts(r)]) : resources;
+  const matching = rules.filter((r) => r.action === action && values.some((v) => wildcardMatch(r.resource, v)));
+  const deny = matching.find((r) => r.effect === "deny");
+  if (deny) return { effect: "deny", rule: deny };
+  const ask = matching.find((r) => r.effect === "ask");
+  if (ask) return { effect: "ask", rule: ask };
+  return { effect: "allow" };
+}
+
+function shellParts(command: string): string[] {
+  return command
+    .split(/\r?\n|;|&&|\|\|/)
+    .map((p) => p.trim())
+    .filter((p) => p && p !== command.trim());
+}
+
 /** OpenCode-style wildcard: "*" any run, "?" one char; "x *" also matches bare "x". */
 export function wildcardMatch(pattern: string, value: string): boolean {
   const body = pattern

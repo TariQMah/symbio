@@ -1,7 +1,8 @@
 // Minimal MCP server (Streamable HTTP transport, JSON responses) that exposes
 // Symbio's tools to agents. Registrations are per working folder (URL token);
 // the calling agent is identified by the session ID OpenCode sends in
-// `params._meta["ai.opencode/sessionID"]` with every tool call.
+// `params._meta["ai.opencode/sessionID"]` with every tool call, or by the
+// `x-symbio-session` header Symbio gives each GitHub Copilot CLI session.
 
 import type { Context } from "hono";
 
@@ -53,18 +54,21 @@ export async function handleMcp<Ctx>(c: Context, resolve: McpResolver<Ctx>): Pro
     return c.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } }, 400);
   }
 
+  // Runtimes that don't send the session with each call (GitHub Copilot CLI) send it as a header,
+  // set per session when Symbio creates it.
+  const sessionHeader = c.req.header("x-symbio-session") || undefined;
   const requests = Array.isArray(body) ? body : [body];
-  const responses = (await Promise.all(requests.map((r) => handleOne(r, token, resolve)))).filter((r) => r !== null);
+  const responses = (await Promise.all(requests.map((r) => handleOne(r, token, resolve, sessionHeader)))).filter((r) => r !== null);
   if (responses.length === 0) return c.body(null, 202); // notifications only
   return c.json(Array.isArray(body) ? responses : responses[0]);
 }
 
-async function handleOne<Ctx>(req: JsonRpcRequest, token: string, resolve: McpResolver<Ctx>) {
+async function handleOne<Ctx>(req: JsonRpcRequest, token: string, resolve: McpResolver<Ctx>, sessionHeader?: string) {
   const isNotification = req.id === undefined || req.id === null;
   const reply = (result: unknown) => (isNotification ? null : { jsonrpc: "2.0", id: req.id, result });
   const fail = (code: number, message: string) =>
     isNotification ? null : { jsonrpc: "2.0", id: req.id, error: { code, message } };
-  const sessionId: string | undefined = req.params?._meta?.["ai.opencode/sessionID"];
+  const sessionId: string | undefined = req.params?._meta?.["ai.opencode/sessionID"] ?? sessionHeader;
   const caller = resolve(token, sessionId);
   if (!caller) return fail(-32001, "unknown token");
 

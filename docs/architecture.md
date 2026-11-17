@@ -98,6 +98,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `runtime/types.ts` | `AgentRuntime`: what Symbio needs from an agent runtime (sessions, prompts, interrupts, models, instructions, permissions, questions, history, usage, changes, background shells) and the event vocabulary the team logic and the chat use. The team and the API call runtimes only through it |
 | `opencode/runtime.ts` | The OpenCode runtime: starts, supervises and restarts `opencode serve`, measures its memory, and implements `AgentRuntime` over its API |
 | `opencode/client.ts` | Typed wrapper over the OpenCode HTTP API |
+| `copilot/runtime.ts` | The GitHub Copilot CLI runtime (in progress, not selectable yet): `AgentRuntime` over the Copilot SDK, with Symbio's rules applied to each permission request, notes carried with the next prompt, and Copilot's events and stored conversation translated into Symbio's vocabulary (see [copilot-api.md](copilot-api.md)) |
 
 The UI (`web/src/`) is React + Vite with Motion for animation and lucide icons. `api.ts` is its
 client; `ProjectView.tsx` holds the project screen (team sidebar and tabs), `Chat.tsx` renders a

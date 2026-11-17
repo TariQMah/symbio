@@ -35,6 +35,10 @@ script, unless marked otherwise. Re-verify when either changes, and update this 
 - `client.resumeSession(id, config)` continues a session, also from a new runtime process (it
   remembered a file it created and an answer it got). Handlers and MCP servers are given again.
 - `client.listSessions()`, `client.deleteSession(id)` (removes it from disk).
+- **New instructions for an open session:** `resumeSession(id, { systemMessage, … })` on a
+  session that is already open returns a new session object that uses them from the next turn
+  ("Your name is Alpha" → resumed with "Bravo" → it answered Bravo). Symbio reopens a session
+  this way before its next turn when its brief or private docs change.
 - `session.getEvents()` is the stored conversation: `session.start`, `user.message`,
   `system.message`, `assistant.turn_start`, `assistant.message` (`content`, `toolRequests`),
   `tool.execution_start` / `_complete`, `permission.*`, `assistant.turn_end`, `abort`,
@@ -98,6 +102,32 @@ each session its own header (or URL) to know who is calling. The headers arrived
 
 ## Changes
 
-`session.rpc.workspaces.diff({ mode: "session" })` falls back to the folder's uncommitted git diff
-(`isFallback: true, unavailableReason: "file-change-tracking-disabled"`) unless the session was
-created with `enableFileChangeTracking` (to verify). There is no diff between two given turns.
+`session.rpc.workspaces.diff({ mode: "session" })` gives the files the session changed, with unified
+diffs, when the session was created with `enableFileChangeTracking: true` (`isFallback: false`);
+without it, it falls back to the folder's uncommitted git diff (`unavailableReason:
+"file-change-tracking-disabled"`). There is no diff between two given turns, so a task's changes
+are the whole session's.
+
+## Failures
+
+A model that doesn't exist (or isn't enabled) fails the turn at once: `session.error` with
+`errorType: "query"`, `message: 'Execution failed: Model "…" is not available.'`, then
+`session.idle`. `session.setModel(id)` switches a live session (it then said it was the new model).
+
+## How Symbio maps it (`src/server/copilot/runtime.ts`)
+
+| Symbio needs | With Copilot |
+|---|---|
+| A session per agent, in its folder | `createSession` with a Symbio-made `sessionId`, `workingDirectory`, `enableFileChangeTracking` |
+| Symbio's tools | the `symbio` MCP server per session, with an `x-symbio-session` header (`mcp.ts` reads it) |
+| Briefs and private docs | `systemMessage` (`append`), reopened before the next turn when they change |
+| Permission rules | `onPermissionRequest`: `guard.ts`'s `evaluate` decides; deny → reject with a reason, ask → `permission.asked` for the human |
+| Notes without a turn | kept, and appended to the next prompt in `<symbio-notes>`; the history shows them as notes again |
+| Queued messages taken back mid-turn | `rpc.queue.pendingItems` / `rpc.queue.withdrawMessage` |
+| Questions to the human | `onUserInputRequest` → a form with one `answer` field |
+| Events and history | translated into OpenCode's vocabulary (`runtime/types.ts`) |
+| Signing in | its own `COPILOT_HOME` (given by Symbio) pointed at the user's GitHub login |
+
+Not there yet: background processes (`list_processes` / `stop_process` return nothing), memory
+measurement (the SDK doesn't give the process id), prices from Copilot's model list, and choosing
+the runtime in the UI.
