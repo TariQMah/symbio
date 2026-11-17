@@ -1140,7 +1140,14 @@ export class Team implements TeamCore {
     return runtime;
   }
 
-  /** The runtime new agents of the project run on, started if it isn't yet (Copilot starts on demand). */
+  /** Starts the runtimes a project's agents (and its new agents) run on, if they aren't running: its page needs them. */
+  async startRuntimesOf(project: Project): Promise<void> {
+    const kinds = new Set<RuntimeKind>([project.runtime ?? "opencode", ...project.agents.map((a) => runtimeOf(a))]);
+    if (!project.agents.length) return; // nothing to show yet; New project / start bring its runtime up
+    for (const kind of kinds) await this.runtimeFor({ runtime: kind }).catch((err) => console.error(`[runtime] ${kind}:`, err.message));
+  }
+
+  /** The runtime new agents of the project run on, started if it isn't yet (each runtime starts on demand). */
   async runtimeFor(project: Pick<Project, "runtime">): Promise<AgentRuntime> {
     const kind = project.runtime ?? "opencode";
     const runtime = this.runtimes.get(kind);
@@ -1183,6 +1190,8 @@ export class Team implements TeamCore {
 
   /** Before starting an agent's turn: make sure its tools and private docs are in place. */
   private async prepare(project: Project, agent: Agent) {
+    // Runtimes start when needed: waking an agent (or adding to its conversation) is a need.
+    await this.runtimeFor({ runtime: runtimeOf(agent) });
     await this.reattach(project, agent);
     await this.ensureTools(project, agent);
     await this.syncPrivateDocs(project, agent);

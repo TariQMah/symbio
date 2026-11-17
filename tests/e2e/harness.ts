@@ -63,7 +63,7 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
   proc.stderr!.on("data", (d) => (log += d));
 
   const base = `http://127.0.0.1:${port}`;
-  const tokenFile = path.join(root, "home", "ui-token");
+  const tokenFile = path.join(fullEnv.SYMBIO_HOME!, "ui-token");
   // A started Symbio that never answers would keep the test file from ending: stop it.
   const fail = (err: unknown) => {
     if (proc.exitCode === null) proc.kill();
@@ -83,7 +83,17 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
     if (!res.ok) throw new Error(`${method} ${route} → ${res.status}: ${JSON.stringify(data)}`);
     return data;
   };
-  await until("OpenCode (stand-in) to run", async () => (await call("GET", "/runtime").catch(() => null))?.state === "running", 30_000, () => log).catch(fail);
+  // Runtimes start when needed (on a first run, OpenCode at once): wait for the API, and for OpenCode
+  // when it was started.
+  await until(
+    "Symbio's API (and OpenCode, when started)",
+    async () => {
+      const info = await call("GET", "/runtime").catch(() => null);
+      return !!info && info.state !== "starting";
+    },
+    30_000,
+    () => log,
+  ).catch(fail);
 
   return {
     base,

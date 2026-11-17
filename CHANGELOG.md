@@ -11,6 +11,9 @@ versions follow [Semantic Versioning](https://semver.org/).
   its sessions apart from your own Copilot history. Symbio's rules still apply to every command an agent runs and every
   file it reads or writes; background processes, model prices and the chat's steps work as with OpenCode. Models you
   added to the Copilot CLI with your own key (e.g. Azure AI Foundry, in Copilot's `providers.json`) are offered too.
+- **OpenCode and Copilot start only when needed**: when a project's agents run on them, or when something asks for them
+  (a project's page, New project's models, Settings). Using only Copilot no longer keeps OpenCode running. The top bar
+  shows the runtime of the project you're looking at, and elsewhere the ones running.
 
 ## [0.14.3]
 

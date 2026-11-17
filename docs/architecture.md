@@ -33,7 +33,9 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
   keeps the runtime it was created on, `Agent.runtime`). The team logic talks to both through one
   interface, `AgentRuntime` (`runtime/types.ts`), and the chat reads one event and history
   vocabulary. Copilot runs through the Copilot SDK in Symbio's own Copilot folder
-  (`~/.symbio/copilot`), started when a project uses it; see [copilot-api.md](copilot-api.md). The
+  (`~/.symbio/copilot`); see [copilot-api.md](copilot-api.md). **Each runtime starts when something
+  needs it** (an agent to wake, a project's page, New project's models, Settings), and at launch only
+  if agents left active run on it (OpenCode also on a first run, for connecting a provider). The
   rest of this page describes OpenCode, the default.
 - **OpenCode is the default runtime.** Symbio ships with a pinned OpenCode (the `@opencode/cli`
   dependency; `SYMBIO_OPENCODE_BIN` overrides it) and starts its *own* private `opencode serve`: a random port,
@@ -59,7 +61,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 
 | Module | Responsibility |
 |---|---|
-| `index.ts` | Startup: store, connections, OpenCode runtime, team, HTTP server, static UI, shutdown |
+| `index.ts` | Startup: store, connections, the runtimes (started when needed), team, HTTP server, static UI, shutdown |
 | `api.ts` | REST routes for the UI |
 | `bus.ts` | In-process event bus feeding the UI's SSE stream (and the polling fallback) |
 | `origin.ts` | Host/Origin checks on every request (against DNS rebinding and cross-site requests) |

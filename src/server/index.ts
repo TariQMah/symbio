@@ -14,6 +14,7 @@ import { isTunnelRequest, loginPage, RemoteAccess, remoteDecision, SESSION_COOKI
 import { bus } from "./bus.js";
 import { OpencodeRuntime } from "./opencode/runtime.js";
 import { CopilotRuntime } from "./copilot/runtime.js";
+import { runtimeOf, type RuntimeKind } from "./runtime/types.js";
 import { Store, globalDir } from "./store.js";
 import { Team } from "./team.js";
 import { removeOrphanWorkspaces } from "./workspaces.js";
@@ -206,12 +207,19 @@ async function main() {
     if (webRoot && process.env.SYMBIO_NO_OPEN !== "1") openBrowser(url);
   });
 
-  console.log("Starting OpenCode…");
-  runtime
-    .start()
-    .then(() => console.log(`OpenCode ${runtime.version} ready`))
-    .catch((err) => console.error("OpenCode failed to start:", err.message));
-  if (store.list().some((p) => p.runtime === "copilot" || p.agents.some((a) => a.runtime === "copilot" && a.status !== "stopped"))) {
+  // Each runtime starts when something needs it (a project's agents, New project, Settings), and at
+  // launch only when agents that were left active run on it. On a first run (no projects yet) OpenCode
+  // starts too, so the first steps (connecting a provider, its models) are ready.
+  const projects = store.list();
+  const used = (kind: RuntimeKind) => projects.some((p) => p.agents.some((a) => runtimeOf(a) === kind && a.status !== "stopped"));
+  if (used("opencode") || projects.length === 0) {
+    console.log("Starting OpenCode…");
+    runtime
+      .start()
+      .then(() => console.log(`OpenCode ${runtime.version} ready`))
+      .catch((err) => console.error("OpenCode failed to start:", err.message));
+  }
+  if (used("copilot")) {
     console.log("Starting GitHub Copilot CLI…");
     copilot
       .start()

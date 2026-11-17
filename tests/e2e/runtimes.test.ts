@@ -47,7 +47,6 @@ test("a new project's agents run on GitHub Copilot CLI when chosen, with its mod
   assert.equal(await page.locator('.topbar .runtime[data-runtime="opencode"]').count(), 0);
   // Elsewhere, every runtime that is running.
   await page.goto(`${symbio.base}/#/`);
-  await page.locator('.topbar .runtime[data-runtime="opencode"]').waitFor();
   await page.locator('.topbar .runtime[data-runtime="copilot"]').waitFor();
   assert.deepEqual((page as any).errors, []);
 });
@@ -110,5 +109,36 @@ test("models from the user's own Copilot providers (e.g. Azure AI Foundry) are o
   assert.equal(project.coordinatorModel, "foundry/fake-byok");
   await idle(symbio, project.id);
   await page.locator(".msg-assistant", { hasText: "Noted (core)" }).first().waitFor();
+});
+
+test("each runtime starts when needed: with only Copilot agents, OpenCode isn't started", async () => {
+  const first = await startSymbio();
+  const home = path.join(first.root, "home");
+  let again: Symbio | null = null;
+  try {
+    const directory = first.folder("copilot-only");
+    const project = await first.call("POST", "/projects", { name: "Copilot only", directory, coordinatorModel: "copilot/scripted", allowedModels: ["copilot/scripted"], runtime: "copilot" });
+    await first.call("POST", `/projects/${project.id}/start`);
+    await idle(first, project.id);
+    await first.stop();
+
+    // The same data, started again: core runs on Copilot, so only Copilot starts.
+    again = await startSymbio({ SYMBIO_HOME: home });
+    const runtimes = async () => Object.fromEntries((await again!.call("GET", "/runtime")).runtimes.map((r: any) => [r.kind, r.state]));
+    await until("Copilot to start", async () => (await runtimes()).copilot === "running");
+    assert.equal((await runtimes()).opencode, "stopped", "OpenCode isn't started for nothing");
+    const { page } = await openPage(again);
+    await page.goto(`${again.base}/#/`);
+    await page.locator('.topbar .runtime[data-runtime="copilot"]').waitFor();
+    assert.equal(await page.locator('.topbar .runtime[data-runtime="opencode"]').count(), 0);
+
+    // Something that needs OpenCode starts it: its models, for a new project on it.
+    const models = await again.call("GET", "/models?runtime=opencode");
+    assert.ok(models.some((m: any) => m.ref === "fake/scripted"));
+    assert.equal((await runtimes()).opencode, "running");
+  } finally {
+    await again?.stop();
+    await first.stop().catch(() => {});
+  }
 });
 

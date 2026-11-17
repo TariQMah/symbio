@@ -255,13 +255,21 @@ function SymbioVersion() {
 }
 
 /**
- * The agent runtimes' status. On a project's page, the one its agents run on; elsewhere, OpenCode
- * (always running) and any other runtime that is running.
+ * The agent runtimes' status. On a project's page, the one its agents run on; elsewhere, the ones
+ * running (each starts when something needs it).
  */
 function RuntimeBadges({ runtime, only }: { runtime: RuntimeInfo | null; only: RuntimeKind | null }) {
   if (!runtime) return <span className="runtime">Connecting…</span>;
   const all: RuntimeStatus[] = runtime.runtimes ?? [{ kind: "opencode", label: "OpenCode", ...runtime }];
-  const shown = only ? all.filter((r) => r.kind === only) : all.filter((r) => r.kind === "opencode" || r.state !== "stopped");
+  const shown = only ? all.filter((r) => r.kind === only) : all.filter((r) => r.state !== "stopped");
+  if (!shown.length) {
+    return (
+      <span className="runtime" title="OpenCode and GitHub Copilot CLI start when a project needs them.">
+        <span className="dot stopped" />
+        <span className="runtime-label">No runtime running</span>
+      </span>
+    );
+  }
   return (
     <>
       {shown.map((r) => (
@@ -285,9 +293,7 @@ function RuntimeBadge({ runtime }: { runtime: RuntimeStatus }) {
         ? `Starting ${name}…`
         : runtime.state === "crashed"
           ? `${name} restarting`
-          : runtime.kind === "opencode"
-            ? `${name} stopped`
-            : `${name} not started`;
+          : `${name} not started`;
   return (
     <span className="runtime" data-runtime={runtime.kind} title={[runtime.error, memory && `Memory: ${memory}`].filter(Boolean).join("\n") || undefined}>
       <span className={`dot ${runtime.state}`} />

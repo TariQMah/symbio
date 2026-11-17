@@ -29,7 +29,8 @@ export function Home({ runtime, create }: { runtime: RuntimeInfo | null; create?
     });
   }, []);
 
-  const canCreate = runtime?.state === "running";
+  // Runtimes start when needed (OpenCode's models load when the dialog asks): connected is enough.
+  const canCreate = runtime !== null;
 
   // Opened as "#/new" (New project… in the project switcher): open the dialog once it can be used,
   // and drop "new" from the address so closing it, or reloading, doesn't bring it back.
@@ -96,7 +97,12 @@ export function Home({ runtime, create }: { runtime: RuntimeInfo | null; create?
         </div>
       )}
 
-      <AnimatePresence>{creating && <NewProjectDialog onClose={() => setCreating(false)} />}</AnimatePresence>
+      <AnimatePresence>
+        {creating && (
+          // New projects run on the runtime of the latest one, until the human picks another.
+          <NewProjectDialog onClose={() => setCreating(false)} initialRuntime={projects?.slice().sort((a, b) => b.createdAt - a.createdAt)[0]?.runtime ?? "opencode"} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -140,7 +146,7 @@ function ProjectRow({ project: p }: { project: Project }) {
 
 const STEPS = ["Folder", "Setup", "Models"] as const;
 
-function NewProjectDialog({ onClose }: { onClose: () => void }) {
+function NewProjectDialog({ onClose, initialRuntime }: { onClose: () => void; initialRuntime: RuntimeKind }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
@@ -151,7 +157,7 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
   const [docsLocation, setDocsLocation] = useState<DocsLocation>("project");
   const [rulesRegister, setRulesRegister] = useState(true);
   const [projectConnections, setProjectConnections] = useState<ProjectConnection[]>([]);
-  const [runtime, setRuntime] = useState<RuntimeKind>("opencode");
+  const [runtime, setRuntime] = useState<RuntimeKind>(initialRuntime);
   const [models, setModels] = useState<ModelChoice>({ allowed: [], coordinator: "", core: [], coreOnly: [] });
   const coordinator = models.coordinator;
   // Each runtime has its own models: a new runtime starts the choice over.

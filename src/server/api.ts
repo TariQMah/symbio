@@ -28,6 +28,12 @@ const DEBUG = process.env.SYMBIO_DEBUG === "1";
 
 export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, connections: Connections) {
   const api = new Hono();
+  // A project's page reads its agents' conversations, forms and processes: their runtimes must be up.
+  api.use("/projects/:id/*", async (c, next) => {
+    const project = store.get(c.req.param("id"));
+    if (project) await team.startRuntimesOf(project);
+    await next();
+  });
 
   // ---- usage and prices (estimated cost = tokens × the price per model)
   const priceBook = PriceBook.at(globalDir);
@@ -221,7 +227,9 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   });
 
   // ---- Model providers (connected to OpenCode; keys are passed on, never stored or returned)
-  const oc = () => {
+  // OpenCode starts when something needs it (here: its providers), like Copilot.
+  const oc = async () => {
+    await team.runtimeFor({ runtime: "opencode" });
     if (!runtime.client) throw new Error("OpenCode is not running");
     return runtime.client;
   };
@@ -229,7 +237,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   api.get("/providers", async (c) => {
     try {
-      const { connected, catalog } = await listProviders(oc());
+      const { connected, catalog } = await listProviders(await oc());
       const projects = store.list();
       return c.json({
         connected: connected.map((p) => ({
@@ -246,7 +254,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   api.post("/providers/:id/key", async (c) => {
     const body = await c.req.json<{ key?: string; answer?: Record<string, string> }>();
     try {
-      await connectWithKey(oc(), c.req.param("id"), body.key ?? "", body.answer ?? {});
+      await connectWithKey(await oc(), c.req.param("id"), body.key ?? "", body.answer ?? {});
       return c.json({ ok: true });
     } catch (err) {
       return fail(c, err);
@@ -256,7 +264,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   api.post("/providers/:id/oauth", async (c) => {
     const body = await c.req.json<{ methodID: string; answer?: Record<string, string> }>();
     try {
-      return c.json(await beginOauth(oc(), c.req.param("id"), body.methodID, body.answer ?? {}));
+      return c.json(await beginOauth(await oc(), c.req.param("id"), body.methodID, body.answer ?? {}));
     } catch (err) {
       return fail(c, err);
     }
@@ -264,7 +272,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   api.get("/providers/:id/oauth/:attemptId", async (c) => {
     try {
-      return c.json(await oauthStatus(oc(), c.req.param("id"), c.req.param("attemptId")));
+      return c.json(await oauthStatus(await oc(), c.req.param("id"), c.req.param("attemptId")));
     } catch (err) {
       return fail(c, err);
     }
@@ -273,7 +281,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   api.post("/providers/:id/oauth/:attemptId/complete", async (c) => {
     const body = await c.req.json<{ code?: string }>().catch(() => ({}) as { code?: string });
     try {
-      await completeOauth(oc(), c.req.param("id"), c.req.param("attemptId"), body.code?.trim() || null);
+      await completeOauth(await oc(), c.req.param("id"), c.req.param("attemptId"), body.code?.trim() || null);
       return c.json({ ok: true });
     } catch (err) {
       return fail(c, err);
@@ -281,13 +289,13 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   });
 
   api.delete("/providers/:id/oauth/:attemptId", async (c) => {
-    await cancelOauth(oc(), c.req.param("id"), c.req.param("attemptId"));
+    await cancelOauth(await oc(), c.req.param("id"), c.req.param("attemptId"));
     return c.json({ ok: true });
   });
 
   api.delete("/providers/logins/:loginId", async (c) => {
     try {
-      await removeLogin(oc(), c.req.param("loginId"));
+      await removeLogin(await oc(), c.req.param("loginId"));
       return c.json({ ok: true });
     } catch (err) {
       return fail(c, err);
@@ -448,6 +456,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     if (!project) throw new HttpError(404, "project not found");
     return project;
   };
+
   const withAgent = (project: Project, agentId: string) => {
     const agent = project.agents.find((a) => a.id === agentId);
     if (!agent) throw new HttpError(404, "agent not found");
