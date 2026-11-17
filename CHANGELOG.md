@@ -5,6 +5,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0-beta.1]
+
+Beta: try it with `sym update --to 0.15.0-beta.1` (installed copies stay on 0.14.x until 0.15.0 is out).
+
 - **GitHub Copilot CLI as an agent runtime** (preview): in New project → Models, choose whether the agents run on
   OpenCode or on GitHub Copilot CLI, with its own models and your Copilot subscription. Symbio uses your existing
   Copilot login (`copilot login`), or you sign in from Settings → **GitHub Copilot CLI** with a code on GitHub; it keeps

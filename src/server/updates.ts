@@ -228,6 +228,14 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "when they do. Those helpers are part of the team (they follow the shared-asset rules, and you can see them in list_team), " +
       "but don't give them work unless the human asks you to.",
   },
+  {
+    id: "2026-11-17-agent-runtimes",
+    text:
+      "A project's agents can now run on GitHub Copilot CLI as well as OpenCode (the human chooses), and the human can move a " +
+      "project from one to the other. If that happens, you get one last turn to write your own handoff, then every agent continues " +
+      "in a new session on the other runtime from a handoff note, with its name, folder, branch, tasks and assets. Tool names and " +
+      "behavior differ between runtimes, and background processes are stopped by the move: start again the ones you need.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */
