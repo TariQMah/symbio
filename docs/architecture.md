@@ -35,10 +35,16 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
   vocabulary. Copilot runs through the Copilot SDK in Symbio's own Copilot folder
   (`~/.symbio/copilot`); see [copilot-api.md](copilot-api.md). **Each runtime starts when something
   needs it** (an agent to wake, a project's page, New project's models, Settings), and at launch only
-  if agents left active run on it (OpenCode also on a first run, for connecting a provider). The
-  rest of this page describes OpenCode, the default.
-- **OpenCode is the default runtime.** Symbio ships with a pinned OpenCode (the `@opencode/cli`
-  dependency; `SYMBIO_OPENCODE_BIN` overrides it) and starts its *own* private `opencode serve`: a random port,
+  if agents left active run on it. The rest of this page describes OpenCode, the default.
+- **Symbio ships no runtime** (`runtime/install.ts`). The human installs the ones they use (the
+  first-run cards on the Projects page, or Settings → Agent runtimes): Symbio runs
+  `npm install <package>@<version>` into `~/.symbio/runtimes/<kind>`, the version being its own dev
+  dependency (what it's developed and tested with), and records where the runtime starts in
+  `runtime.json`; removing it deletes the folder. A runtime is found, in order: an environment
+  variable (`SYMBIO_OPENCODE_BIN`, `SYMBIO_COPILOT_SDK`), Symbio's copy, or a development checkout's
+  `node_modules`; never one on the PATH. New projects can only pick an installed runtime; one that
+  existing projects use but that's missing (Symbio used to ship OpenCode) is installed at startup.
+- **OpenCode is the default runtime.** Symbio starts its *own* private `opencode serve`: a random port,
   a random `OPENCODE_SERVER_PASSWORD`, Basic auth user `opencode`, in `--stdio` mode so the password
   doesn't reach agents' shells and the server exits with Symbio. It doesn't touch any other
   OpenCode instance you run.

@@ -8,10 +8,10 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
 import path from "node:path";
 import { EventEmitter } from "node:events";
-import { createRequire } from "node:module";
 import { OpencodeClient, parseModel } from "./client.js";
 import { sessionUsage, type Usage } from "../costs.js";
 import type { PermissionRule } from "../guard.js";
+import { locate, NotInstalledError } from "../runtime/install.js";
 import type {
   AgentRuntime,
   BackgroundShell,
@@ -56,13 +56,15 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
 
   async start(): Promise<void> {
     if (this.state === "running" || this.state === "starting") return;
+    const launch = resolveOpencode();
+    if (!launch) throw new NotInstalledError("opencode");
+    const { command, args, shell } = launch;
     this.stopping = false;
     this.setState("starting");
     killOrphan(this.pidFile);
 
     const port = await freePort();
     const password = randomBytes(24).toString("base64url");
-    const { command, args, shell } = resolveOpencode();
 
     // --stdio: OpenCode removes the password from its own environment after reading it,
     // so agents' shells don't inherit it (they could otherwise call OpenCode directly and
@@ -356,46 +358,16 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
 }
 
 /**
- * The OpenCode executable that ships with Symbio (the @opencode/cli dependency, pinned to a
- * version Symbio was verified against). Its postinstall puts the platform binary at the
- * path its package.json declares.
+ * How to launch OpenCode: the copy Symbio installed (runtime/install.ts), SYMBIO_OPENCODE_BIN, or a
+ * development checkout's; null when it isn't installed. Symbio never falls back to an \`opencode\` on
+ * the PATH: the version it runs is the one it was tested with.
  */
-export function bundledOpencode(): string | null {
-  try {
-    const require = createRequire(import.meta.url);
-    const pkgPath = require.resolve("@opencode/cli/package.json");
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    const rel = typeof pkg.bin === "string" ? pkg.bin : pkg.bin?.opencode;
-    const exe = rel ? path.resolve(path.dirname(pkgPath), rel) : null;
-    return exe && existsSync(exe) ? exe : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Finds a way to launch opencode: an explicit SYMBIO_OPENCODE_BIN, the bundled copy, a global
- * install, then whatever `opencode` is on the PATH. Prefers the real executable so we can
- * kill/monitor it directly instead of a .cmd shim.
- */
-export function resolveOpencode(): { command: string; args: string[]; shell: boolean } {
-  const override = process.env.SYMBIO_OPENCODE_BIN;
+export function resolveOpencode(): { command: string; args: string[]; shell: boolean } | null {
+  const found = locate("opencode");
+  if (!found) return null;
   // A .js/.mjs file runs with this Node: the end-to-end tests' stand-in OpenCode (tests/e2e).
-  if (override && /\.m?js$/i.test(override)) return { command: process.execPath, args: [override], shell: false };
-  if (override) return { command: override, args: [], shell: false };
-  const bundled = bundledOpencode();
-  if (bundled) return { command: bundled, args: [], shell: false };
-  if (process.platform === "win32") {
-    try {
-      const root = execFileSync("npm.cmd", ["root", "-g"], { encoding: "utf8", windowsHide: true, shell: true }).trim();
-      const exe = path.join(root, "@opencode", "cli", "bin", "opencode.exe");
-      if (existsSync(exe)) return { command: exe, args: [], shell: false };
-    } catch {
-      // fall through
-    }
-    return { command: "opencode", args: [], shell: true };
-  }
-  return { command: "opencode", args: [], shell: false };
+  if (/\.m?js$/i.test(found.entry)) return { command: process.execPath, args: [found.entry], shell: false };
+  return { command: found.entry, args: [], shell: false };
 }
 
 function killTree(pid: number) {

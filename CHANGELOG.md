@@ -11,6 +11,11 @@ versions follow [Semantic Versioning](https://semver.org/).
   its sessions apart from your own Copilot history. Symbio's rules still apply to every command an agent runs and every
   file it reads or writes; background processes, model prices and the chat's steps work as with OpenCode. Models you
   added to the Copilot CLI with your own key (e.g. Azure AI Foundry, in Copilot's `providers.json`) are offered too.
+- **Symbio no longer comes with OpenCode: you install the agent runtimes you use.** On the first run, the Projects page
+  asks for one and offers OpenCode and GitHub Copilot CLI, each with an Install button (also in Settings → **Agent
+  runtimes**, where you can remove them). Symbio downloads the version it's tested with into its own folder; nothing
+  else on the computer changes. New projects offer only the installed runtimes. If you already have OpenCode projects,
+  Symbio installs OpenCode again by itself after the update. `sym doctor` lists the installed runtimes.
 - **OpenCode and Copilot start only when needed**: when a project's agents run on them, or when something asks for them
   (a project's page, New project's models, Settings). Using only Copilot no longer keeps OpenCode running. The top bar
   shows the runtime of the project you're looking at, and elsewhere the ones running.

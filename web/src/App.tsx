@@ -261,12 +261,12 @@ function SymbioVersion() {
 function RuntimeBadges({ runtime, only }: { runtime: RuntimeInfo | null; only: RuntimeKind | null }) {
   if (!runtime) return <span className="runtime">Connecting…</span>;
   const all: RuntimeStatus[] = runtime.runtimes ?? [{ kind: "opencode", label: "OpenCode", ...runtime }];
-  const shown = only ? all.filter((r) => r.kind === only) : all.filter((r) => r.state !== "stopped");
+  const shown = only ? all.filter((r) => r.kind === only) : all.filter((r) => r.state !== "stopped" || r.installing);
   if (!shown.length) {
     return (
-      <span className="runtime" title="OpenCode and GitHub Copilot CLI start when a project needs them.">
+      <span className="runtime" title="Agent runtimes start when a project needs them (Settings → Agent runtimes installs them).">
         <span className="dot stopped" />
-        <span className="runtime-label">No runtime running</span>
+        <span className="runtime-label">{all.some((r) => r.installed !== false) ? "No runtime running" : "No runtime installed"}</span>
       </span>
     );
   }
@@ -287,7 +287,11 @@ function RuntimeBadge({ runtime }: { runtime: RuntimeStatus }) {
       : `${runtime.memoryMB} MB`
     : null;
   const label =
-    runtime.state === "running"
+    runtime.installed === false
+      ? runtime.installing
+        ? `Installing ${name}…`
+        : `${name} not installed`
+      : runtime.state === "running"
       ? `${name} ${runtime.version ?? ""}`
       : runtime.state === "starting"
         ? `Starting ${name}…`

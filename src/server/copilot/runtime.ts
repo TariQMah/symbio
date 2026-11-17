@@ -11,10 +11,10 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { emptyUsage, type Usage } from "../costs.js";
 import { evaluate, type PermissionRule } from "../guard.js";
 import { processTreeMemory } from "../opencode/runtime.js";
+import { importRuntime, NotInstalledError } from "../runtime/install.js";
 import type {
   AgentRuntime,
   BackgroundShell,
@@ -29,7 +29,7 @@ import type {
 
 /** Models are stored as "<provider>/<id>"; Copilot's own ids have no provider. */
 export const COPILOT_PROVIDER = "copilot";
-const NOT_SIGNED_IN = "Not signed in to GitHub Copilot. Sign in from Settings → GitHub Copilot CLI.";
+const NOT_SIGNED_IN = "Not signed in to GitHub Copilot. Sign in from Settings → Agent runtimes.";
 
 /** A device code to enter on GitHub while signing in. */
 export interface SignInCode {
@@ -69,14 +69,14 @@ export interface SdkClient {
 export type SdkClientFactory = (options: { baseDirectory: string }) => Promise<SdkClient>;
 
 /**
- * The real SDK, or a stand-in module named by SYMBIO_COPILOT_SDK (the end-to-end tests'
- * tests/e2e/fake-copilot.mjs), which exports `createClient(options)`.
+ * The SDK where it's installed (runtime/install.ts), or a stand-in module named by
+ * SYMBIO_COPILOT_SDK (the end-to-end tests' tests/e2e/fake-copilot.mjs) exporting \`createClient(options)\`.
  */
 const defaultFactory: SdkClientFactory = async (options) => {
-  const standIn = process.env.SYMBIO_COPILOT_SDK;
-  if (standIn) return (await import(pathToFileURL(path.resolve(standIn)).href)).createClient(options);
-  const { CopilotClient } = await import("@github/copilot-sdk");
-  return new CopilotClient({ baseDirectory: options.baseDirectory, logLevel: "error" } as any) as unknown as SdkClient;
+  const sdk = await importRuntime("copilot");
+  if (typeof sdk.createClient === "function") return sdk.createClient(options);
+  const CopilotClient = sdk.CopilotClient ?? sdk.default?.CopilotClient;
+  return new CopilotClient({ baseDirectory: options.baseDirectory, logLevel: "error" }) as SdkClient;
 };
 
 /** What Symbio knows about a session: enough to open it again (after a restart, or with new instructions). */
@@ -165,7 +165,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       this.setState("running");
     } catch (err) {
       this.lastError = (err as Error).message;
-      this.setState("crashed");
+      this.setState(err instanceof NotInstalledError ? "stopped" : "crashed");
       throw err;
     }
   }

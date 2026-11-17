@@ -1,6 +1,6 @@
 name: OpenCode contract
 
-# Every day, the OpenCode API checks (tests/contract) against the bundled OpenCode and against
+# Every day, the OpenCode API checks (tests/contract) against the pinned OpenCode (the one users install) and against
 # the newest release, so a change in OpenCode (much of the API Symbio uses is experimental) is
 # caught before users meet it, and before Symbio upgrades. A failed scheduled run e-mails the
 # repository owner.

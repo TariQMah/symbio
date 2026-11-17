@@ -157,6 +157,10 @@ project the connections it needs.
 - **Updates** come from the npm registry (`symbio@latest`), installed by npm like any global
   package; releases are built and published by GitHub Actions with provenance. Applying an update
   restarts Symbio, so it's never possible through remote access.
+- **Agent runtimes** (OpenCode, the Copilot SDK) also come from the npm registry, by npm, at the
+  exact versions Symbio is tested with, into `~/.symbio/runtimes`, when the human asks for one in
+  Settings (or at startup, for one existing projects use). Symbio never runs one from the PATH, so
+  another copy on the computer doesn't change what runs.
 
 ## Things to know
 

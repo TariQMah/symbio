@@ -56,7 +56,7 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
     SYMBIO_KEYRING_SERVICE: `symbio-e2e-${port}`,
     ...env,
   };
-  for (const k of ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"]) fullEnv[k] = path.join(root, k);
+  for (const k of ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"]) fullEnv[k] = env[k] ?? path.join(root, k);
   const proc: ChildProcess = spawn(process.execPath, [path.join(repo, "dist/server/index.js")], { env: fullEnv, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
   let log = "";
   proc.stdout!.on("data", (d) => (log += d));

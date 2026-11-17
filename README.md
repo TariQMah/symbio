@@ -113,12 +113,17 @@ place. Here Symbio was restarted mid-task, and it told the helper to pick up whe
 - **Node.js 22+**
 - **Git** (recommended): it isolates helpers from each other. Without git, helpers share the folder
   and rely on shared-asset grants alone.
-- A model provider: OpenCode's own, or any you connect in Symbio's **Settings → Model providers**
-  (API key or browser sign-in).
+- An **agent runtime**, installed from Symbio on the first run (or later in **Settings → Agent
+  runtimes**). Symbio doesn't come with one, so you only have the ones you use:
+  - [OpenCode](https://opencode.ai), with a model provider: OpenCode's own, or any you connect in
+    Symbio's **Settings → Model providers** (API key or browser sign-in). It shares your OpenCode
+    configuration and provider logins, so providers you already use in OpenCode show up in Symbio too.
+  - **GitHub Copilot CLI** (preview), with a GitHub account that has a Copilot subscription (sign in
+    from Settings, or Symbio reuses your `copilot login`).
 
-Symbio brings its own copy of [OpenCode](https://opencode.ai), pinned to a version it's tested
-with, and runs it privately. It shares your OpenCode configuration and provider logins, so
-providers you already use in OpenCode show up in Symbio too.
+  Symbio downloads each one, at the version it's tested with, into its own folder
+  (`~/.symbio/runtimes`), runs it privately, and deletes it when you remove it. Each project picks
+  the runtime its agents run on.
 
 Symbio has been developed and used on **Windows 11**. It's written to be cross-platform (macOS and
 Linux are expected to work), but those haven't been tested yet. Reports are welcome.
@@ -222,7 +227,7 @@ All optional, set as environment variables:
 | `SYMBIO_HOME` | `~/.symbio` | Where Symbio keeps its global data |
 | `SYMBIO_NO_OPEN` | | Set to `1` to not open the browser on start (use the link Symbio prints) |
 | `SYMBIO_DEBUG` | | Set to `1` to enable the read-only OpenCode debug routes (for development) |
-| `SYMBIO_OPENCODE_BIN` | bundled | Path to an `opencode` executable to use instead of the bundled one |
+| `SYMBIO_OPENCODE_BIN` | installed | Path to an `opencode` executable to use instead of the one Symbio installed |
 | `SYMBIO_CLOUDFLARED_BIN` | auto | Path to `cloudflared` for remote access (otherwise the PATH, or a copy downloaded once) |
 | `SYMBIO_STUCK_MINUTES` | `10` | Silence before the watchdog interrupts a working agent |
 | `SYMBIO_RECYCLE_MB` | `1500` | Restart OpenCode above this memory use once every agent is idle |

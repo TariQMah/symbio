@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowRight, FolderOpen, FolderPlus, Plus } from "lucide-react";
-import { api, subscribe, type DocsLocation, type Inspection, type Project, type ProjectConnection, type RuntimeInfo, type RuntimeKind } from "./api";
+import { api, subscribe, type DocsLocation, type Inspection, type Project, type ProjectConnection, type RuntimeInfo, type RuntimeKind, type RuntimeView } from "./api";
+import { RuntimeCards, useRuntimes } from "./Runtimes";
 import { ConnectionsPicker } from "./ConnectionsPicker";
 import { FolderSummary } from "./FolderSummary";
 import { FolderBrowser } from "./FolderBrowser";
@@ -29,8 +30,11 @@ export function Home({ runtime, create }: { runtime: RuntimeInfo | null; create?
     });
   }, []);
 
-  // Runtimes start when needed (OpenCode's models load when the dialog asks): connected is enough.
-  const canCreate = runtime !== null;
+  // Symbio ships no agent runtime: projects need one installed. Runtimes start when needed (their
+  // models load when the dialog asks), so installed is enough.
+  const { runtimes, reload: reloadRuntimes } = useRuntimes();
+  const installed = runtimes?.filter((r) => r.installed) ?? [];
+  const canCreate = runtime !== null && installed.length > 0;
 
   // Opened as "#/new" (New project… in the project switcher): open the dialog once it can be used,
   // and drop "new" from the address so closing it, or reloading, doesn't bring it back.
@@ -40,15 +44,16 @@ export function Home({ runtime, create }: { runtime: RuntimeInfo | null; create?
     history.replaceState(null, "", "#/");
   }, [create, canCreate]);
 
-  // First run on a new machine: nothing to run agents on until a provider is connected.
+  // First steps with OpenCode only: nothing to run agents on until a model provider is connected.
   const [noProviders, setNoProviders] = useState(false);
+  const onlyOpenCode = installed.length === 1 && installed[0].kind === "opencode";
   useEffect(() => {
-    if (runtime?.state !== "running") return;
+    if (!onlyOpenCode || projects?.length !== 0) return;
     api
       .providers()
       .then((p) => setNoProviders(p.connected.every((c) => c.models === 0)))
       .catch(() => {});
-  }, [runtime?.state]);
+  }, [onlyOpenCode, projects?.length]);
 
   return (
     <div className="page-inner">
@@ -63,6 +68,19 @@ export function Home({ runtime, create }: { runtime: RuntimeInfo | null; create?
         </button>
       </div>
 
+      {runtimes && installed.length === 0 && (
+        <div className="first-run section" style={{ padding: 16 }}>
+          <div>
+            <h2>Install an agent runtime to start</h2>
+            <p>
+              Agents run on an agent runtime, and Symbio doesn't come with one: install at least one. Each project picks the one its agents run
+              on; you can add or remove them later in Settings → Agent runtimes.
+            </p>
+          </div>
+          <RuntimeCards runtimes={runtimes} onChange={reloadRuntimes} />
+        </div>
+      )}
+
       {noProviders && (
         <div className="notice row" style={{ justifyContent: "space-between", gap: 12 }}>
           <span>No model provider is connected yet, so agents have no models to run on.</span>
@@ -72,7 +90,7 @@ export function Home({ runtime, create }: { runtime: RuntimeInfo | null; create?
         </div>
       )}
 
-      {projects && projects.length === 0 && (
+      {projects && projects.length === 0 && !(runtimes && installed.length === 0) && (
         <div className="section">
           <EmptyState
             icon={<FolderPlus size={20} />}
@@ -100,7 +118,11 @@ export function Home({ runtime, create }: { runtime: RuntimeInfo | null; create?
       <AnimatePresence>
         {creating && (
           // New projects run on the runtime of the latest one, until the human picks another.
-          <NewProjectDialog onClose={() => setCreating(false)} initialRuntime={projects?.slice().sort((a, b) => b.createdAt - a.createdAt)[0]?.runtime ?? "opencode"} />
+          <NewProjectDialog
+            onClose={() => setCreating(false)}
+            runtimes={installed}
+            initialRuntime={pickRuntime(installed, projects?.slice().sort((a, b) => b.createdAt - a.createdAt)[0]?.runtime ?? "opencode")}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -146,7 +168,16 @@ function ProjectRow({ project: p }: { project: Project }) {
 
 const STEPS = ["Folder", "Setup", "Models"] as const;
 
-function NewProjectDialog({ onClose, initialRuntime }: { onClose: () => void; initialRuntime: RuntimeKind }) {
+/** The runtime wanted if it's installed, else the first installed one. */
+const pickRuntime = (installed: RuntimeView[], wanted: RuntimeKind): RuntimeKind =>
+  installed.some((r) => r.kind === wanted) ? wanted : (installed[0]?.kind ?? wanted);
+
+const RUNTIME_CHOICE: Record<RuntimeKind, string> = {
+  opencode: "Models from the providers you connect in Settings.",
+  copilot: "Your GitHub Copilot subscription and its models (sign in from Settings).",
+};
+
+function NewProjectDialog({ onClose, initialRuntime, runtimes }: { onClose: () => void; initialRuntime: RuntimeKind; runtimes: RuntimeView[] }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
@@ -406,21 +437,17 @@ function NewProjectDialog({ onClose, initialRuntime }: { onClose: () => void; in
         <>
           <div className="field">
             <span>Agents run on</span>
+            {/* Only the installed runtimes (Settings → Agent runtimes installs the others). */}
             <div className="runtime-choice">
-              <label className="choice">
-                <input type="radio" name="runtime" checked={runtime === "opencode"} onChange={() => chooseRuntime("opencode")} />
-                <span className="choice-body">
-                  <span className="choice-title">OpenCode</span>
-                  <span className="choice-desc">Comes with Symbio; models from any provider you connect in Settings.</span>
-                </span>
-              </label>
-              <label className="choice">
-                <input type="radio" name="runtime" checked={runtime === "copilot"} onChange={() => chooseRuntime("copilot")} />
-                <span className="choice-body">
-                  <span className="choice-title">GitHub Copilot CLI</span>
-                  <span className="choice-desc">Your GitHub Copilot subscription and its models (sign in with <code>copilot login</code>).</span>
-                </span>
-              </label>
+              {runtimes.map((r) => (
+                <label className="choice" key={r.kind}>
+                  <input type="radio" name="runtime" checked={runtime === r.kind} onChange={() => chooseRuntime(r.kind)} />
+                  <span className="choice-body">
+                    <span className="choice-title">{r.label}</span>
+                    <span className="choice-desc">{RUNTIME_CHOICE[r.kind]}</span>
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
           <ModelPicker value={models} onChange={setModels} runtime={runtime} />

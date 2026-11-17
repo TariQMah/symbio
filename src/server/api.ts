@@ -4,7 +4,8 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { bus, type UiEvent } from "./bus.js";
 import type { OpencodeRuntime } from "./opencode/runtime.js";
-import type { AgentRuntime, RuntimeKind } from "./runtime/types.js";
+import { runtimeOf, type AgentRuntime, type RuntimeKind } from "./runtime/types.js";
+import { isInstalled, locate, NotInstalledError, RUNTIME_PACKAGES, RuntimeInstaller } from "./runtime/install.js";
 import { CopilotRuntime } from "./copilot/runtime.js";
 import type { CoreMode, ReviewBy, Store, Project, DocsLocation, HelperWorkspace, ProjectConnection } from "./store.js";
 import { existsSync, promises as fs } from "node:fs";
@@ -26,7 +27,7 @@ import { defaultModel, globalDir, modelsFor } from "./store.js";
 // Debug routes pass OpenCode responses through, which can contain provider keys.
 const DEBUG = process.env.SYMBIO_DEBUG === "1";
 
-export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, connections: Connections) {
+export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, connections: Connections, installer = new RuntimeInstaller()) {
   const api = new Hono();
   // A project's page reads its agents' conversations, forms and processes: their runtimes must be up.
   api.use("/projects/:id/*", async (c, next) => {
@@ -134,6 +135,8 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     runtimes: [...team.runtimes.values()].map((r) => ({
       kind: r.kind,
       label: r.label,
+      installed: isInstalled(r.kind),
+      installing: installer.state(r.kind).installing,
       state: r.state,
       version: r.version,
       error: r.lastError,
@@ -143,19 +146,36 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   /** Calls `fn` when any runtime's state changes; returns the way to stop. */
   const onAnyRuntimeState = (fn: () => void) => {
     for (const r of team.runtimes.values()) r.on("state", fn);
+    installer.on("change", fn);
     return () => {
       for (const r of team.runtimes.values()) r.off("state", fn);
+      installer.off("change", fn);
     };
   };
 
   api.get("/runtime", (c) => c.json(runtimeInfo()));
 
-  // Every agent runtime Symbio can use, for choosing one (a project's runtime), and Copilot's sign-in.
+  // Every agent runtime Symbio can use: whether it's installed (and installing it), for choosing one
+  // (a project's runtime), and Copilot's sign-in.
   const runtimeView = (r: AgentRuntime) => {
     const copilot = r instanceof CopilotRuntime ? r : null;
+    const pkg = RUNTIME_PACKAGES[r.kind];
+    const found = locate(r.kind);
+    const install = installer.state(r.kind);
     return {
       kind: r.kind,
       label: r.label,
+      description: pkg.description,
+      needs: pkg.needs,
+      sizeMB: pkg.sizeMB,
+      installed: !!found,
+      installedVersion: found?.version ?? null,
+      // Only Symbio's own copy can be removed from here (not a development checkout's).
+      removable: found?.source === "symbio",
+      installing: install.installing,
+      installLog: install.log,
+      installError: install.error,
+      projects: store.list().filter((p) => (p.runtime ?? "opencode") === r.kind).length,
       state: r.state,
       version: r.version,
       error: r.lastError,
@@ -165,6 +185,36 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     };
   };
   api.get("/runtimes", (c) => c.json([...team.runtimes.values()].map(runtimeView)));
+
+  const runtimeKind = (kind: string) => {
+    const r = team.runtimes.get(kind as RuntimeKind);
+    if (!r) throw new HttpError(404, `Unknown runtime "${kind}".`);
+    return r;
+  };
+  // Installs a runtime into Symbio's folder; it takes minutes, so this returns at once and the
+  // runtime events tell how it goes.
+  api.post("/runtimes/:kind/install", (c) => {
+    const r = runtimeKind(c.req.param("kind"));
+    if (!isInstalled(r.kind) || installer.state(r.kind).error) {
+      installer.install(r.kind).catch((err) => console.error(`[runtime] installing ${r.kind}:`, err.message));
+    }
+    return c.json(runtimeView(r), 202);
+  });
+  api.delete("/runtimes/:kind", async (c) => {
+    const r = runtimeKind(c.req.param("kind"));
+    if (locate(r.kind)?.source !== "symbio") return c.json({ error: `${r.label} wasn't installed by Symbio here: there's nothing to remove.` }, 400);
+    const busy = store.list().filter((p) => p.agents.some((a) => runtimeOf(a) === r.kind && a.status !== "stopped"));
+    if (busy.length) {
+      return c.json({ error: `Agents of ${busy.map((p) => p.name).join(", ")} run on ${r.label}: stop them first.` }, 409);
+    }
+    await r.stop();
+    try {
+      await installer.remove(r.kind);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500);
+    }
+    return c.json(runtimeView(r));
+  });
 
   const copilotRuntime = () => {
     const r = team.runtimes.get("copilot");
@@ -394,6 +444,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     }>();
     if (!body.name?.trim() || !body.directory?.trim()) return c.json({ error: "name and directory are required" }, 400);
     if (body.runtime !== undefined && !team.runtimes.has(body.runtime)) return c.json({ error: `Unknown runtime "${body.runtime}"` }, 400);
+    if (!isInstalled(body.runtime ?? "opencode")) return c.json({ error: new NotInstalledError(body.runtime ?? "opencode").message }, 400);
     if (!path.isAbsolute(body.directory.trim())) return c.json({ error: "directory must be a full path" }, 400);
     if (!body.coordinatorModel) return c.json({ error: "coordinatorModel is required" }, 400);
     const allowed = body.allowedModels?.length ? body.allowedModels : [body.coordinatorModel];

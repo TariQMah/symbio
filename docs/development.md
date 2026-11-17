@@ -5,9 +5,11 @@ first.
 
 ## Setup
 
-Requirements: Node.js 22+ and git. OpenCode comes with `npm install` (`@opencode/cli`, pinned to
-2.1.x); it needs at least one model provider connected (in Symbio's Settings, or with
-`opencode auth login`). Native modules (the OS keyring binding and `sharp`) install prebuilt
+Requirements: Node.js 22+ and git. In a clone, `npm install` brings both agent runtimes as dev
+dependencies (`@opencode/cli`, `@github/copilot-sdk`), and Symbio uses those; an installed Symbio has
+none until the human installs one (`runtime/install.ts`, which installs exactly the dev dependency's
+version). `SYMBIO_NO_DEV_RUNTIMES=1` makes a clone behave like a fresh install. OpenCode needs at least
+one model provider connected (in Symbio's Settings, or with `opencode auth login`). Native modules (the OS keyring binding and `sharp`) install prebuilt
 binaries; nothing compiles.
 
 ```sh
@@ -143,8 +145,10 @@ never updates itself. To test updates without npm, install a packed version into
 prefix and point it at a stand-in registry: `SYMBIO_UPDATE_REGISTRY` (serves `/symbio/latest`),
 `SYMBIO_UPDATE_SPEC` (what to install, e.g. a `.tgz`) and `SYMBIO_UPDATE_CHANGELOG`.
 
-OpenCode is a pinned dependency (`@opencode/cli`, patch updates only). Moving to a newer minor
-version means re-verifying the APIs in [opencode-api.md](opencode-api.md) first.
+The runtimes are pinned dev dependencies (`@opencode/cli`, patch updates only; `@github/copilot-sdk`,
+exact), and they're the versions users install. Moving to a newer one means re-verifying the APIs in
+[opencode-api.md](opencode-api.md) or [copilot-api.md](copilot-api.md) first; users get it with the
+Symbio update (Settings → Agent runtimes reinstalls; a missing one is reinstalled at startup).
 
 ## Debugging
 
@@ -176,7 +180,10 @@ tests):
 
 Both have the same scripted "model". The tests drive Symbio through its API and a real browser
 (Edge, or `BROWSER_CHANNEL=chrome`). Projects are created on the run's runtime with its models
-(`MODEL`, `MODEL_2` in the harness). Where the runtimes word things differently for the model (a
+(`MODEL`, `MODEL_2` in the harness). `startSymbio` gives the runtimes through the environment, as if
+installed; `install.test.ts` starts with none (`SYMBIO_NO_DEV_RUNTIMES`) and installs them with
+`tests/e2e/fake-installer.mjs` in place of npm (`SYMBIO_RUNTIME_INSTALLER`; `SYMBIO_FAKE_INSTALL_FAILS=<kind>`
+makes it fail). Where the runtimes word things differently for the model (a
 refused call, an answered question, how a tool call is written), the harness has helpers
 (`refused`, `answered`, `RUNTIME`).
 

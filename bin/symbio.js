@@ -132,7 +132,10 @@ async function status() {
   if (s !== "running") return;
   const runtime = (await api("GET", "/api/runtime")).body;
   const projects = (await api("GET", "/api/projects")).body ?? [];
-  console.log(`OpenCode ${runtime?.version ?? "?"} (${runtime?.state ?? "?"}${runtime?.memoryMB ? `, ${runtime.memoryMB} MB` : ""})`);
+  for (const r of runtime?.runtimes ?? []) {
+    if (!r.installed) continue;
+    console.log(`${r.label}${r.version ? ` ${r.version}` : ""} (${r.state}${r.memoryMB ? `, ${r.memoryMB} MB` : ""})`);
+  }
   const remote = (await api("GET", "/api/remote")).body;
   if (remote?.active) console.log(`Remote access ON: ${remote.url} (${remote.sessions} session(s)) — sym remote off`);
   for (const p of projects) {
@@ -191,16 +194,20 @@ async function doctor() {
     gitVersion = execFileSync("git", ["--version"], { encoding: "utf8" }).trim();
   } catch {}
   check(!!gitVersion, gitVersion || "git", "Install git (https://git-scm.com) so helpers can work in parallel without conflicts.");
-  let oc = "";
+  // Symbio ships no agent runtime: the human installs the ones they use (Settings → Agent runtimes).
+  let installed = [];
   try {
-    const { resolveOpencode } = await import(pathToFileURL(path.join(root, "dist", "server", "opencode", "runtime.js")).href);
-    const { command, args, shell } = resolveOpencode();
-    oc = `${execFileSync(command, [...args, "--version"], { encoding: "utf8", shell, timeout: 20_000 }).trim()} (${command})`;
+    const { RUNTIME_PACKAGES, locate } = await import(pathToFileURL(path.join(root, "dist", "server", "runtime", "install.js")).href);
+    for (const spec of Object.values(RUNTIME_PACKAGES)) {
+      const found = locate(spec.kind);
+      console.log(`${found ? "✔" : "·"} ${spec.label}: ${found ? `installed${found.version ? ` (${found.version})` : ""} — ${found.entry}` : "not installed"}`);
+      if (found) installed.push(spec.kind);
+    }
   } catch {}
-  check(!!oc, oc ? `OpenCode ${oc}` : "OpenCode", "Reinstall Symbio (npm i -g symbio): it brings its own OpenCode.");
+  check(installed.length > 0, `${installed.length} agent runtime(s) installed`, "Open Symbio and install one: Settings → Agent runtimes (or the cards on the first page).");
   const s = await state();
   check(s !== "other", s === "running" ? `Symbio running at ${BASE}` : s === "stopped" ? `Port ${PORT} free` : `Port ${PORT}`, `Another program uses port ${PORT}; use SYMBIO_PORT.`);
-  if (s === "running") {
+  if (s === "running" && installed.includes("opencode") && installed.length === 1) {
     const providers = (await api("GET", "/api/providers").catch(() => ({ body: null }))).body;
     const n = providers?.connected?.length ?? 0;
     check(n > 0, `${n} model provider(s) connected`, "Open Symbio → Settings → Model providers and connect one.");

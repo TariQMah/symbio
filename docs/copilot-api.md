@@ -133,7 +133,7 @@ Copilot's; keys never leave the server.
 "https://github.com/login/device", expiresIn, interval } }`; `advance({ flowId })` returns once the
 user has authorized the device (`{ kind: "completed", result: { status, login } }`), and
 `cancel({ flowId })` ends it. It needs a session, but works signed out (a scratch session, no
-model). `method: "web"` gives an `open-url` step instead. Symbio's Settings → GitHub Copilot CLI uses
+model). `method: "web"` gives an `open-url` step instead. Symbio's Settings → Agent runtimes → GitHub Copilot CLI uses
 the device code.
 
 ## Usage and cost

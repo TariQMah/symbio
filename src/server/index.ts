@@ -15,6 +15,7 @@ import { bus } from "./bus.js";
 import { OpencodeRuntime } from "./opencode/runtime.js";
 import { CopilotRuntime } from "./copilot/runtime.js";
 import { runtimeOf, type RuntimeKind } from "./runtime/types.js";
+import { isInstalled, RUNTIME_PACKAGES, RuntimeInstaller } from "./runtime/install.js";
 import { Store, globalDir } from "./store.js";
 import { Team } from "./team.js";
 import { removeOrphanWorkspaces } from "./workspaces.js";
@@ -76,6 +77,7 @@ async function main() {
   // GitHub Copilot CLI: its sessions in Symbio's own Copilot folder; started when a project uses it.
   const copilot = new CopilotRuntime(path.join(globalDir, "copilot"));
   const team = new Team(store, [runtime, copilot], `http://127.0.0.1:${PORT}`);
+const installer = new RuntimeInstaller();
   team.remote = new RemoteOps(connections, {
     log: (project, m) => team.log(project, m),
     notify: (project, agent, text) => team.notify(project, agent, text),
@@ -184,7 +186,7 @@ async function main() {
     remote.stop(remoteRequests.has(c.req.raw) ? "turned off from a remote session" : "turned off on this computer");
     return c.json(remote.status(!remoteRequests.has(c.req.raw)));
   });
-  app.route("/api", createApi(store, runtime, team, connections));
+  app.route("/api", createApi(store, runtime, team, connections, installer));
   // Agents' tool server. Only reachable from this machine (we bind to 127.0.0.1) and only with a per-run token.
   app.all("/mcp/:token", (c) => handleMcp(c, team.mcpResolver));
 
@@ -208,23 +210,29 @@ async function main() {
   });
 
   // Each runtime starts when something needs it (a project's agents, New project, Settings), and at
-  // launch only when agents that were left active run on it. On a first run (no projects yet) OpenCode
-  // starts too, so the first steps (connecting a provider, its models) are ready.
+  // launch only when agents that were left active run on it. Symbio ships no runtime: the human
+  // installs the ones they use (Settings → Runtimes). One that projects use but that isn't installed
+  // (Symbio used to ship OpenCode) is installed now, so those projects keep working.
   const projects = store.list();
-  const used = (kind: RuntimeKind) => projects.some((p) => p.agents.some((a) => runtimeOf(a) === kind && a.status !== "stopped"));
-  if (used("opencode") || projects.length === 0) {
-    console.log("Starting OpenCode…");
-    runtime
-      .start()
-      .then(() => console.log(`OpenCode ${runtime.version} ready`))
-      .catch((err) => console.error("OpenCode failed to start:", err.message));
-  }
-  if (used("copilot")) {
-    console.log("Starting GitHub Copilot CLI…");
-    copilot
-      .start()
-      .then(() => console.log(`GitHub Copilot CLI ${copilot.version} ready${copilot.login ? ` (${copilot.login})` : ""}`))
-      .catch((err) => console.error("GitHub Copilot CLI failed to start:", err.message));
+  const usedBy = (kind: RuntimeKind) => projects.filter((p) => (p.runtime ?? "opencode") === kind || p.agents.some((a) => runtimeOf(a) === kind));
+  const active = (kind: RuntimeKind) => projects.some((p) => p.agents.some((a) => runtimeOf(a) === kind && a.status !== "stopped"));
+  for (const r of [runtime, copilot]) {
+    const label = RUNTIME_PACKAGES[r.kind].label;
+    const start = () => {
+      console.log(`Starting ${label}…`);
+      return r
+        .start()
+        .then(() => console.log(`${label} ${r.version} ready`))
+        .catch((err) => console.error(`${label} failed to start:`, err.message));
+    };
+    if (!isInstalled(r.kind)) {
+      if (!usedBy(r.kind).length) continue;
+      console.log(`${label} isn't installed, and projects use it: installing it (Settings → Runtimes shows how it goes)…`);
+      installer
+        .install(r.kind)
+        .then(() => (active(r.kind) ? start() : undefined))
+        .catch((err) => console.error(`${label} couldn't be installed:`, err.message));
+    } else if (active(r.kind)) void start();
   }
   team.startWatchdog();
   updates.start();

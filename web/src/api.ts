@@ -280,16 +280,32 @@ export interface RuntimeInfo {
 export interface RuntimeStatus {
   kind: RuntimeKind;
   label: string;
+  /** Whether it's installed (Symbio ships none: the human installs the ones they use). */
+  installed?: boolean;
+  installing?: boolean;
   state: RuntimeInfo["state"];
   version: string | null;
   error: string | null;
   memoryMB?: number | null;
 }
 
-/** An agent runtime as Settings shows it (GET /runtimes), with GitHub Copilot's sign-in. */
+/** An agent runtime as Settings shows it (GET /runtimes): installing it, and GitHub Copilot's sign-in. */
 export interface RuntimeView {
   kind: RuntimeKind;
   label: string;
+  description: string;
+  needs: string;
+  sizeMB: number;
+  installed: boolean;
+  installedVersion: string | null;
+  /** Symbio's own copy (not a development checkout's): it can be removed. */
+  removable: boolean;
+  installing: boolean;
+  /** npm's last lines while it installs. */
+  installLog: string[];
+  installError: string | null;
+  /** Projects whose agents run on it. */
+  projects: number;
   state: RuntimeInfo["state"];
   version: string | null;
   error: string | null;
@@ -581,6 +597,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export const api = {
   runtime: () => call<RuntimeInfo>("GET", "/runtime"),
   runtimes: () => call<RuntimeView[]>("GET", "/runtimes"),
+  installRuntime: (kind: RuntimeKind) => call<RuntimeView>("POST", `/runtimes/${kind}/install`),
+  removeRuntime: (kind: RuntimeKind) => call<RuntimeView>("DELETE", `/runtimes/${kind}`),
   checkCopilot: () => call<RuntimeView>("POST", "/runtimes/copilot/check"),
   copilotSignIn: () => call<RuntimeView>("POST", "/runtimes/copilot/sign-in"),
   cancelCopilotSignIn: () => call<RuntimeView>("DELETE", "/runtimes/copilot/sign-in"),

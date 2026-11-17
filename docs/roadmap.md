@@ -9,7 +9,9 @@ welcome (open an issue). Items marked *(good first contribution)* are small and 
 **GitHub Copilot CLI as an agent runtime** (branch `copilot-runtime`). Done: the runtime-neutral
 layer, the Copilot runtime, choosing it per project in New project, signing in from Settings,
 background processes, prices, briefs worded for each runtime, and every end-to-end test on both
-runtimes, memory recycling and crash recovery for Copilot too. Left: merging into `next`.
+runtimes, memory recycling and crash recovery for Copilot too, and no bundled runtime: the human
+installs the ones they use (first-run cards, Settings → Agent runtimes), so a machine can have only
+Copilot or only OpenCode. Left: merging into `next`.
 
 ## Next
 

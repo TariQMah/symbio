@@ -34,6 +34,7 @@ import { Processes } from "./team/processes.js";
 import { QuietHelpers } from "./team/quiet-helpers.js";
 import { Usage } from "./team/usage.js";
 import { Watchdog } from "./team/watchdog.js";
+import { NotInstalledError } from "./runtime/install.js";
 import { describeOuterRepository, listRepositories, projectRepositories, repoRoot, resolveRepository, swallowedRepositories } from "./repos.js";
 import { changedFiles, createWorkspace, inProjectFolder, isGitRepo, leaveWorkspace, mergeWorkspace, reattachWorkspace, removeWorkspace, restoreWorkspace, syncWorkspace } from "./workspaces.js";
 
@@ -1144,7 +1145,12 @@ export class Team implements TeamCore {
   async startRuntimesOf(project: Project): Promise<void> {
     const kinds = new Set<RuntimeKind>([project.runtime ?? "opencode", ...project.agents.map((a) => runtimeOf(a))]);
     if (!project.agents.length) return; // nothing to show yet; New project / start bring its runtime up
-    for (const kind of kinds) await this.runtimeFor({ runtime: kind }).catch((err) => console.error(`[runtime] ${kind}:`, err.message));
+    for (const kind of kinds) {
+      await this.runtimeFor({ runtime: kind }).catch((err) => {
+        // A runtime that isn't installed: the project's page says so; nothing to log on every request.
+        if (!(err instanceof NotInstalledError)) console.error(`[runtime] ${kind}:`, err.message);
+      });
+    }
   }
 
   /** The runtime new agents of the project run on, started if it isn't yet (each runtime starts on demand). */

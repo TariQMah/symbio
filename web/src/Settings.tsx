@@ -3,7 +3,8 @@ import { AnimatePresence } from "motion/react";
 import { ArrowLeft, Check, Pencil, Plug, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import { api, type ConnectionView, type FtpSecurity } from "./api";
 import { ConnIcon } from "./ConnectionsPicker";
-import { CopilotSection, ProvidersSection } from "./Providers";
+import { ProvidersSection } from "./Providers";
+import { RuntimesSection, useRuntimes } from "./Runtimes";
 import { CostsSection, PricesSection } from "./Usage";
 import { RemoteSection } from "./Remote";
 import { UpdatesSection } from "./Updates";
@@ -36,6 +37,7 @@ export function Settings() {
   const [testing, setTesting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const backLabel = useBackLabel();
+  const openCodeInstalled = !!useRuntimes().runtimes?.find((r) => r.kind === "opencode")?.installed;
 
   // Escape leaves Settings, unless it's closing a dialog or the cursor is in a field.
   useEffect(() => {
@@ -88,6 +90,8 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+      <RuntimesSection />
 
       <section className="section">
         <div className="section-head">
@@ -170,9 +174,8 @@ export function Settings() {
         )}
       </section>
 
-      <ProvidersSection />
-
-      <CopilotSection />
+      {/* Model providers are OpenCode's: shown once it's installed. */}
+      {openCodeInstalled && <ProvidersSection />}
 
       <CostsSection />
 

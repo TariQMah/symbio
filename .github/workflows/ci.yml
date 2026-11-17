@@ -22,7 +22,7 @@ jobs:
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
           npm test
-      # The runtimes' APIs as Symbio uses them: the bundled OpenCode (no model or sign-in needed), and
+      # The runtimes' APIs as Symbio uses them: the pinned OpenCode (dev dependency) (no model or sign-in needed), and
       # GitHub Copilot CLI when the COPILOT_GITHUB_TOKEN secret is set (skipped otherwise; nothing is billed).
       - run: npm run test:contract
         env:

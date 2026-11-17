@@ -61,17 +61,17 @@ test("signing in to GitHub Copilot from Settings, with a device code", async () 
     await page.locator("button.btn.primary", { hasText: "Continue" }).click();
     await page.locator("button.btn.primary", { hasText: "Continue" }).click();
     await page.locator(".runtime-choice .choice", { hasText: "GitHub Copilot CLI" }).click();
-    await page.locator(".error", { hasText: "Sign in from Settings → GitHub Copilot CLI" }).waitFor();
+    await page.locator(".error", { hasText: "Sign in from Settings → Agent runtimes" }).waitFor();
     await page.keyboard.press("Escape");
 
     await page.goto(`${signedOut.base}/#/settings`);
-    const section = page.locator(".copilot-section");
-    await section.locator(".list-title", { hasText: "Not signed in" }).waitFor();
+    const section = page.locator('.runtime-card[data-runtime="copilot"]');
+    await section.locator(".copilot-sign-in", { hasText: "Not signed in" }).waitFor();
     await section.locator("button", { hasText: "Sign in with GitHub" }).click();
     await section.locator(".device-code", { hasText: "FAKE-1234" }).waitFor();
     assert.equal(await section.locator("a", { hasText: "Open GitHub" }).getAttribute("href"), "https://github.com/login/device");
     // Approved on GitHub (the stand-in approves it a moment later).
-    await section.locator(".list-title", { hasText: "Signed in as e2e" }).waitFor({ timeout: 15_000 });
+    await section.locator(".copilot-login", { hasText: "Signed in as e2e" }).waitFor({ timeout: 15_000 });
     assert.equal(await section.locator(".device-code").count(), 0, "the code is gone");
     assert.deepEqual((page as any).errors, []);
   } finally {
