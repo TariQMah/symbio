@@ -19,21 +19,27 @@ npm install
 npm run typecheck
 npm test
 npm run build
-npm run test:e2e   # the whole app in a browser, against a stand-in OpenCode (after build)
-npm run test:contract  # the OpenCode API as Symbio uses it, against the real OpenCode
+npm run test:e2e   # the whole app in a browser, on each runtime: stand-in OpenCode and stand-in Copilot (after build)
+npm run test:contract  # the runtimes' APIs as Symbio uses them: the real OpenCode, and the real Copilot CLI (with a login)
 npm run dev        # server (watch) + UI on http://localhost:5173
 ```
 
 Before you finish: `npm run typecheck`, `npm test`, `npm run build` and `npm run test:e2e` must pass
-(and `npm run test:contract` when you touch how Symbio calls OpenCode). A user-visible change gets an
+(and `npm run test:contract` when you touch how Symbio calls a runtime). A user-visible change gets an
 end-to-end test in `tests/e2e/` (see [docs/development.md](docs/development.md#end-to-end-tests)).
+
+**Both runtimes, always.** Agents run on OpenCode or GitHub Copilot CLI (`src/server/runtime/types.ts`).
+The end-to-end suite runs every test on both, and both must pass: what starts working on one side must
+not break the other. Team logic talks to `AgentRuntime`, never to one runtime's API. When a runtime
+can't support something yet, skip it there explicitly in the test, with the reason, and note it in
+[docs/copilot-api.md](docs/copilot-api.md) or [docs/opencode-api.md](docs/opencode-api.md).
 
 ## Rules
 
 - **Domain-neutral.** Symbio is for any kind of project. Never assume software in code, UI text or
   agent briefs ("shared asset", not "database").
-- **Verify OpenCode behavior live** before relying on it, and record what you learn in
-  `docs/opencode-api.md`. The v2 API is partly experimental.
+- **Verify runtime behavior live** before relying on it, and record what you learn in
+  `docs/opencode-api.md` or `docs/copilot-api.md`. Both APIs are partly experimental.
 - **No secrets to the browser or to agents.** Copy whitelisted fields from OpenCode responses;
   never pass them through.
 - **Safety first on the user's machine.** Never stop processes by name (`taskkill /IM`, `pkill`);

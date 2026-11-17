@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Crown, Eye, Lock, Search } from "lucide-react";
-import { api, type ModelInfo } from "./api";
+import { api, type ModelInfo, type RuntimeKind } from "./api";
 
 /** The project's models and who may use them (Project.coreModels, Project.coreOnlyModels). */
 export interface ModelChoice {
@@ -39,7 +39,7 @@ export const choiceBody = (c: ModelChoice) => ({ allowedModels: c.allowed, coord
  * Choose which models the project may use and who may use each: click a model to allow it, the
  * crown for core to be able to use it (several can be crowned), the lock to keep it for core only.
  */
-export function ModelPicker(props: { value: ModelChoice; onChange: (next: ModelChoice) => void }) {
+export function ModelPicker(props: { value: ModelChoice; onChange: (next: ModelChoice) => void; runtime?: RuntimeKind }) {
   const { value, onChange } = props;
   const { allowed, core, coreOnly } = value;
   const [models, setModels] = useState<ModelInfo[] | null>(null);
@@ -52,11 +52,13 @@ export function ModelPicker(props: { value: ModelChoice; onChange: (next: ModelC
   const [pinned] = useState(() => new Set(allowed));
 
   useEffect(() => {
+    setModels(null);
+    setError(null);
     api
-      .models()
+      .models(props.runtime)
       .then(setModels)
       .catch((e) => setError(e.message));
-  }, []);
+  }, [props.runtime]);
 
   const visible = useMemo(() => {
     const q = query.toLowerCase();

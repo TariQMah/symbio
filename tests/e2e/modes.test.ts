@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { after, before, test } from "node:test";
-import { closeBrowser, history, idle, openPage, projectWithCore, startSymbio, until, type Symbio } from "./harness.js";
+import { closeBrowser, history, idle, openPage, projectWithCore, refused, startSymbio, until, type Symbio } from "./harness.js";
 
 let symbio: Symbio;
 before(async () => {
@@ -34,8 +34,8 @@ test("Plan blocks starting work and changing files; Act lets it; the selector an
   await send(["Let's think about it first", spawn, "@core write notes.txt sketch", "@core shell echo draft > draft.txt", "@core shell git --version", "@core say Here's what I propose."]);
   const planned = await history(symbio, project.id, core.id);
   assert.match(planned, /Plan mode: the human wants to discuss and plan before anything starts, so creating helpers is blocked/);
-  assert.match(planned, /Permission denied: edit/, "file edits are denied in core's session");
-  assert.match(planned, /Permission denied: shell/, "and writing commands");
+  assert.match(planned, refused("edit"), "file edits are denied in core's session");
+  assert.match(planned, refused("shell"), "and writing commands");
   assert.match(planned, /git version/, "read-only commands still run");
   assert.ok(!existsSync(path.join(directory, "notes.txt")) && !existsSync(path.join(directory, "draft.txt")), "nothing written");
   assert.equal((await symbio.call("GET", `/projects/${project.id}`)).agents.length, 1, "no helper created");

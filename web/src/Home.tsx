@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowRight, FolderOpen, FolderPlus, Plus } from "lucide-react";
-import { api, subscribe, type DocsLocation, type Inspection, type Project, type ProjectConnection, type RuntimeInfo } from "./api";
+import { api, subscribe, type DocsLocation, type Inspection, type Project, type ProjectConnection, type RuntimeInfo, type RuntimeKind } from "./api";
 import { ConnectionsPicker } from "./ConnectionsPicker";
 import { FolderSummary } from "./FolderSummary";
 import { FolderBrowser } from "./FolderBrowser";
@@ -151,8 +151,15 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
   const [docsLocation, setDocsLocation] = useState<DocsLocation>("project");
   const [rulesRegister, setRulesRegister] = useState(true);
   const [projectConnections, setProjectConnections] = useState<ProjectConnection[]>([]);
+  const [runtime, setRuntime] = useState<RuntimeKind>("opencode");
   const [models, setModels] = useState<ModelChoice>({ allowed: [], coordinator: "", core: [], coreOnly: [] });
   const coordinator = models.coordinator;
+  // Each runtime has its own models: a new runtime starts the choice over.
+  const chooseRuntime = (next: RuntimeKind) => {
+    if (next === runtime) return;
+    setRuntime(next);
+    setModels({ allowed: [], coordinator: "", core: [], coreOnly: [] });
+  };
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const [browsing, setBrowsing] = useState(false);
@@ -212,6 +219,7 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
         name: name.trim(),
         directory: directory.trim(),
         ...choiceBody(models),
+        runtime,
         docsLocation,
         rulesRegister,
         initGit: !!offerGit && initGit,
@@ -389,7 +397,28 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
       )}
 
       {step === 2 && (
-        <ModelPicker value={models} onChange={setModels} />
+        <>
+          <div className="field">
+            <span>Agents run on</span>
+            <div className="runtime-choice">
+              <label className="choice">
+                <input type="radio" name="runtime" checked={runtime === "opencode"} onChange={() => chooseRuntime("opencode")} />
+                <span className="choice-body">
+                  <span className="choice-title">OpenCode</span>
+                  <span className="choice-desc">Comes with Symbio; models from any provider you connect in Settings.</span>
+                </span>
+              </label>
+              <label className="choice">
+                <input type="radio" name="runtime" checked={runtime === "copilot"} onChange={() => chooseRuntime("copilot")} />
+                <span className="choice-body">
+                  <span className="choice-title">GitHub Copilot CLI</span>
+                  <span className="choice-desc">Your GitHub Copilot subscription and its models (sign in with <code>copilot login</code>).</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <ModelPicker value={models} onChange={setModels} runtime={runtime} />
+        </>
       )}
 
       {step === 0 && !inspection && !inspectError && directory.trim() === "" && (

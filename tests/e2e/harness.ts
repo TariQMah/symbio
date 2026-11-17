@@ -1,6 +1,10 @@
-// End-to-end harness: a real Symbio (the built dist/) against the stand-in OpenCode
-// (fake-opencode.mjs, a scripted "model"), everything in temporary folders, driven through its
-// API and a real browser (Edge or Chrome via playwright-core). Run `npm run build` first.
+// End-to-end harness: a real Symbio (the built dist/) against a stand-in agent runtime with a
+// scripted "model", everything in temporary folders, driven through its API and a real browser
+// (Edge or Chrome via playwright-core). Run `npm run build` first.
+//
+// Every test runs on each runtime: SYMBIO_E2E_RUNTIME picks which ("opencode", the default:
+// fake-opencode.mjs; "copilot": fake-copilot.mjs in place of the Copilot SDK). Projects are
+// created on that runtime, with its models (MODEL, MODEL_2). `npm run test:e2e` runs both.
 
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -44,6 +48,9 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
     SYMBIO_HOME: path.join(root, "home"),
     SYMBIO_PORT: String(port),
     SYMBIO_OPENCODE_BIN: path.join(repo, "tests/e2e/fake-opencode.mjs"),
+    SYMBIO_COPILOT_SDK: path.join(repo, "tests/e2e/fake-copilot.mjs"),
+    // Never the user's own Copilot login.
+    SYMBIO_COPILOT_USER_HOME: path.join(root, "no-copilot-login"),
     SYMBIO_NO_OPEN: "1",
     // Keeps the vault's test entries apart from real credentials.
     SYMBIO_KEYRING_SERVICE: `symbio-e2e-${port}`,
@@ -100,13 +107,26 @@ export async function until(what: string, check: () => boolean | Promise<boolean
   throw new Error(`Timed out waiting for ${what}${context ? `\n--- Symbio output ---\n${context().slice(-3000)}` : ""}`);
 }
 
-export const MODEL = "fake/scripted";
+/** The runtime this run's projects use. */
+export const RUNTIME: "opencode" | "copilot" = process.env.SYMBIO_E2E_RUNTIME === "copilot" ? "copilot" : "opencode";
+const PROVIDER = RUNTIME === "copilot" ? "copilot" : "fake";
+/** The stand-in runtime's scripted models, and one that fails every turn at once. */
+export const MODEL = `${PROVIDER}/scripted`;
+export const MODEL_2 = `${PROVIDER}/scripted-2`;
+export const UNAVAILABLE_MODEL = `${PROVIDER}/unavailable`;
+
+// What each runtime tells the model, in its own words, for assertions on an agent's history.
+/** A tool call Symbio's rules refused ("edit", "shell"). */
+export const refused = (action: string) => (RUNTIME === "copilot" ? new RegExp(`Symbio blocks this \\(${action}`) : new RegExp(`Permission denied: ${action}`));
+/** The human's answer to the runtime's own question tool. */
+export const answered = (answer: string) =>
+  RUNTIME === "copilot" ? new RegExp(`User responded: ${answer}`) : new RegExp(`User has answered your questions.*${answer}`);
 
 /** A project with core started and its greeting turn done. */
 export async function projectWithCore(symbio: Symbio, name: string, opts: { directory?: string; models?: string[] } = {}) {
   const directory = opts.directory ?? symbio.folder(name.toLowerCase().replace(/\W+/g, "-"));
   const models = opts.models ?? [MODEL];
-  const project = await symbio.call("POST", "/projects", { name, directory, coordinatorModel: models[0], allowedModels: models });
+  const project = await symbio.call("POST", "/projects", { name, directory, coordinatorModel: models[0], allowedModels: models, runtime: RUNTIME });
   const { coordinator } = await symbio.call("POST", `/projects/${project.id}/start`);
   await idle(symbio, project.id);
   return { project, core: coordinator, directory };

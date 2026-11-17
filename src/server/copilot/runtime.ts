@@ -11,6 +11,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { emptyUsage, type Usage } from "../costs.js";
 import { evaluate, type PermissionRule } from "../guard.js";
 import type {
@@ -56,7 +57,13 @@ export interface SdkClient {
 
 export type SdkClientFactory = (options: { baseDirectory: string }) => Promise<SdkClient>;
 
+/**
+ * The real SDK, or a stand-in module named by SYMBIO_COPILOT_SDK (the end-to-end tests'
+ * tests/e2e/fake-copilot.mjs), which exports `createClient(options)`.
+ */
 const defaultFactory: SdkClientFactory = async (options) => {
+  const standIn = process.env.SYMBIO_COPILOT_SDK;
+  if (standIn) return (await import(pathToFileURL(path.resolve(standIn)).href)).createClient(options);
   const { CopilotClient } = await import("@github/copilot-sdk");
   return new CopilotClient({ baseDirectory: options.baseDirectory, logLevel: "error" } as any) as unknown as SdkClient;
 };
@@ -71,9 +78,15 @@ interface SessionState {
   notes: string[];
   busy: boolean;
   turnError: { type: string; message: string; status?: number } | null;
-  /** Prompts sent and not yet in the conversation (id → text), for taking them back. */
-  queued: Map<string, string>;
+  /** Prompts sent and not yet in the conversation, for taking them back (or sending them again). */
+  queued: Map<string, { prompt: string; text: string; notes: string[] }>;
   usage: Usage;
+  /**
+   * While a prompt is being sent, the session's events wait: a quick turn can end before `send`
+   * returns, and the caller marks the agent busy when it does (it would then stay busy).
+   */
+  sending: number;
+  held: any[];
 }
 
 interface OpenQuestion {
@@ -182,7 +195,13 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
         providerID: COPILOT_PROVIDER,
         id: String(m.id),
         name: String(m.name ?? m.id),
-        raw: { ...m, providerID: COPILOT_PROVIDER, id: String(m.id), capabilities: { ...m.capabilities, input: { image: !!m.capabilities?.supports?.vision } } },
+        raw: {
+          ...m,
+          providerID: COPILOT_PROVIDER,
+          id: String(m.id),
+          // Shaped like OpenCode's records where Symbio reads them (api.ts: vision).
+          capabilities: { ...m.capabilities, input: m.capabilities?.supports?.vision ? ["text", "image"] : ["text"] },
+        },
       }));
   }
 
@@ -228,11 +247,21 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     const state = this.state_(sessionId);
     if (state.stale && !state.busy) await this.close(sessionId);
     const session = await this.session(sessionId);
-    const prompt = state.notes.length ? `${text}\n\n${NOTES_OPEN}\n${state.notes.join("\n\n")}\n${NOTES_CLOSE}` : text;
+    const notes = state.notes;
+    const prompt = notes.length ? `${text}\n\n${NOTES_OPEN}\n${notes.join("\n\n")}\n${NOTES_CLOSE}` : text;
     state.notes = [];
-    const id = await session.send({ prompt, mode: delivery === "steer" ? "immediate" : "enqueue" });
-    if (id && delivery === "queue") state.queued.set(id, prompt);
-    return id;
+    state.sending++;
+    try {
+      const id = await session.send({ prompt, mode: delivery === "steer" ? "immediate" : "enqueue" });
+      if (id) state.queued.set(id, { prompt, text, notes });
+      return id;
+    } finally {
+      // After the caller has seen the result (and marked the agent busy).
+      setImmediate(() => {
+        if (--state.sending > 0) return;
+        for (const e of state.held.splice(0)) this.translate(sessionId, e);
+      });
+    }
   }
 
   async note(sessionId: string, text: string): Promise<void> {
@@ -259,10 +288,14 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
   async cancelQueued(sessionId: string, id: string): Promise<boolean> {
     const live = this.open.get(sessionId);
     const state = this.sessions.get(sessionId);
-    const prompt = state?.queued.get(id);
-    if (!live || !state || prompt === undefined) return false;
-    const res = await live.session.rpc.queue.withdrawMessage({ messageId: id, expectedPrompt: prompt }).catch(() => null);
-    if (res?.removed) state.queued.delete(id);
+    const queued = state?.queued.get(id);
+    if (!live || !state || !queued) return false;
+    const res = await live.session.rpc.queue.withdrawMessage({ messageId: id, expectedPrompt: queued.prompt }).catch(() => null);
+    if (res?.removed) {
+      state.queued.delete(id);
+      // The caller takes back only its own text: notes that rode along wait for the next prompt.
+      state.notes = [...queued.notes, ...state.notes];
+    }
     return !!res?.removed;
   }
 
@@ -324,10 +357,15 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     return [];
   }
 
-  /** Copilot tracks what a session changed, but not between two given turns: all of the session's changes. */
-  async changes(sessionId: string): Promise<FileChange[]> {
-    const res = await (await this.session(sessionId)).rpc.workspaces.diff({ mode: "session" });
-    return (res?.changes ?? []).map((c: any) => {
+  /**
+   * Copilot diffs a whole session, not two given turns: its diff, kept to the files the turns from
+   * `from` to `to` edited (each edit step lists its files). A file also edited earlier shows all
+   * of the session's changes to it.
+   */
+  async changes(sessionId: string, from: string, to: string): Promise<FileChange[]> {
+    const session = await this.session(sessionId);
+    const res = await session.rpc.workspaces.diff({ mode: "session" });
+    const all: FileChange[] = (res?.changes ?? []).map((c: any) => {
       const patch = String(c.diff ?? "");
       const lines = patch.split("\n");
       return {
@@ -338,6 +376,9 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
         patch,
       };
     });
+    const directory = this.state_(sessionId).directory ?? "";
+    const edited = editedBetween(await session.getEvents(), from, to, directory);
+    return edited ? all.filter((c) => edited.has(fileKey(directory, c.file))) : all;
   }
 
   // ---------------------------------------------------------------- tools and processes
@@ -378,6 +419,8 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
         turnError: null,
         queued: new Map(),
         usage: emptyUsage(),
+        sending: 0,
+        held: [],
       };
       this.sessions.set(sessionId, s);
     }
@@ -428,7 +471,11 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
   }
 
   private attach(sessionId: string, session: SdkSession) {
-    const off = session.on((e) => this.translate(sessionId, e));
+    const off = session.on((e) => {
+      const state = this.state_(sessionId);
+      if (state.sending > 0) state.held.push(e);
+      else this.translate(sessionId, e);
+    });
     this.open.set(sessionId, { session, off });
   }
 
@@ -495,6 +542,13 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
         break;
       case "session.idle": {
         const error = d.aborted ? { type: "aborted", message: "The turn was interrupted." } : state.turnError;
+        if (error && !d.aborted) {
+          // A turn that fails before it starts (a model that isn't available) drops its prompt: it
+          // isn't in the conversation. Keep what it carried for the next turn, as OpenCode would.
+          const lost = [...state.queued.values()];
+          state.queued.clear();
+          state.notes = [...lost.flatMap((q) => [...q.notes, q.text]), ...state.notes];
+        }
         state.busy = false;
         state.turnError = null;
         this.emitEvent(sessionId, error ? "session.execution.failed" : "session.execution.succeeded", error ? { error } : {});
@@ -652,7 +706,7 @@ export function splitNotes(text: string): { text: string; notes: string[] } {
  * by the user, so pointing the new home's config at the user's login (as `~/.copilot/config.json`
  * does) signs it in without copying any secret (verified with CLI 1.0.112, docs/copilot-api.md).
  */
-export function seedLogin(home: string, userHome = path.join(os.homedir(), ".copilot")) {
+export function seedLogin(home: string, userHome = process.env.SYMBIO_COPILOT_USER_HOME ?? path.join(os.homedir(), ".copilot")) {
   const target = path.join(home, "config.json");
   const source = path.join(userHome, "config.json");
   if (!existsSync(source)) return;
@@ -670,4 +724,31 @@ export function seedLogin(home: string, userHome = path.join(os.homedir(), ".cop
 /** Copilot's config.json has `//` comment lines. */
 function parseConfig(text: string): any {
   return JSON.parse(text.replace(/^\s*\/\/.*$/gm, "").trim() || "{}");
+}
+
+const fileKey = (directory: string, file: string) => path.relative(directory, path.resolve(directory, file)).replace(/\\/g, "/").toLowerCase();
+
+/**
+ * Files edited by the turns from user message `from` to user message `to` (inclusive), from the
+ * edit steps' `fileEdits`; null when the session's events don't say (nothing to filter on).
+ */
+export function editedBetween(events: any[], from: string, to: string, directory: string): Set<string> | null {
+  const files = new Set<string>();
+  let known = false;
+  let inRange = false;
+  let pastEnd = false;
+  for (const e of events) {
+    const d = e?.data ?? {};
+    if (e?.type === "user.message") {
+      const id = String(d.messageId ?? e.id);
+      if (pastEnd) break;
+      if (id === from) inRange = true;
+      if (id === to) pastEnd = true;
+      continue;
+    }
+    if (e?.type !== "tool.execution_complete" || !Array.isArray(d.fileEdits)) continue;
+    known = true;
+    if (inRange) for (const edit of d.fileEdits) if (edit?.path) files.add(fileKey(directory, String(edit.path)));
+  }
+  return known ? files : null;
 }

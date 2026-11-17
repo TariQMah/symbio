@@ -165,12 +165,19 @@ export interface Approval {
 
 export type CoreMode = "auto" | "plan" | "act";
 
+/** The program that runs the agents: OpenCode, or GitHub Copilot CLI. */
+export type RuntimeKind = "opencode" | "copilot";
+
+export const RUNTIME_LABEL: Record<RuntimeKind, string> = { opencode: "OpenCode", copilot: "GitHub Copilot CLI" };
+
 export interface Project {
   id: string;
   name: string;
   directory: string;
   allowedModels: string[];
   coordinatorModel: string;
+  /** The agent runtime new agents run on (unset: OpenCode). */
+  runtime?: RuntimeKind;
   /** Models core may use (unset: all allowed) and models only core may use (store.ts modelsFor). */
   coreModels?: string[];
   coreOnlyModels?: string[];
@@ -549,7 +556,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   runtime: () => call<RuntimeInfo>("GET", "/runtime"),
-  models: () => call<ModelInfo[]>("GET", "/models"),
+  models: (runtime?: RuntimeKind) => call<ModelInfo[]>("GET", `/models${runtime ? `?runtime=${runtime}` : ""}`),
   projects: () => call<Project[]>("GET", "/projects"),
   project: (id: string) => call<Project>("GET", `/projects/${id}`),
   inspect: (dir: string) => call<Inspection>("GET", `/inspect?dir=${encodeURIComponent(dir)}`),
@@ -580,6 +587,7 @@ export const api = {
     directory: string;
     allowedModels: string[];
     coordinatorModel: string;
+    runtime?: RuntimeKind;
     docsLocation: DocsLocation;
     initGit: boolean;
     connections: ProjectConnection[];

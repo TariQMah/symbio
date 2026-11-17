@@ -65,6 +65,15 @@ Symbio's private OpenCode server listens on `127.0.0.1` with a random port and p
 agents' shells don't inherit it. Without that, an agent could call OpenCode directly and rewrite
 its own permission rules. The server exits when Symbio does.
 
+## GitHub Copilot CLI
+
+Projects can run their agents on GitHub Copilot CLI instead of OpenCode. Symbio starts it through the
+Copilot SDK over stdio (no network port), with its own data folder (`~/.symbio/copilot`), signed in
+with the user's own GitHub login: Symbio points that folder at the login in `~/.copilot/config.json`;
+the token stays in the OS credential store and is never copied. Copilot asks its host before every
+tool call, so the rules below are applied by Symbio itself (`guard.ts`'s `evaluate`) for each shell
+command, file write and read, the same rules as for OpenCode.
+
 ## What agents can't do
 
 Every agent session gets permission rules from `src/server/guard.ts`:

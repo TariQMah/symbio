@@ -3,17 +3,19 @@
 // not on the Team class, so their dependencies stay explicit and there are no import cycles.
 
 import type { AssetRegister } from "../assets.js";
-import type { AgentRuntime } from "../runtime/types.js";
+import type { AgentRuntime, RuntimeKind } from "../runtime/types.js";
 import type { PlanStore } from "../plan.js";
 import type { Agent, MessageKind, Project, Store } from "../store.js";
 
 export interface TeamCore {
   readonly store: Store;
+  /** The default runtime (OpenCode). */
   readonly runtime: AgentRuntime;
+  readonly runtimes: Map<RuntimeKind, AgentRuntime>;
   /** Set when Symbio itself is shutting down on purpose. */
   readonly shuttingDown: boolean;
   /** The runtime an agent's session lives in; throws when it isn't running. */
-  rt(agent?: Agent): AgentRuntime;
+  rt(agent: Pick<Agent, "runtime">): AgentRuntime;
   /** Adds an entry to the project's message log (Messages tab). */
   log(project: Project, m: { from: string; to: string; kind: MessageKind; text: string }): Promise<void>;
   /** A message from Symbio to an agent: wakes it (`wake`), or is only added to its conversation. */

@@ -927,3 +927,7 @@ tr.file-view-target > td, tr.file-view-target > th { background: rgba(212, 160, 
 .simulator-row-label { font-weight: 600; font-size: 12.5px; color: var(--text-2); }
 .simulator-missing { grid-column: 2 / -1; }
 .simulator-result > .simulator-row { display: grid; flex-direction: initial; }
+
+/* New project: which runtime the agents run on, side by side. */
+.runtime-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 640px) { .runtime-choice { grid-template-columns: 1fr; } }

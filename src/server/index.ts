@@ -13,6 +13,7 @@ import { loadUiToken, tokenMatches } from "./ui-token.js";
 import { isTunnelRequest, loginPage, RemoteAccess, remoteDecision, SESSION_COOKIE } from "./remote-access.js";
 import { bus } from "./bus.js";
 import { OpencodeRuntime } from "./opencode/runtime.js";
+import { CopilotRuntime } from "./copilot/runtime.js";
 import { Store, globalDir } from "./store.js";
 import { Team } from "./team.js";
 import { removeOrphanWorkspaces } from "./workspaces.js";
@@ -71,7 +72,9 @@ async function main() {
   await connections.load();
 
   const runtime = new OpencodeRuntime(path.join(globalDir, "opencode.pid"));
-  const team = new Team(store, runtime, `http://127.0.0.1:${PORT}`);
+  // GitHub Copilot CLI: its sessions in Symbio's own Copilot folder; started when a project uses it.
+  const copilot = new CopilotRuntime(path.join(globalDir, "copilot"));
+  const team = new Team(store, [runtime, copilot], `http://127.0.0.1:${PORT}`);
   team.remote = new RemoteOps(connections, {
     log: (project, m) => team.log(project, m),
     notify: (project, agent, text) => team.notify(project, agent, text),
@@ -208,6 +211,13 @@ async function main() {
     .start()
     .then(() => console.log(`OpenCode ${runtime.version} ready`))
     .catch((err) => console.error("OpenCode failed to start:", err.message));
+  if (store.list().some((p) => p.runtime === "copilot" || p.agents.some((a) => a.runtime === "copilot" && a.status !== "stopped"))) {
+    console.log("Starting GitHub Copilot CLI…");
+    copilot
+      .start()
+      .then(() => console.log(`GitHub Copilot CLI ${copilot.version} ready${copilot.login ? ` (${copilot.login})` : ""}`))
+      .catch((err) => console.error("GitHub Copilot CLI failed to start:", err.message));
+  }
   team.startWatchdog();
   updates.start();
 
@@ -216,7 +226,7 @@ async function main() {
     team.shuttingDown = true;
     team.stopWatchdog();
     updates.stop();
-    await runtime.stop();
+    await Promise.all([runtime.stop(), copilot.stop()]);
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown?.());

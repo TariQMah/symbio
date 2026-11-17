@@ -25,8 +25,8 @@ node bin/symbio.js run     # foreground, http://127.0.0.1:4310
 | `npm run build` | Production build: Vite for the UI, `tsc` for the server |
 | `npm start` | Same as `sym`: starts the built app in the background and opens the browser (`node bin/symbio.js run` runs it in the foreground) |
 | `npm test` | Unit tests (`node:test` via tsx, `tests/*.test.ts`) |
-| `npm run test:contract` | The OpenCode API as Symbio uses it, against a real `opencode serve` (`tests/contract/`) |
-| `npm run test:e2e` | The whole app (built first) against a stand-in OpenCode, driven in Edge/Chrome (`tests/e2e/`) |
+| `npm run test:contract` | The runtimes' APIs as Symbio uses them: a real `opencode serve`, and the real GitHub Copilot CLI when signed in (`tests/contract/`) |
+| `npm run test:e2e` | The whole app (built first), driven in Edge/Chrome, once per runtime: against a stand-in OpenCode, then a stand-in Copilot (`tests/e2e/`, `scripts/e2e.mjs`) |
 | `npm run typecheck` | Type-checks the server and the UI |
 | `prepublishOnly` | Runs typecheck, tests and build before `npm publish` |
 
@@ -60,9 +60,15 @@ docs/                  This documentation
 
 ## Making changes
 
-- **Verify OpenCode behavior live.** Much of the OpenCode v2 API is new or experimental. Before
-  relying on an endpoint or event, call it (`/api/debug/opencode/...` helps) and record what you
-  found in [opencode-api.md](opencode-api.md).
+- **Verify runtime behavior live.** Much of the OpenCode v2 API and of the Copilot SDK is new or
+  experimental. Before relying on an endpoint, call or event, try it (`/api/debug/opencode/...`
+  helps; for Copilot, a throwaway `scripts/_*.ts` with the SDK) and record what you found in
+  [opencode-api.md](opencode-api.md) or [copilot-api.md](copilot-api.md).
+- **Keep both runtimes working.** Agents run on OpenCode or GitHub Copilot CLI. The team logic, the
+  API and the UI use `AgentRuntime` (`src/server/runtime/types.ts`), never one runtime's API; each
+  runtime translates into Symbio's event and history vocabulary. Every end-to-end test runs on both
+  runtimes and must pass on both. Something a runtime can't do yet is skipped there explicitly in
+  the test, with the reason, and noted in that runtime's API page.
 - **Stay domain-neutral.** Nothing in Symbio, including the agent briefs in `prompts.ts`, should
   assume the project is software. Use "shared asset", "helper", "work", not "database", "backend",
   "code".
@@ -94,6 +100,11 @@ docs/                  This documentation
 - `npm run test:contract` starts the bundled OpenCode (or `SYMBIO_OPENCODE_BIN`) with its data in a
   temporary folder and checks every endpoint Symbio relies on that doesn't need a model. CI runs it
   on each push, and daily against the newest OpenCode too (`.github/workflows/opencode-contract.yml`).
+  It also drives the real GitHub Copilot CLI through Symbio's Copilot runtime, with turns on a model
+  that doesn't exist (they fail before reaching a provider, so nothing is billed). That part needs a
+  GitHub login with Copilot: yours (`copilot login`, reused, not copied), or `COPILOT_GITHUB_TOKEN`
+  (a fine-grained token with the Copilot Requests permission; CI's secret of that name). Without one
+  it's skipped.
 - A Symbio started with a temporary `SYMBIO_HOME` still uses your own OpenCode data (sessions,
   sign-ins) unless you also set the `XDG_*` folders (see [opencode-api.md](opencode-api.md)).
 - For UI changes, add or extend an end-to-end test (below), and look at the result. `scripts/screenshot.mjs` captures screens with your installed
@@ -151,10 +162,23 @@ version means re-verifying the APIs in [opencode-api.md](opencode-api.md) first.
 ## End-to-end tests
 
 `npm run test:e2e` (after `npm run build`) starts the real, built Symbio for each file in
-`tests/e2e/`, with everything in temporary folders, against `tests/e2e/fake-opencode.mjs`: a stand-in
-for `opencode serve` with the same API, events and stored messages (recorded from OpenCode 2.1.4 in
-`tests/e2e/fixtures/opencode-turns.json`), and a scripted "model". The tests drive Symbio through its
-API and a real browser (Edge, or `BROWSER_CHANNEL=chrome`).
+`tests/e2e/`, with everything in temporary folders, and runs every test twice, once per runtime
+(`SYMBIO_E2E_RUNTIME`; `node scripts/e2e.mjs --runtime copilot` runs one, and file paths pick some
+tests):
+
+- **OpenCode:** against `tests/e2e/fake-opencode.mjs`, a stand-in for `opencode serve` with the same
+  API, events and stored messages (recorded from OpenCode 2.1.4 in
+  `tests/e2e/fixtures/opencode-turns.json`).
+- **GitHub Copilot CLI:** against `tests/e2e/fake-copilot.mjs`, loaded in place of the Copilot SDK
+  (`SYMBIO_COPILOT_SDK`), with the same calls, permission and question callbacks, and events (as
+  verified in [copilot-api.md](copilot-api.md)). It calls Symbio's tools through Symbio's real MCP
+  server, and asks Symbio's rules before every tool call, as Copilot does.
+
+Both have the same scripted "model". The tests drive Symbio through its API and a real browser
+(Edge, or `BROWSER_CHANNEL=chrome`). Projects are created on the run's runtime with its models
+(`MODEL`, `MODEL_2` in the harness). Where the runtimes word things differently for the model (a
+refused call, an answered question, how a tool call is written), the harness has helpers
+(`refused`, `answered`, `RUNTIME`).
 
 The script is written in the messages. A line `@<agent> <step>` is run by that agent (`core`, or a
 helper's name), so a task given to a helper can carry the helper's own lines:
@@ -165,13 +189,13 @@ helper's name), so a task given to a helper can carry the helper's own lines:
 | `tool <name> <json>` | Calls one of Symbio's tools (`spawn_agent`, `merge_work`, `send_message`…), as a real model would |
 | `shell <command>` | Runs a command in the agent's folder (e.g. `git commit`) |
 | `write <path> <text>` | Writes a file in the agent's folder |
-| `question <title> \| <option> \| …` | Asks through OpenCode's question form and waits for the answer |
+| `question <title> \| <option> \| …` | Asks through the runtime's question tool and waits for the answer |
 | `wait <ms>` | Pauses |
 
-A session on the model `fake/unavailable` fails every turn at once. `tests/e2e/harness.ts` has the
-helpers (`startSymbio`, `projectWithCore`, `idle`, `history`, `openPage` for a desktop or phone page).
-When OpenCode changes how a turn looks, record it again with a real model and update the stand-in to
-match.
+A session on the model `UNAVAILABLE_MODEL` (`fake/unavailable`, `copilot/unavailable`) fails every
+turn at once. `tests/e2e/harness.ts` has the helpers (`startSymbio`, `projectWithCore`, `idle`,
+`history`, `openPage` for a desktop or phone page). When a runtime changes how a turn looks, record it
+again with a real model and update its stand-in to match.
 
 ## Testing remote access
 

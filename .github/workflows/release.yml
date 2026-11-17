@@ -34,10 +34,12 @@ jobs:
             exit 1
           fi
       - run: npm ci
-      # Nothing is published unless every check passes: unit tests, the OpenCode contract and the
-      # end-to-end tests (the whole app in a browser).
+      # Nothing is published unless every check passes: unit tests, the runtimes' contracts and the
+      # end-to-end tests (the whole app in a browser, on each runtime).
       - name: Check
         shell: bash
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"

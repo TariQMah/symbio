@@ -6,7 +6,9 @@ welcome (open an issue). Items marked *(good first contribution)* are small and 
 
 ## Now
 
-Nothing in progress; the top of Next is what comes up.
+**GitHub Copilot CLI as an agent runtime** (branch `copilot-runtime`). Done: the runtime-neutral
+layer, the Copilot runtime, choosing it per project in New project, and every end-to-end test on both
+runtimes. Next: background processes, prices and sign-in from Symbio, briefs worded for Copilot.
 
 ## Next
 

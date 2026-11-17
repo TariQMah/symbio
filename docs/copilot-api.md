@@ -112,7 +112,15 @@ are the whole session's.
 
 A model that doesn't exist (or isn't enabled) fails the turn at once: `session.error` with
 `errorType: "query"`, `message: 'Execution failed: Model "…" is not available.'`, then
-`session.idle`. `session.setModel(id)` switches a live session (it then said it was the new model).
+`session.idle`, with **no `user.message`: the prompt isn't recorded** (and no request is billed:
+`totalPremiumRequests: 0`). Symbio carries such a prompt to the next turn, as OpenCode keeps it in the
+conversation. `session.setModel(id)` switches a live session (it then said it was the new model).
+
+MCP servers are connected when a session is opened (`server/discover`, `initialize`,
+`tools/list`), each request with the session's headers, again when it's reopened after a restart.
+
+`tests/contract/copilot.test.ts` checks these against the real CLI, with turns on a missing model
+only, so it costs nothing.
 
 ## How Symbio maps it (`src/server/copilot/runtime.ts`)
 
@@ -125,9 +133,11 @@ A model that doesn't exist (or isn't enabled) fails the turn at once: `session.e
 | Notes without a turn | kept, and appended to the next prompt in `<symbio-notes>`; the history shows them as notes again |
 | Queued messages taken back mid-turn | `rpc.queue.pendingItems` / `rpc.queue.withdrawMessage` |
 | Questions to the human | `onUserInputRequest` → a form with one `answer` field |
-| Events and history | translated into OpenCode's vocabulary (`runtime/types.ts`) |
+| Events and history | translated into OpenCode's vocabulary (`runtime/types.ts`); a quick turn's events wait until the prompt call has returned |
+| A task's changes | the session's diff, kept to the files the task's turns edited (`fileEdits` of edit steps) |
 | Signing in | its own `COPILOT_HOME` (given by Symbio) pointed at the user's GitHub login |
 
 Not there yet: background processes (`list_processes` / `stop_process` return nothing), memory
-measurement (the SDK doesn't give the process id), prices from Copilot's model list, and choosing
-the runtime in the UI.
+measurement (the SDK doesn't give the process id), prices from Copilot's model list, signing in from
+Symbio (today: `copilot login` in a terminal), and briefs worded for Copilot (they describe
+OpenCode's code mode).

@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { bus, type UiEvent } from "./bus.js";
 import type { OpencodeRuntime } from "./opencode/runtime.js";
+import type { RuntimeKind } from "./runtime/types.js";
 import type { CoreMode, ReviewBy, Store, Project, DocsLocation, HelperWorkspace, ProjectConnection } from "./store.js";
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
@@ -30,10 +31,14 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   // ---- usage and prices (estimated cost = tokens × the price per model)
   const priceBook = PriceBook.at(globalDir);
   const priceBookLoaded = priceBook.load();
-  let catalog: { at: number; models: any[] } | null = null;
+  let catalog: { at: number; kinds: string; models: any[] } | null = null;
   const catalogModels = async () => {
-    if (runtime.state !== "running") return catalog?.models ?? [];
-    if (!catalog || Date.now() - catalog.at > 10 * 60_000) catalog = { at: Date.now(), models: (await runtime.listModels()).map((m) => m.raw) };
+    const running = [...team.runtimes.values()].filter((r) => r.state === "running");
+    if (!running.length) return catalog?.models ?? [];
+    if (!catalog || catalog.kinds !== running.map((r) => r.kind).join() || Date.now() - catalog.at > 10 * 60_000) {
+      const lists = await Promise.all(running.map((r) => r.listModels().catch(() => [])));
+      catalog = { at: Date.now(), kinds: running.map((r) => r.kind).join(), models: lists.flat().map((m) => m.raw) };
+    }
     return catalog.models;
   };
   const pricesFor = async (refs: string[]) => {
@@ -120,14 +125,34 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   api.get("/runtime", (c) => c.json(runtimeInfo()));
 
+  // Every agent runtime Symbio can use, for choosing one (a project's runtime).
+  api.get("/runtimes", (c) =>
+    c.json(
+      [...team.runtimes.values()].map((r) => ({
+        kind: r.kind,
+        label: r.label,
+        state: r.state,
+        version: r.version,
+        error: r.lastError,
+        login: (r as { login?: string | null }).login ?? null,
+      })),
+    ),
+  );
+
   api.post("/runtime/restart", async (c) => {
     await runtime.restart();
     return c.json(runtimeInfo());
   });
 
+  // A runtime's models (?runtime=copilot); the runtime is started if it isn't yet.
   api.get("/models", async (c) => {
-    if (runtime.state !== "running") return c.json({ error: `${runtime.label} is not running` }, 503);
-    const models = await runtime.listModels();
+    const kind = c.req.query("runtime") === "copilot" ? "copilot" : "opencode";
+    let models;
+    try {
+      models = await (await team.runtimeFor({ runtime: kind })).listModels();
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 503);
+    }
     if (c.req.query("raw") && DEBUG) return c.json(models.map((m) => m.raw));
     return c.json(
       models.map((m) => ({
@@ -303,8 +328,10 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       rulesRegister?: boolean;
       coreModels?: string[];
       coreOnlyModels?: string[];
+      runtime?: RuntimeKind;
     }>();
     if (!body.name?.trim() || !body.directory?.trim()) return c.json({ error: "name and directory are required" }, 400);
+    if (body.runtime !== undefined && !team.runtimes.has(body.runtime)) return c.json({ error: `Unknown runtime "${body.runtime}"` }, 400);
     if (!path.isAbsolute(body.directory.trim())) return c.json({ error: "directory must be a full path" }, 400);
     if (!body.coordinatorModel) return c.json({ error: "coordinatorModel is required" }, 400);
     const allowed = body.allowedModels?.length ? body.allowedModels : [body.coordinatorModel];
@@ -335,6 +362,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       origin: inspection.empty ? "new" : "existing",
       inspectionSummary: describeInspection(inspection),
       connections: cleanLinks(body.connections),
+      runtime: body.runtime,
     });
     if (roles.coreModels || roles.coreOnlyModels) {
       Object.assign(project, roles);

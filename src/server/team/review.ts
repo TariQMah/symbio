@@ -117,9 +117,9 @@ export class Reviews {
     if (!ranges.length) return { files: [], note: "Nothing recorded yet: the changes show once the helper reports the task." };
     const byFile = new Map<string, TaskChange>();
     for (const w of ranges) {
-      const changes = await this.team
-        .rt()
-        .changes(w.sessionId, w.from, w.to!)
+      const owner = project.agents.find((a) => a.sessionId === w.sessionId || a.previousSessions?.some((p) => p.sessionId === w.sessionId));
+      const changes = await Promise.resolve()
+        .then(() => this.team.rt(owner ?? {}).changes(w.sessionId, w.from, w.to!))
         .catch(() => []);
       for (const f of changes) {
         const patch = f.patch;

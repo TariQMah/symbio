@@ -2,7 +2,7 @@
 // message arrives, and the human answers it from Needs you.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { closeBrowser, history, idle, openPage, projectWithCore, startSymbio, until, type Symbio } from "./harness.js";
+import { answered, closeBrowser, history, idle, openPage, projectWithCore, startSymbio, until, type Symbio } from "./harness.js";
 
 let symbio: Symbio;
 before(async () => {
@@ -42,7 +42,7 @@ test("a question stays open while a helper's message arrives, and is answered fr
 
   await idle(symbio, project.id);
   const text = await history(symbio, project.id, core.id);
-  assert.match(text, /User has answered your questions.*Coffee/, "core got the answer");
+  assert.match(text, answered("Coffee"), "core got the answer");
   assert.match(text, /Thanks for answering\./, "and carried on");
   assert.match(text, /report ready/, "the helper's message was delivered after");
 });

@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { CopilotRuntime, seedLogin, splitNotes, toHistory, type SdkClient, type SdkSession } from "../src/server/copilot/runtime.js";
+import { CopilotRuntime, editedBetween, seedLogin, splitNotes, toHistory, type SdkClient, type SdkSession } from "../src/server/copilot/runtime.js";
 import { AGENT_PERMISSIONS } from "../src/server/guard.js";
 
 /** A fake SDK: records the configs sessions are created and opened with, and lets the test play events. */
@@ -15,13 +15,17 @@ function fakeSdk() {
   const sent: { sessionId: string; prompt: string; mode?: string }[] = [];
   const handlers = new Map<string, (e: any) => void>();
   const configs = new Map<string, any>();
+  /** Runs inside `send`, before it returns (events can arrive before the caller gets the id). */
+  const hooks: { onSend?: (sessionId: string, id: string) => void } = {};
   const session = (sessionId: string, config: any): SdkSession => {
     configs.set(sessionId, config);
     return {
       sessionId,
       send: async (o) => {
         sent.push({ sessionId, ...o });
-        return `msg_${sent.length}`;
+        const id = `msg_${sent.length}`;
+        hooks.onSend?.(sessionId, id);
+        return id;
       },
       abort: async () => {},
       setModel: async () => {},
@@ -31,7 +35,12 @@ function fakeSdk() {
         return () => handlers.delete(sessionId);
       },
       disconnect: async () => {},
-      rpc: {},
+      rpc: {
+        queue: {
+          pendingItems: async () => ({ items: [] }),
+          withdrawMessage: async ({ messageId }: { messageId: string }) => ({ removed: messageId.startsWith("msg_"), interrupted: false }),
+        },
+      },
     };
   };
   const client: SdkClient = {
@@ -52,7 +61,7 @@ function fakeSdk() {
     getSessionMetadata: async () => null,
   };
   const play = (sessionId: string, type: string, data: any = {}) => handlers.get(sessionId)!({ id: `ev_${Math.random()}`, type, data });
-  return { client, created, resumed, sent, configs, play };
+  return { client, created, resumed, sent, configs, play, hooks };
 }
 
 async function setup() {
@@ -203,4 +212,58 @@ test("Symbio's own Copilot folder reuses the user's GitHub login without copying
   const config = JSON.parse(readFileSync(path.join(home, "config.json"), "utf8"));
   assert.deepEqual(Object.keys(config).sort(), ["lastLoggedInUser", "loggedInUsers"]);
   assert.equal(config.lastLoggedInUser.login, "me");
+});
+
+test("a turn that ends before the prompt call returns still reaches the team after it (the agent isn't left busy)", async () => {
+  const { sdk, runtime, events, sessionId } = await setup();
+  sdk.hooks.onSend = (id, messageId) => {
+    sdk.play(id, "user.message", { messageId, content: "hi" });
+    sdk.play(id, "session.idle", {});
+  };
+  let seenWhenReturned = -1;
+  await runtime.prompt(sessionId, "hi", "queue").then(() => (seenWhenReturned = events.length));
+  assert.equal(seenWhenReturned, 0, "nothing yet when the caller marks the agent busy");
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(
+    events.map((e) => e.type),
+    ["session.inbox.delivered", "session.execution.started", "session.execution.succeeded"],
+  );
+});
+
+test("a prompt a failing model never took (and its notes) goes with the next one", async () => {
+  const { sdk, runtime, sessionId } = await setup();
+  await runtime.note(sessionId, "Symbio: a note.");
+  await runtime.prompt(sessionId, "[from: writer · request]\nPlease review.", "queue");
+  await new Promise((r) => setImmediate(r));
+  sdk.play(sessionId, "session.error", { errorType: "query", message: 'Model "x" is not available.' });
+  sdk.play(sessionId, "session.idle", {});
+  await runtime.prompt(sessionId, "Symbio: your model failed; you were switched. Continue.", "queue");
+  assert.deepEqual(splitNotes(sdk.sent.at(-1)!.prompt), {
+    text: "Symbio: your model failed; you were switched. Continue.",
+    notes: ["Symbio: a note.", "[from: writer · request]\nPlease review."],
+  });
+});
+
+test("a task's changes are the files its turns edited", () => {
+  const events = [
+    { type: "user.message", data: { messageId: "u1" } },
+    { type: "tool.execution_complete", data: { success: true, fileEdits: [{ path: "C:\\work\\script.md" }] } },
+    { type: "user.message", data: { messageId: "u2" } },
+    { type: "tool.execution_complete", data: { success: true, fileEdits: [{ path: "C:\\work\\frames.txt" }] } },
+    { type: "user.message", data: { messageId: "u3" } },
+    { type: "tool.execution_complete", data: { success: true, fileEdits: [{ path: "C:\\work\\final.mp4" }] } },
+  ];
+  assert.deepEqual([...editedBetween(events, "u2", "u2", "C:\\work")!], ["frames.txt"]);
+  assert.deepEqual([...editedBetween(events, "u1", "u2", "C:\\work")!], ["script.md", "frames.txt"]);
+  assert.equal(editedBetween([{ type: "user.message", data: { messageId: "u1" } }], "u1", "u1", "C:\\work"), null, "unknown: no filter");
+});
+
+test("a queued prompt taken back mid-turn leaves its notes for the next prompt", async () => {
+  const { sdk, runtime, sessionId } = await setup();
+  await runtime.note(sessionId, "Symbio: the human answered writer's question.");
+  const id = await runtime.prompt(sessionId, "[from: writer · info]\nDone.", "queue");
+  await new Promise((r) => setImmediate(r));
+  assert.equal(await runtime.cancelQueued(sessionId, id!), true, "handed to the agent in a tool result instead");
+  await runtime.prompt(sessionId, "@core say noted", "queue");
+  assert.deepEqual(splitNotes(sdk.sent.at(-1)!.prompt).notes, ["Symbio: the human answered writer's question."]);
 });

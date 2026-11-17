@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, test } from "node:test";
-import { closeBrowser, history, idle, openPage, projectWithCore, startSymbio, until, type Symbio } from "./harness.js";
+import { closeBrowser, history, idle, MODEL, MODEL_2, openPage, projectWithCore, startSymbio, until, type Symbio } from "./harness.js";
 
 let symbio: Symbio;
 before(async () => {
@@ -17,7 +17,7 @@ after(async () => {
 });
 
 const tool = (agent: string, name: string, args: object) => `@${agent} tool ${name} ${JSON.stringify(args)}`;
-const MODELS = ["fake/scripted", "fake/scripted-2"];
+const MODELS = [MODEL, MODEL_2];
 
 test("a model locked to core isn't given to helpers; select all and none", async () => {
   const { project, core } = await projectWithCore(symbio, "Roles", { models: MODELS });
@@ -43,18 +43,18 @@ test("a model locked to core isn't given to helpers; select all and none", async
   await page.locator("button", { hasText: "Save changes" }).click();
   await until("the roles to be saved", async () => {
     const p = await symbio.call("GET", `/projects/${project.id}`);
-    return JSON.stringify(p.coreOnlyModels) === JSON.stringify(["fake/scripted"]);
+    return JSON.stringify(p.coreOnlyModels) === JSON.stringify([MODEL]);
   });
 
   const say = async (text: string) => {
     await symbio.call("POST", `/projects/${project.id}/agents/${core.id}/messages`, { text });
     await idle(symbio, project.id);
   };
-  await say(tool("core", "spawn_agent", { name: "picky", purpose: "x", task: "@picky say hi", workspace: "shared", model: "fake/scripted" }));
-  assert.match(await history(symbio, project.id, core.id), /is for core only in this project\. Helpers may use: fake\/scripted-2/);
+  await say(tool("core", "spawn_agent", { name: "picky", purpose: "x", task: "@picky say hi", workspace: "shared", model: MODEL }));
+  assert.match(await history(symbio, project.id, core.id), new RegExp(`is for core only in this project\\. Helpers may use: ${MODEL_2}`));
   await say(tool("core", "spawn_agent", { name: "helper", purpose: "x", task: "@helper say hi", workspace: "shared" }));
   const helper = (await symbio.call("GET", `/projects/${project.id}`)).agents.find((a: any) => a.name === "helper");
-  assert.equal(helper.model, "fake/scripted-2", "a new helper starts on a model helpers may use");
+  assert.equal(helper.model, MODEL_2, "a new helper starts on a model helpers may use");
 });
 
 test("working agents move up the team list, under core", async () => {

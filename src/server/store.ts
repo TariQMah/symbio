@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { replaceFile } from "./fsutil.js";
+import type { RuntimeKind } from "./runtime/types.js";
 
 export type AgentRole = "coordinator" | "worker";
 /** "waiting" = blocked on a question to the human (not hung; the watchdog leaves it alone). */
@@ -19,6 +20,8 @@ export interface Agent {
   /** "human": created by the human from the team list, to work with them directly (no first task). */
   startedBy?: "human";
   sessionId: string;
+  /** The runtime its session lives in (runtime/types.ts). Unset: OpenCode (agents from before there was a choice). */
+  runtime?: RuntimeKind;
   /** Working folder: the project root (coordinator, shared helpers), or the helper's own git worktree. */
   directory: string;
   /**
@@ -63,6 +66,11 @@ export interface Project {
   directory: string;
   allowedModels: string[]; // provider/model
   coordinatorModel: string;
+  /**
+   * The agent runtime new agents run on: "opencode" (unset) or "copilot" (GitHub Copilot CLI).
+   * Models are the runtime's own; agents keep the runtime they were created on.
+   */
+  runtime?: RuntimeKind;
   /**
    * Which allowed models core may use (the crowns in the model picker); unset: all of them.
    * coordinatorModel is the one it runs on now.
@@ -256,6 +264,7 @@ export class Store {
     inspectionSummary: string;
     connections?: ProjectConnection[];
     rulesRegister?: boolean;
+    runtime?: RuntimeKind;
   }) {
     const directory = path.resolve(input.directory);
     const existing = this.list().find((p) => samePath(p.directory, directory));
@@ -274,6 +283,7 @@ export class Store {
           coordinatorModel: input.coordinatorModel,
           docsLocation: input.docsLocation,
           rulesRegister: input.rulesRegister,
+          ...(input.runtime && input.runtime !== "opencode" ? { runtime: input.runtime } : {}),
           origin: input.origin,
           inspectionSummary: input.inspectionSummary,
           kickedOff: false,

@@ -65,7 +65,10 @@ test("questions wait in Needs you, are answered together, and reach whoever aske
   assert.doesNotMatch(await history(symbio, project.id, writer.id), /Q1:/, "each asker only gets its own answers");
 
   // Setting one aside tells whoever asked, with the note.
+  // The request returns once core has its note (Q2 shows as set aside a moment before that).
+  const setAside = page.waitForResponse((r) => /\/questions\/Q2\/set-aside$/.test(new URL(r.url()).pathname));
   await card("Q2").locator("button", { hasText: "Set aside" }).click();
+  await setAside;
   await until("Q2 to be set aside", async () => (await questions()).Q2.state === "set-aside");
   // Both notes to core wait for its next turn (they don't wake it).
   await say("@core say noted");

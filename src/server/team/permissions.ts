@@ -29,8 +29,9 @@ export class Permissions {
     return this.open.size;
   }
 
-  clear() {
-    this.open.clear();
+  /** Forgets open requests (all, or those of the agents `which` picks): their runtime went away. */
+  clear(which?: (agentId: string) => boolean) {
+    for (const [id, p] of this.open) if (!which || which(p.agentId)) this.open.delete(id);
   }
 
   /** Open requests in a project. */

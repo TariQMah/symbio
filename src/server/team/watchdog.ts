@@ -2,6 +2,7 @@
 // OpenCode is restarted before its memory makes it crash; agents interrupted by a crash or
 // restart are woken once OpenCode is back.
 
+import { runtimeOf, type RuntimeKind } from "../runtime/types.js";
 import type { Agent, Project } from "../store.js";
 import { active, type TeamCore } from "./core.js";
 
@@ -18,7 +19,7 @@ export class Watchdog {
   private recycling = false;
   private lastRecycle = 0;
   /** Agents to wake once OpenCode is running again, and why they stopped. */
-  private interrupted = new Map<string, { reason: string; wasWaiting: boolean }>();
+  private interrupted = new Map<string, { reason: string; wasWaiting: boolean; kind: RuntimeKind }>();
 
   /** @param openPermissions how many permission requests wait for the human (a restart would lose them). */
   constructor(
@@ -40,11 +41,11 @@ export class Watchdog {
 
   /** An agent that has been "busy" without any event for too long is hung: interrupt and nudge it. */
   async checkStuck() {
-    if (this.team.runtime.state !== "running") return;
     const now = Date.now();
     for (const project of this.team.store.list()) {
       for (const agent of project.agents) {
         if (agent.status !== "busy" || now - agent.lastActivity < STUCK_AFTER_MS) continue;
+        if (this.team.runtimes.get(runtimeOf(agent))?.state !== "running") continue;
         // Silent because it's waiting for the human's answer (an event may have been missed): not a hang.
         const forms = await this.team.forms(agent).catch(() => []);
         if (forms.length) {
@@ -118,7 +119,7 @@ export class Watchdog {
    * (OpenCode crash or restart, or Symbio itself going down), so they can be told to continue
    * once OpenCode is back. Marks them idle meanwhile.
    */
-  markInterrupted(reason: string) {
+  markInterrupted(reason: string, kind?: RuntimeKind) {
     // On a deliberate shutdown, leave statuses on disk as they are: the next start sees who was
     // working and wakes them then.
     if (this.team.shuttingDown) return;
@@ -126,7 +127,8 @@ export class Watchdog {
       let changed = false;
       for (const agent of project.agents) {
         if (agent.status !== "busy" && agent.status !== "stuck" && agent.status !== "waiting") continue;
-        this.interrupted.set(agent.id, { reason, wasWaiting: agent.status === "waiting" });
+        if (kind && runtimeOf(agent) !== kind) continue;
+        this.interrupted.set(agent.id, { reason, wasWaiting: agent.status === "waiting", kind: runtimeOf(agent) });
         agent.status = "idle";
         changed = true;
       }
@@ -135,11 +137,11 @@ export class Watchdog {
   }
 
   /** Wakes up the agents interrupted by a crash/restart (after tools and briefs are re-registered). */
-  async recoverInterrupted() {
+  async recoverInterrupted(kind?: RuntimeKind) {
     for (const project of this.team.store.list()) {
       for (const agent of project.agents) {
         const info = this.interrupted.get(agent.id);
-        if (!info) continue;
+        if (!info || (kind && info.kind !== kind)) continue;
         this.interrupted.delete(agent.id);
         if (!active(agent)) continue;
         await this.wake(project, agent, info);

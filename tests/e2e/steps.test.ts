@@ -3,7 +3,7 @@
 // raw command or script is a click away.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { closeBrowser, gitRepo, idle, openPage, projectWithCore, startSymbio, type Symbio } from "./harness.js";
+import { closeBrowser, gitRepo, idle, openPage, projectWithCore, RUNTIME, startSymbio, type Symbio } from "./harness.js";
 
 let symbio: Symbio;
 before(async () => {
@@ -50,7 +50,8 @@ test("a run of steps folds into one line in plain words, the raw command a click
   const message = run.locator(".step-run-body > .tool", { hasText: "Message to setor" });
   await message.locator(".tool-arg", { hasText: "Got T201, publishing it now." }).waitFor();
   await message.locator("> summary").click();
-  await message.locator("pre.tool-io", { hasText: "tools.symbio.send_message" }).waitFor();
+  // What the model sent: OpenCode calls Symbio's tools from a script (code mode), Copilot directly.
+  await message.locator("pre.tool-io", { hasText: RUNTIME === "copilot" ? '"to": "setor"' : "tools.symbio.send_message" }).waitFor();
   await message.locator("pre.tool-io.out", { hasText: "Delivered to setor." }).waitFor();
 });
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { Trash2, X } from "lucide-react";
-import { api, type Project, type ProjectConnection } from "./api";
+import { api, RUNTIME_LABEL, type Project, type ProjectConnection } from "./api";
 import { ConnectionsPicker } from "./ConnectionsPicker";
 import { ModelPicker, choiceBody, choiceOf } from "./ModelPicker";
 import { RemoveDialog } from "./ProjectMenu";
@@ -325,12 +325,12 @@ function Models({ project, onChanged }: { project: Project; onChanged: (p: Proje
           <p>
             Agents switch to the next model they may use when one fails. The crown marks the models core may use (core runs on the
             first unless you change it in its chat), the lock keeps a model for core only. Adding a model also resumes agents that got
-            stuck.
+            stuck. This project's agents run on {RUNTIME_LABEL[project.runtime ?? "opencode"]}.
           </p>
         </div>
       </div>
       <div style={{ padding: 12 }}>
-        <ModelPicker value={choice} onChange={setChoice} />
+        <ModelPicker value={choice} onChange={setChoice} runtime={project.runtime} />
       </div>
       <SaveBar
         dirty={dirty && choice.allowed.length > 0 && !!choice.coordinator && helpersLeft}

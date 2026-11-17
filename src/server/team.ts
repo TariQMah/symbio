@@ -10,7 +10,7 @@ import { AGENT_PERMISSIONS, PLAN_MODE_PERMISSIONS } from "./guard.js";
 import { bus } from "./bus.js";
 import { privateDocsInstruction } from "./docs.js";
 import type { McpResolver } from "./mcp.js";
-import type { AgentRuntime, RuntimeEvent } from "./runtime/types.js";
+import { runtimeOf, type AgentRuntime, type RuntimeEvent, type RuntimeKind } from "./runtime/types.js";
 import { PlanStore, type TaskInput, type TaskStatus } from "./plan.js";
 import type { RemoteOps } from "./remote.js";
 import { coordinatorBrief, kickoffMessage, modeNote, workerBrief } from "./prompts.js";
@@ -97,21 +97,39 @@ export class Team implements TeamCore {
   readonly watchdog = new Watchdog(this, () => this.permissions.size);
   private loopGuard = new LoopGuard(this);
 
+  /** The agent runtimes, by kind. The first one given is the default (OpenCode). */
+  readonly runtimes = new Map<RuntimeKind, AgentRuntime>();
+  /** The default runtime: OpenCode. */
+  readonly runtime: AgentRuntime;
+
   constructor(
     readonly store: Store,
-    readonly runtime: AgentRuntime,
+    runtimes: AgentRuntime | AgentRuntime[],
     private readonly mcpBaseUrl: string,
   ) {
-    runtime.on("event", (e) => this.onEvent(e));
-    runtime.on("state", (state) => {
-      // Open permission requests die with the OpenCode process.
-      if (state === "crashed" || state === "stopped") this.permissions.clear();
-      if (state === "crashed") this.markInterrupted("the OpenCode runtime crashed and was restarted");
-      else if (state === "stopped") this.markInterrupted("the OpenCode runtime was restarted");
-      // Tool registrations and briefs live in the OpenCode process; push them whenever it
-      // (re)starts, then wake whoever was interrupted.
-      else if (state === "running") void this.refreshAll().then(() => this.watchdog.recoverInterrupted());
-    });
+    const list = Array.isArray(runtimes) ? runtimes : [runtimes];
+    this.runtime = list[0];
+    for (const runtime of list) {
+      this.runtimes.set(runtime.kind, runtime);
+      runtime.on("event", (e) => this.onEvent(e));
+      runtime.on("state", (state) => {
+        const kind = runtime.kind;
+        // Open permission requests die with the runtime's process.
+        if (state === "crashed" || state === "stopped") this.permissions.clear((agentId) => this.agentRuntime(agentId) === kind);
+        if (state === "crashed") this.markInterrupted(`the ${runtime.label} runtime crashed and was restarted`, kind);
+        else if (state === "stopped") this.markInterrupted(`the ${runtime.label} runtime was restarted`, kind);
+        // Tool registrations and briefs live in the runtime's process; push them whenever it
+        // (re)starts, then wake whoever was interrupted.
+        else if (state === "running") void this.refreshAll(kind).then(() => this.watchdog.recoverInterrupted(kind));
+      });
+    }
+  }
+
+  private agentRuntime(agentId: string): RuntimeKind | undefined {
+    for (const project of this.store.list()) {
+      const agent = project.agents.find((a) => a.id === agentId);
+      if (agent) return runtimeOf(agent);
+    }
   }
 
   /** Starts the background checks: the watchdog (hangs, memory) and the hourly housekeeping. */
@@ -493,7 +511,8 @@ export class Team implements TeamCore {
     const existing = this.coordinator(project);
     if (existing) return existing;
 
-    const sessionId = await this.rt().createSession({
+    const runtime = await this.runtimeFor(project);
+    const sessionId = await runtime.createSession({
       title: `${project.name} · core`,
       directory: project.directory,
       model: project.coordinatorModel,
@@ -506,6 +525,7 @@ export class Team implements TeamCore {
       name: "core",
       role: "coordinator",
       sessionId,
+      runtime: runtime.kind,
       directory: project.directory,
       branch: null,
       model: project.coordinatorModel,
@@ -572,7 +592,8 @@ export class Team implements TeamCore {
       );
     }
     const workspace = await createWorkspace(project, name, mode, repo);
-    const sessionId = await this.rt().createSession({
+    const runtime = await this.runtimeFor(project);
+    const sessionId = await runtime.createSession({
       title: `${project.name} · ${name}`,
       directory: workspace.directory,
       model,
@@ -585,6 +606,7 @@ export class Team implements TeamCore {
       role: "worker",
       purpose: opts.purpose,
       sessionId,
+      runtime: runtime.kind,
       directory: workspace.directory,
       ...(repo ? { repo } : {}),
       branch: workspace.branch,
@@ -973,7 +995,8 @@ export class Team implements TeamCore {
    */
   async removeProject(project: Project, deleteData: boolean): Promise<void> {
     for (const agent of project.agents) {
-      const runtime = this.runtime.state === "running" ? this.runtime : null;
+      const own = this.runtimes.get(runtimeOf(agent));
+      const runtime = own?.state === "running" ? own : null;
       if (runtime) {
         await runtime.interrupt(agent.sessionId).catch(() => {});
         await this.processes.stopAll(project, agent).catch(() => {});
@@ -1110,9 +1133,32 @@ export class Team implements TeamCore {
   // ---------------------------------------------------------------- internals
 
   /** The runtime an agent's session lives in; throws when it isn't running. */
-  rt(_agent?: Agent): AgentRuntime {
-    if (this.runtime.state !== "running") throw new Error(`${this.runtime.label} is not running (${this.runtime.state})`);
-    return this.runtime;
+  rt(agent: Pick<Agent, "runtime">): AgentRuntime {
+    const runtime = this.runtimes.get(runtimeOf(agent));
+    if (!runtime) throw new Error(`The ${runtimeOf(agent)} runtime isn't available in this Symbio.`);
+    if (runtime.state !== "running") throw new Error(`${runtime.label} is not running (${runtime.state})`);
+    return runtime;
+  }
+
+  /** The runtime new agents of the project run on, started if it isn't yet (Copilot starts on demand). */
+  async runtimeFor(project: Pick<Project, "runtime">): Promise<AgentRuntime> {
+    const kind = project.runtime ?? "opencode";
+    const runtime = this.runtimes.get(kind);
+    if (!runtime) throw new Error(`The ${kind} runtime isn't available in this Symbio.`);
+    if (runtime.state === "stopped" || runtime.state === "crashed") await runtime.start();
+    if (runtime.state === "starting") {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`${runtime.label} didn't start in time.`)), 60_000);
+        const onState = (state: string) => {
+          if (state === "starting") return;
+          clearTimeout(timer);
+          runtime.off("state", onState);
+          state === "running" ? resolve() : reject(new Error(`${runtime.label} didn't start (${runtime.lastError ?? state}).`));
+        };
+        runtime.on("state", onState);
+      });
+    }
+    return this.rt({ runtime: kind });
   }
 
   /** The URL of Symbio's MCP tool server for a working folder (a token per folder, for this run). */
@@ -1157,26 +1203,29 @@ export class Team implements TeamCore {
     await this.system(project, agent, `Symbio: ${text.replace(`${agent.name}'s folder`, "Your folder")} Check your state before continuing.`, false);
   }
 
-  private async refreshAll() {
-    for (const project of this.store.list()) {
-      for (const agent of project.agents.filter(active)) await this.reattach(project, agent);
+  private async refreshAll(kind: RuntimeKind) {
+    const mine = (a: Agent) => runtimeOf(a) === kind;
+    for (const project of this.store.list().filter((p) => p.agents.some(mine))) {
+      const agents = project.agents.filter((a) => active(a) && mine(a));
+      for (const agent of agents) await this.reattach(project, agent);
       // Once per folder (several agents can share one).
       const dirs = new Set<string>();
-      for (const agent of project.agents.filter(active)) {
+      for (const agent of agents) {
         if (dirs.has(agent.directory)) continue;
         dirs.add(agent.directory);
         await this.ensureTools(project, agent, true);
       }
-      for (const agent of project.agents.filter(active)) {
+      for (const agent of agents) {
         await this.refreshInstructions(project, agent).catch((err) =>
           console.error(`[team] could not refresh instructions for ${project.name}/${agent.name}:`, err.message),
         );
       }
       // Usage totals (also for stopped agents, so project totals stay complete).
-      for (const agent of project.agents.filter((a) => !a.usage || active(a))) {
+      for (const agent of project.agents.filter((a) => mine(a) && (!a.usage || active(a)))) {
         await this.usage.refresh(project, agent).catch(() => {});
       }
-      await this.tellAboutUpdates(project).catch((err) => console.error(`[updates] ${project.name}:`, err.message));
+      const coordinator = this.coordinator(project);
+      if (coordinator && mine(coordinator)) await this.tellAboutUpdates(project).catch((err) => console.error(`[updates] ${project.name}:`, err.message));
     }
   }
 
@@ -1282,8 +1331,8 @@ export class Team implements TeamCore {
   }
 
   /** Agents working when their runtime went away are woken once OpenCode is back (see Watchdog). */
-  markInterrupted(reason: string) {
-    this.watchdog.markInterrupted(reason);
+  markInterrupted(reason: string, kind?: RuntimeKind) {
+    this.watchdog.markInterrupted(reason, kind);
   }
 
   /**

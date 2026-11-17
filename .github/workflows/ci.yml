@@ -22,8 +22,12 @@ jobs:
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
           npm test
-      # The OpenCode API as Symbio uses it, against the bundled OpenCode (no model or sign-in needed).
+      # The runtimes' APIs as Symbio uses them: the bundled OpenCode (no model or sign-in needed), and
+      # GitHub Copilot CLI when the COPILOT_GITHUB_TOKEN secret is set (skipped otherwise; nothing is billed).
       - run: npm run test:contract
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - run: npm run build
-      # The whole app against a stand-in OpenCode with a scripted model, in a real browser (Edge).
+      # The whole app in a real browser (Edge), once per runtime: against a stand-in OpenCode and a
+      # stand-in Copilot SDK, both with the same scripted model.
       - run: npm run test:e2e
