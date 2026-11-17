@@ -142,7 +142,8 @@ export function catalogPrice(model: any): Price | null {
  * catalog model with the same name (e.g. "foundry/code-claude-opus-5-5" → "claude-opus-5-5").
  */
 export function resolvePrices(refs: string[], book: Record<string, Price>, catalog: any[]) {
-  const byRef = new Map(catalog.map((m) => [`${m.providerID}/${m.id}`, m]));
+  // The same ref can come from two runtimes (an Azure deployment set up in OpenCode and in Copilot): a priced one wins.
+  const byRef = new Map([...catalog.filter((m) => !catalogPrice(m)), ...catalog.filter((m) => catalogPrice(m))].map((m) => [`${m.providerID}/${m.id}`, m]));
   const priced = catalog.filter((m) => catalogPrice(m));
   const out: Record<string, { price: Price | null; source: "yours" | "opencode" | "suggested" | "none"; from?: string }> = {};
   for (const ref of refs) {

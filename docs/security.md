@@ -74,7 +74,9 @@ the token stays in the OS credential store and is never copied; or the human sig
 with a GitHub device code. Copilot asks its host before running commands and writing files, so the
 rules below are applied by Symbio itself (`guard.ts`'s `evaluate`); reads inside the working folder
 don't ask, so Symbio checks every file read in a hook that runs before each tool. The same rules as
-for OpenCode.
+for OpenCode. Model providers set up for the Copilot CLI with your own key (`providers.json` in your
+Copilot folder) are read where they are and handed to Copilot's process; Symbio doesn't copy them,
+and only model names reach the browser.
 
 ## What agents can't do
 

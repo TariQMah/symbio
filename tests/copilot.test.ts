@@ -5,8 +5,12 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { CopilotRuntime, editedBetween, priceOf, seedLogin, splitNotes, toHistory, type SdkClient, type SdkSession } from "../src/server/copilot/runtime.js";
+import { CopilotRuntime, editedBetween, priceOf, seedLogin, splitNotes, toHistory, userProviders, type SdkClient, type SdkSession } from "../src/server/copilot/runtime.js";
 import { AGENT_PERMISSIONS } from "../src/server/guard.js";
+
+// Never the user's own Copilot folder (their login, their providers.json).
+const NO_USER_HOME = mkdtempSync(path.join(os.tmpdir(), "sym-cp-nouser-"));
+process.env.SYMBIO_COPILOT_USER_HOME = NO_USER_HOME;
 
 /** A fake SDK: records the configs sessions are created and opened with, and lets the test play events. */
 function fakeSdk() {
@@ -321,5 +325,41 @@ test("Copilot's prices (AI credits per million tokens) in dollars", () => {
     cache: { read: 0.01, write: 0.125 },
   });
   assert.equal(priceOf({ id: "auto" }), null);
+});
+
+test("the user's own Copilot providers (bring your own key) are read where they are and given to every session", async () => {
+  const userHome = mkdtempSync(path.join(os.tmpdir(), "sym-cp-byok-"));
+  process.env.SYMBIO_COPILOT_USER_HOME = userHome;
+  try {
+    writeFileSync(
+      path.join(userHome, "providers.json"),
+      "// Providers\n" +
+        JSON.stringify({
+          providers: [
+            { name: "foundry", type: "anthropic", baseUrl: "https://example.invalid/anthropic", apiKey: "sk-secret" },
+            { name: "copilot", baseUrl: "https://example.invalid" },
+          ],
+          models: [
+            { id: "code-claude-haiku-5-5", provider: "foundry", modelId: "claude-haiku-5.5", name: "Claude Haiku 5.5 (Foundry)", capabilities: { supports: { vision: true } } },
+            { id: "orphan", provider: "nowhere" },
+          ],
+        }),
+    );
+    assert.deepEqual(userProviders().providers.map((p) => p.name), ["foundry"], "a provider can't take Copilot's name");
+    assert.deepEqual(userProviders().models.map((m) => m.id), ["code-claude-haiku-5-5"], "models of unknown providers are left out");
+
+    const { sdk, runtime } = await setup();
+    const models = await runtime.listModels();
+    const own = models.find((m) => m.providerID === "foundry")!;
+    assert.equal(`${own.providerID}/${own.id}`, "foundry/code-claude-haiku-5-5");
+    assert.ok(!JSON.stringify(models).includes("sk-secret"), "no key in what goes to the browser");
+    const id = await runtime.createSession({ title: "B · core", directory: "C:/work/b", model: "foundry/code-claude-haiku-5-5", permissions: [], toolsUrl: "http://x/mcp/t" });
+    const config = sdk.created.find((c) => c.sessionId === id);
+    assert.equal(config.model, "foundry/code-claude-haiku-5-5", "chosen as <provider>/<id>, as the SDK names it");
+    assert.deepEqual(config.providers.map((p: any) => p.name), ["foundry"]);
+    assert.equal(config.models[0].id, "code-claude-haiku-5-5");
+  } finally {
+    process.env.SYMBIO_COPILOT_USER_HOME = NO_USER_HOME;
+  }
 });
 

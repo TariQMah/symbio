@@ -313,8 +313,10 @@ async function drain(state) {
     while (state.queue.length) {
       const item = state.queue.shift();
       // Like the real one: a model that isn't available fails before the prompt is recorded.
-      if (state.model === "unavailable") {
-        emit(state, "session.error", { errorType: "query", message: 'Execution failed: Model "unavailable" is not available.' });
+      // A model the session doesn't have (Copilot's own, or one of the providers it was given) isn't available.
+      const known = MODELS.some((m) => m.id === state.model) || (state.config.models ?? []).some((m) => `${m.provider}/${m.id}` === state.model);
+      if (state.model === "unavailable" || !known) {
+        emit(state, "session.error", { errorType: "query", message: `Execution failed: Model "${state.model}" is not available.` });
         emit(state, "session.idle", {}, false);
         continue;
       }

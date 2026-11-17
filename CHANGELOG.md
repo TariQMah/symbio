@@ -9,7 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/).
   OpenCode or on GitHub Copilot CLI, with its own models and your Copilot subscription. Symbio uses your existing
   Copilot login (`copilot login`), or you sign in from Settings → **GitHub Copilot CLI** with a code on GitHub; it keeps
   its sessions apart from your own Copilot history. Symbio's rules still apply to every command an agent runs and every
-  file it reads or writes; background processes, model prices and the chat's steps work as with OpenCode.
+  file it reads or writes; background processes, model prices and the chat's steps work as with OpenCode. Models you
+  added to the Copilot CLI with your own key (e.g. Azure AI Foundry, in Copilot's `providers.json`) are offered too.
 
 ## [0.14.3]
 

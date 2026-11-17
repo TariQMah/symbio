@@ -260,7 +260,19 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     if (!this.login) await this.checkLogin();
     if (!this.login) throw new Error(NOT_SIGNED_IN);
     const models = await this.api().listModels();
-    return models
+    // The user's own providers (BYOK, e.g. Azure AI Foundry) come after Copilot's.
+    const own: RuntimeModel[] = userProviders().models.map((m) => ({
+      providerID: m.provider,
+      id: m.id,
+      name: m.name ?? m.id,
+      raw: {
+        providerID: m.provider,
+        id: m.id,
+        name: m.name ?? m.id,
+        capabilities: { input: m.capabilities?.supports?.vision ? ["text", "image"] : ["text"] },
+      },
+    }));
+    return [...models
       .filter((m: any) => m?.id && m.id !== "auto")
       .map((m: any) => ({
         providerID: COPILOT_PROVIDER,
@@ -274,7 +286,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
           capabilities: { ...m.capabilities, input: m.capabilities?.supports?.vision ? ["text", "image"] : ["text"] },
           ...(priceOf(m) ? { cost: priceOf(m) } : {}),
         },
-      }));
+      })), ...own];
   }
 
   // ---------------------------------------------------------------- sessions
@@ -600,7 +612,10 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
   private config(sessionId: string, state: SessionState) {
     const url = state.directory ? this.toolsByFolder.get(state.directory) : undefined;
     const instructions = [...state.instructions.values()].join("\n\n");
+    // Read each time a session opens, so a provider added or a key changed in Copilot applies.
+    const own = userProviders();
     return {
+      ...(own.models.length ? { providers: own.providers, models: own.models } : {}),
       clientName: "symbio",
       streaming: true,
       enableFileChangeTracking: true,
@@ -795,7 +810,37 @@ export function priceOf(model: any): { input: number; output: number; cache: { r
   return { input: usd(p.inputPrice), output: usd(p.outputPrice), cache: { read: usd(p.cacheReadPrice), write: usd(p.cacheWritePrice) } };
 }
 
-/** "copilot/gpt-6-luna" → "gpt-6-luna". */
+/**
+ * The user's own model providers for Copilot (bring your own key: Azure AI Foundry, OpenAI…), from
+ * Copilot's `providers.json` in their Copilot folder, read where it is (never copied: one place to
+ * change, and no second copy of the key). The SDK doesn't load that file by itself; it takes the
+ * same entries per session (`providers` + `models`), and a model is then chosen as
+ * "<provider>/<id>", which is also how Symbio stores it (verified live, docs/copilot-api.md).
+ * Keys stay on the server: only model names go to the browser.
+ */
+export function userProviders(userHome = process.env.SYMBIO_COPILOT_USER_HOME ?? path.join(os.homedir(), ".copilot")): {
+  providers: { name: string; baseUrl: string; [k: string]: unknown }[];
+  models: { id: string; provider: string; name?: string; capabilities?: any; [k: string]: unknown }[];
+} {
+  const file = path.join(userHome, "providers.json");
+  if (!existsSync(file)) return { providers: [], models: [] };
+  try {
+    const parsed = parseConfig(readFileSync(file, "utf8"));
+    const providers = (Array.isArray(parsed.providers) ? parsed.providers : []).filter(
+      (p: any) => typeof p?.name === "string" && p.name && p.name !== COPILOT_PROVIDER && typeof p.baseUrl === "string",
+    );
+    const names = new Set(providers.map((p: any) => p.name));
+    const models = (Array.isArray(parsed.models) ? parsed.models : []).filter(
+      (m: any) => typeof m?.id === "string" && m.id && !m.id.includes("/") && names.has(m.provider),
+    );
+    return { providers, models };
+  } catch (err) {
+    console.warn("[copilot] couldn't read your Copilot providers.json:", (err as Error).message);
+    return { providers: [], models: [] };
+  }
+}
+
+/** "copilot/gpt-6-luna" → "gpt-6-luna"; the user's own models keep their "<provider>/<id>". */
 export function modelId(ref: string): string {
   return ref.startsWith(`${COPILOT_PROVIDER}/`) ? ref.slice(COPILOT_PROVIDER.length + 1) : ref;
 }

@@ -1,6 +1,8 @@
 // Choosing the agent runtime: the New project dialog offers OpenCode and GitHub Copilot CLI, each with
 // its own models, and the project's agents run on the one chosen.
 import assert from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { after, before, test } from "node:test";
 import { closeBrowser, idle, openPage, startSymbio, until, type Symbio } from "./harness.js";
 
@@ -69,5 +71,37 @@ test("signing in to GitHub Copilot from Settings, with a device code", async () 
   } finally {
     await signedOut.stop();
   }
+});
+
+test("models from the user's own Copilot providers (e.g. Azure AI Foundry) are offered, and agents run on them", async () => {
+  // The harness's stand-in for the user's Copilot folder (~/.copilot), with a providers.json as Copilot keeps it.
+  const userHome = path.join(symbio.root, "no-copilot-login");
+  mkdirSync(userHome, { recursive: true });
+  writeFileSync(
+    path.join(userHome, "providers.json"),
+    JSON.stringify({
+      providers: [{ name: "foundry", type: "anthropic", baseUrl: "https://example.invalid/anthropic", apiKey: "sk-e2e-secret" }],
+      models: [{ id: "fake-byok", provider: "foundry", modelId: "claude-haiku-5.5", name: "Fake BYOK (Foundry)", capabilities: { supports: { vision: true } } }],
+    }),
+  );
+  const listed = await symbio.call("GET", "/models?runtime=copilot");
+  assert.ok(listed.some((m: any) => m.ref === "foundry/fake-byok" && m.name === "Fake BYOK (Foundry)" && m.vision));
+  assert.ok(!JSON.stringify(listed).includes("sk-e2e-secret"), "the key never reaches the browser");
+
+  const { page } = await openPage(symbio);
+  await page.locator("button", { hasText: "New project" }).first().click();
+  const folder = symbio.folder("on-foundry");
+  await page.getByPlaceholder("my-project", { exact: false }).fill(folder);
+  await page.locator("button.btn.primary", { hasText: "Continue" }).click();
+  await page.locator("button.btn.primary", { hasText: "Continue" }).click();
+  await page.locator(".runtime-choice .choice", { hasText: "GitHub Copilot CLI" }).click();
+  await page.locator(".model-group-title", { hasText: "foundry" }).waitFor();
+  await page.locator(".model-row", { hasText: "Fake BYOK (Foundry)" }).click();
+  await page.locator("button.btn.primary", { hasText: "Create project" }).click();
+  await until("the project page", () => /#\/p\//.test(page.url()));
+  const project = (await symbio.call("GET", "/projects")).find((p: any) => p.directory.toLowerCase() === folder.toLowerCase());
+  assert.equal(project.coordinatorModel, "foundry/fake-byok");
+  await idle(symbio, project.id);
+  await page.locator(".msg-assistant", { hasText: "Noted (core)" }).first().waitFor();
 });
 

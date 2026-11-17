@@ -112,6 +112,20 @@ A long command can run in the background (the agent asks for it, or Copilot move
 `session.rpc.tasks.cancel({ id })` → `{ cancelled: true }`, and the process is gone (checked with
 `tasklist`). Symbio's `list_processes` / `stop_process` use these.
 
+## Your own providers (bring your own key)
+
+Providers set up for the Copilot CLI by hand (e.g. Azure AI Foundry) live in `providers.json` in the
+user's Copilot folder: `{ providers: [{ name, type, baseUrl, apiKey, modelProvider }], models: [{ id,
+provider, modelId, name, capabilities }] }` (`//` comment lines allowed). **The SDK doesn't load that
+file**: `listModels()` and a session's `rpc.model.list()` didn't show them, even with the user's own
+`~/.copilot`. A session takes the same entries as `providers` + `models` (experimental, additive to
+Copilot's own models); its model list then has them as `<provider>/<id>`
+(`foundry/code-claude-haiku-5-5`), and `model: "foundry/code-claude-haiku-5-5"` runs on it. Verified
+with one turn on Azure AI Foundry: it answered, `assistant.usage` named the model, and Copilot billed
+nothing (`totalNanoAiu: 0`; the provider bills). Symbio reads the file where it is each time a
+session opens (never copied), gives its entries to every session, and lists its models after
+Copilot's; keys never leave the server.
+
 ## Signing in
 
 `session.rpc.accounts.login.begin({ kind: "githubDotCom", method: "device-code" })` →
@@ -171,7 +185,8 @@ only, so it costs nothing.
 | Signing in | its own `COPILOT_HOME` (given by Symbio) pointed at the user's GitHub login, or a device-code sign-in from Settings |
 | Read rules | the `onPreToolUse` hook for `view` (and `read`, `read_file`) |
 | Background processes | `rpc.tasks.list` / `rpc.tasks.cancel`, ids `<session>:<task>` |
-| Prices | `billing.tokenPrices` / 100, as dollars per million tokens |
+| Prices | `billing.tokenPrices` / 100, as dollars per million tokens; your own providers' models from the price book |
+| Your own providers | `providers.json` in your Copilot folder, read as it is, given to every session (`providers` + `models`) |
 | Briefs | Symbio's tools named as Copilot shows them (`symbio-<name>`) |
 
 | Memory, crashes | the runtime process (`copilot-runtime.exe --headless --stdio`, the client's `cliProcess`, not public API) measured like OpenCode's and recycled by the watchdog; `processExitPromise` marks it crashed and starts it again |

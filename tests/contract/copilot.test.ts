@@ -28,6 +28,8 @@ mkdirSync(work, { recursive: true });
 const events: any[] = [];
 runtime.on("event", (e) => events.push(e));
 const sessions: string[] = [];
+/** The session on a model that doesn't exist: its turns fail at once, so they cost nothing. */
+let missingModelSession = "";
 
 // A tool server like Symbio's, recording who calls it.
 const mcpCalls: { session?: string; method: string }[] = [];
@@ -73,10 +75,26 @@ test("the runtime starts, signed in, and lists models with their prices", async 
   assert.match(runtime.version ?? "", /^\d+\.\d+\.\d+/);
   const models = await runtime.listModels();
   assert.ok(models.length > 0);
-  assert.ok(models.every((m) => m.providerID === "copilot" && m.id && m.id !== "auto"));
+  const copilots = models.filter((m) => m.providerID === "copilot");
+  assert.ok(copilots.length > 0 && copilots.every((m) => m.id && m.id !== "auto"));
   assert.ok(models.some((m) => m.raw?.billing?.tokenPrices), "models carry token prices");
   const priced = models.find((m) => m.raw?.cost);
   assert.ok(priced && priced.raw.cost.input > 0 && priced.raw.cost.input < 100, "prices in dollars per million tokens");
+});
+
+test("the user's own providers (providers.json in their Copilot folder) are offered and selectable", async (t) => {
+  if (skip) return t.skip(skip);
+  const { userProviders } = await import("../../src/server/copilot/runtime.js");
+  const own = userProviders().models;
+  if (!own.length) return t.skip("no providers.json with models in the user's Copilot folder");
+  const ref = `${own[0].provider}/${own[0].id}`;
+  const models = await runtime.listModels();
+  assert.ok(models.some((m) => `${m.providerID}/${m.id}` === ref), `${ref} is offered`);
+  assert.ok(!JSON.stringify(models).match(/apiKey|bearerToken/), "no credentials in the list");
+  const id = await runtime.createSession({ title: "Contract · byok", directory: work, model: ref, permissions: AGENT_PERMISSIONS, toolsUrl });
+  sessions.push(id);
+  const current = await (runtime as any).open.get(id).session.rpc.model.getCurrent();
+  assert.equal(current.modelId, ref, "the session runs on it (no turn: that would bill the user's provider)");
 });
 
 test("signing in starts a GitHub device-code flow, and can be cancelled", async (t) => {
@@ -94,6 +112,7 @@ test("a session in its folder: a turn on a missing model fails at once, as Symbi
   if (skip) return t.skip(skip);
   const id = await runtime.createSession({ title: "Contract · core", directory: work, model: "copilot/no-such-model", permissions: AGENT_PERMISSIONS, toolsUrl });
   sessions.push(id);
+  missingModelSession = id;
   await runtime.setInstruction(id, "symbio-role", "You are a contract test.");
   await runtime.note(id, "Symbio: a note for the next turn.");
   const promptId = await runtime.prompt(id, "Hello", "queue");
@@ -127,7 +146,8 @@ test("queue, changes, usage and model switches answer on a live session", async 
 
 test("after a restart, a session opens again with its folder and Symbio's tools (identified per session)", async (t) => {
   if (skip) return t.skip(skip);
-  const id = sessions[0];
+  const id = missingModelSession;
+  assert.ok(id, "needs the missing-model session");
   await runtime.restart();
   await runtime.ensureTools(work, toolsUrl);
   const callsBefore = mcpCalls.length;
