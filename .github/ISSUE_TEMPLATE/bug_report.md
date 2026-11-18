@@ -15,8 +15,8 @@ labels: bug
 **Environment**
 - OS:
 - Node.js (`node --version`):
-- OpenCode (`opencode --version`):
 - Symbio version or commit:
+- Agent runtime (OpenCode or GitHub Copilot CLI) and its version (`sym doctor` lists them):
 
 **Logs**
 <!-- Errors from the browser console or the terminal running Symbio. Remove API keys, tokens and private content. -->

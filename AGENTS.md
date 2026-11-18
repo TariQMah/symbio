@@ -1,6 +1,6 @@
 # AGENTS.md
 
-You're working on **Symbio**, a local web app that runs a team of OpenCode agents on a user's
+You're working on **Symbio**, a local web app that runs a team of AI agents (on OpenCode or GitHub Copilot CLI) on a user's
 project: a lead agent (core) plans and delegates to helper agents in git worktrees, agents message
 each other through Symbio, and the human steers from the browser.
 
@@ -40,7 +40,7 @@ can't support something yet, skip it there explicitly in the test, with the reas
   agent briefs ("shared asset", not "database").
 - **Verify runtime behavior live** before relying on it, and record what you learn in
   `docs/opencode-api.md` or `docs/copilot-api.md`. Both APIs are partly experimental.
-- **No secrets to the browser or to agents.** Copy whitelisted fields from OpenCode responses;
+- **No secrets to the browser or to agents.** Copy whitelisted fields from runtime responses;
   never pass them through.
 - **Safety first on the user's machine.** Never stop processes by name (`taskkill /IM`, `pkill`);
   use specific PIDs. Don't weaken `src/server/guard.ts` rules; extend `tests/guard.test.ts` when you

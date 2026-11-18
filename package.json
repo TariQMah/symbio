@@ -1,7 +1,7 @@
 {
   "name": "symbio",
   "version": "0.15.0-beta.1",
-  "description": "Run a team of OpenCode agents on a project from your browser",
+  "description": "Run a team of AI agents on a project from your browser, on OpenCode or GitHub Copilot CLI",
   "license": "MIT",
   "author": "LinKzy",
   "homepage": "https://github.com/linkzy/symbio#readme",
@@ -17,6 +17,8 @@
     "agents",
     "multi-agent",
     "opencode",
+    "github-copilot",
+    "copilot-cli",
     "orchestration",
     "llm"
   ],

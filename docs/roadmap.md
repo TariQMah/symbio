@@ -48,11 +48,16 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
    change it (its plan tools take it), the human can change it on the board, and core is told when
    the human does, so it picks up urgent work first. Helpers see it with their task.
-6. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
+6. **Report a problem** ([#16](https://github.com/linkzy/symbio/issues/16)): a link in Symbio that
+   opens a new GitHub issue with the bug template, pre-filled with Symbio's version, the OS and the
+   agent runtimes (nothing private).
+7. **Give feedback** ([#17](https://github.com/linkzy/symbio/issues/17)): a link next to it that opens
+   the repository's Discussions (Ideas, Q&A).
+8. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
    stuck agent) or a task finishes, send it where they are: browser/phone notifications, and
    optionally a messaging app (e.g. Telegram) or e-mail, with per-project choices. Essential for
    steering Symbio away from the computer.
-7. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
+9. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
    the car over Bluetooth, with Symbio working on the computer at home (remote access). Not just
    dictation into the chat box:
    - Only what core says to the human is read aloud: never tool calls, command output, messages
@@ -67,28 +72,28 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    Builds on the phone layout and on telling apart, in core's replies, what's for the human from
    the team's work. To check first: the browsers' own speech recognition and voices (quality,
    languages, whether they keep working with the screen off) against a speech service.
-8. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
+10. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
    at a threshold and the team paused when it's reached, using the cost tracking Symbio already
    has.
-9. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
+11. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
    every Monday"): Symbio wakes core at the set time with the job, and the human sees the runs and
    their results.
-10. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
+12. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
    Keychain on macOS); headless Linux (a server or container) has no keyring, so it needs a
    fallback, such as a key file readable only by the user.
-11. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
+13. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
    two-minute video of core running a team on a non-coding project, and a short GitHub Pages site
    with screenshots. First audience: the OpenCode community.
-12. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
+14. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
    repository (GitHub, Azure DevOps or any git URL, using the matching connection when it's private)
    into a folder and open it as a project, e.g. to continue on another computer. Tucked under an
    advanced option, so it doesn't get in the way of people who don't use git.
-13. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
+15. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-14. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages, starting with Portuguese. *(good first
+16. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages, starting with Portuguese. *(good first
     contribution, once the strings are extracted)*
-15. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
+17. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
 ## Ideas

@@ -12,13 +12,14 @@ is about.
 You don't need any API key or subscription to work on Symbio: the end-to-end tests run against
 stand-ins for OpenCode and GitHub Copilot CLI, and so does CI on your pull request.
 
-## Reporting bugs and suggesting features
+## Reporting bugs, asking and suggesting
 
-Open an issue using one of the templates. For a bug, include:
+Questions and ideas go to [Discussions](https://github.com/linkzy/symbio/discussions) (Q&A, Ideas).
+For a bug, open an issue with the bug template, and include:
 
 - what you did, what you expected, and what happened instead;
-- your OS, Node.js version and Symbio version, and the OpenCode version Symbio uses (`sym doctor`
-  prints both);
+- your OS, Node.js version and Symbio version, and the agent runtime the project uses with its
+  version (`sym doctor` prints them);
 - relevant errors from the browser console or the terminal running Symbio.
 
 Please don't paste API keys, tokens or private project content. For security issues, follow
@@ -33,7 +34,7 @@ Please don't paste API keys, tokens or private project content. For security iss
 3. **Set up.** Follow [docs/development.md](docs/development.md). Use a separate `SYMBIO_HOME` so
    your experiments don't touch your real projects.
 4. **Make the change**, following the conventions in [docs/development.md](docs/development.md):
-   domain-neutral, OpenCode behavior verified live, no secrets reaching the browser or agents, code
+   domain-neutral, runtime behavior (OpenCode, Copilot) verified live, no secrets reaching the browser or agents, code
    that matches its surroundings.
 5. **Check it.**
    ```sh

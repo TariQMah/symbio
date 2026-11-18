@@ -7,14 +7,19 @@
 
 **Run a team of AI agents on your project, from your browser.**
 
-Symbio is a local web app that coordinates several AI agents working on the same folder, on
-[OpenCode](https://opencode.ai) or GitHub Copilot CLI (beta). You talk to one lead agent, **core**. It works out the scope with you, proposes a
-plan, and hands the work to helper agents, each in its own copy of the project. The agents message
+Symbio is a local web app that coordinates several AI agents working on the same folder. You talk
+to one lead agent, **core**. It works out the scope with you, proposes a plan, and hands the work
+to helper agents, each in its own copy of the project. The agents message
 each other directly, ask you when they need a decision, and you watch it all happen on a live board.
 
 It isn't tied to software. A project is just a folder and a goal: code, a book, research, a data
 cleanup, a set of documents. Symbio provides the machinery (messaging, isolation, coordination,
 safety); the agents decide how to organize the work.
+
+It isn't tied to one AI tool either. The agents run on an **agent runtime** you choose per project:
+[OpenCode](https://opencode.ai), with the model providers you connect (OpenAI, Anthropic, Azure,
+OpenRouter, local models…), or **GitHub Copilot CLI** (beta), with your Copilot subscription. You
+install only the ones you use, and a project can move from one to the other.
 
 ![core summarizing the plan it proposed for a travel guidebook](docs/images/chat.png)
 
@@ -59,6 +64,10 @@ place. Here Symbio was restarted mid-task, and it told the helper to pick up whe
 
 ## What it does
 
+- **Your choice of agent runtime.** OpenCode or GitHub Copilot CLI, per project, each with its own
+  models; Symbio's rules, tools, plan and messages work the same on both. Install them from Symbio
+  (nothing else on your machine changes), and move a project from one to the other in its settings:
+  every agent writes a handoff and continues on the other runtime with its tasks and work.
 - **One conversation, a whole team.** You chat with core. It asks what you want, studies an
   existing folder before touching it, and proposes a plan of tasks for you to approve.
 - **Helpers that work in parallel without collisions.** Each helper gets its own git worktree and
@@ -101,13 +110,14 @@ place. Here Symbio was restarted mid-task, and it told the helper to pick up whe
 - **Connections without exposing secrets.** Give agents a GitHub account, an Azure DevOps
   organization, a server (SSH, SFTP) or an FTP account. They ask Symbio to push, open pull requests, call the API or deploy, and Symbio does it with credentials the agents never
   see. Each connection can require your approval for every action.
-- **Resilient.** A supervisor restarts OpenCode if it crashes, a watchdog unsticks hung agents, and
+- **Resilient.** A supervisor restarts the agent runtime if it crashes, a watchdog unsticks hung agents, and
   when a model fails (quota, outage) the agent switches to the next allowed model and carries on.
 - **Long-running teams stay healthy.** Agents can continue in a fresh session with a handoff note
   (when you ask, after each finished task, or automatically when a conversation grows too large to
   send). A daily check backs up Symbio's state and tells you and core about work that exists only
   on this machine and build outputs filling the disk.
-- **Costs in view.** Tokens and estimated cost per agent and model, with prices you can set.
+- **Costs in view.** Tokens and estimated cost per agent and model, with prices you can set (and
+  GitHub Copilot's own prices, in AI credits).
 - **Safety rails.** Agents can't kill processes by name (which would take down your terminals and
   editors), can't read your SSH keys or Symbio's secret store, and must ask before installing
   software. They look at images through scaled-down copies, so a few large pictures can't make a
@@ -148,10 +158,10 @@ on your computer, including the agents, from using Symbio's API behind your back
 |---|---|
 | `sym` | Start Symbio in the background and open it (or just open it, if it's running). Closing the terminal doesn't stop it. |
 | `sym stop` | Stop Symbio. Agents that were working pick up where they left off on the next start. |
-| `sym status` | Whether it's running, OpenCode's state, and each project's agents. |
+| `sym status` | Whether it's running, the agent runtimes' state, and each project's agents. |
 | `sym open` | Open Symbio in the browser. |
 | `sym logs` | The last lines of the log (`~/.symbio/logs/symbio.log`). |
-| `sym doctor` | Check Node.js, git, OpenCode, the port and model providers. |
+| `sym doctor` | Check Node.js, git, the installed agent runtimes, the port and model providers. |
 | `sym run` | Run in the foreground, with the log in the terminal. |
 | `sym remote` | Open a temporary link and access code to use Symbio from another device (see below). `sym remote off` closes it. |
 | `sym update` | Install the latest version and restart Symbio, once no agent is working (`--now` doesn't wait). |
@@ -174,20 +184,26 @@ itself. Whoever gets in controls your agents, so keep the link and code to yours
 
 ## How to use it
 
-1. **Connect your models.** Open **Settings → Model providers** and check that the providers you
-   use are there. Add one with an API key or a browser sign-in, and remove the ones you don't use
-   so the model list stays short.
+1. **Install an agent runtime.** The first time, the Projects page offers them (later: **Settings →
+   Agent runtimes**). Then connect its models:
+   - **OpenCode:** in **Settings → Model providers**, check that the providers you use are there.
+     Add one with an API key or a browser sign-in, and remove the ones you don't use so the model
+     list stays short.
+   - **GitHub Copilot CLI:** sign in with GitHub from its card (or Symbio reuses your
+     `copilot login`). Models you added to the Copilot CLI with your own key show up too.
 2. **Create a project.** On the Projects page, click **New project**:
    - **Folder:** browse for or paste a folder. An empty folder starts a new project; an existing
      one is studied first. Symbio offers to set up git if the folder doesn't have it.
    - **Setup:** choose where the project documentation goes (in the project, or private), and which
      connections (GitHub, Azure DevOps, servers) the agents may use.
-   - **Models:** pick the models agents may use, and the one core runs on (the crown).
+   - **Models:** pick the agent runtime (among the installed ones), the models agents may use, and
+     the one core runs on (the crown).
 3. **Talk to core.** Describe what you want. core asks questions, proposes a plan, and waits for
    your approval in the **Plan** tab (it shows a *Review* badge).
 4. **Watch and steer.** Helpers appear in the sidebar as core creates them. Click any agent to read
    its conversation or message it directly, change its model from its header, or stop and restart
-   it. The **Messages** tab shows all traffic between agents.
+   it. The **Messages** tab shows all traffic between agents. To move the project to another agent
+   runtime later: its **Settings → Agent runtime**.
 5. **Answer what needs you.** Questions, approvals and permission requests show up in **Needs you**
    (top right) and in the relevant chat.
 
@@ -209,6 +225,8 @@ itself. Whoever gets in controls your agents, so keep the link and code to yours
 | `~/.symbio/connections.json` | Connection settings (no secrets) |
 | `~/.symbio/secrets.enc` | Connection secrets, encrypted with a key kept in your OS credential store |
 | `~/.symbio/worktrees/` | Helpers' working copies |
+| `~/.symbio/runtimes/` | The agent runtimes you installed from Symbio |
+| `~/.symbio/copilot/` | GitHub Copilot CLI's sessions for Symbio's agents (kept apart from your own Copilot history) |
 | `~/.symbio/backups/` | Daily backups of Symbio's state (the last 7 days) |
 | `~/.symbio/approvals/` | Remote actions waiting for (or decided by) your approval |
 | `~/.symbio/prices.json` | Model prices used for cost estimates |
@@ -217,7 +235,7 @@ itself. Whoever gets in controls your agents, so keep the link and code to yours
 | `~/.symbio/updates.json` | Your update setting (automatic, tell me, off) |
 | `<project>/.symbio/` | Project state: agents, plan, message log, shared assets, and the files attached in chats (`attachments/`) — git-ignored automatically |
 | `<project>/AGENTS.md`, `<project>/docs/` | Project documentation for agents (unless you chose *private*), and `docs/rules.json` if the rules register is on |
-| OpenCode's database | The conversations themselves. Every agent is an OpenCode session, so you can also open one with `opencode -s <session-id>`. |
+| The runtime's own storage | The conversations themselves: each agent is a session of its runtime. OpenCode keeps them in its database (open one with `opencode -s <session-id>`); GitHub Copilot CLI in `~/.symbio/copilot/`. |
 
 Symbio never deletes your project files. Removing a project from Symbio only forgets it, and can
 optionally delete its `.symbio/` folder.
@@ -235,9 +253,9 @@ All optional, set as environment variables:
 | `SYMBIO_OPENCODE_BIN` | installed | Path to an `opencode` executable to use instead of the one Symbio installed |
 | `SYMBIO_CLOUDFLARED_BIN` | auto | Path to `cloudflared` for remote access (otherwise the PATH, or a copy downloaded once) |
 | `SYMBIO_STUCK_MINUTES` | `10` | Silence before the watchdog interrupts a working agent |
-| `SYMBIO_RECYCLE_MB` | `1500` | Restart OpenCode above this memory use once every agent is idle |
-| `SYMBIO_RECYCLE_HARD_MB` | `3000` | Restart OpenCode above this memory use regardless (agents resume) |
-| `SYMBIO_MEMORY_CHECK_SECONDS` | `60` | How often OpenCode's memory use is checked |
+| `SYMBIO_RECYCLE_MB` | `1500` | Restart an agent runtime above this memory use once its agents are idle |
+| `SYMBIO_RECYCLE_HARD_MB` | `3000` | Restart an agent runtime above this memory use regardless (agents resume) |
+| `SYMBIO_MEMORY_CHECK_SECONDS` | `60` | How often the agent runtimes' memory use is checked |
 | `SYMBIO_BACKUP_DAYS` | `7` | How many daily backups of Symbio's state to keep |
 | `SYMBIO_BUILD_ALERT_GB` | `2` | Build outputs in a helper's folder above this size are reported by the daily check |
 
@@ -245,14 +263,15 @@ All optional, set as environment variables:
 
 Symbio is young and changing quickly, shaped by people using it for real work. The core workflow
 works end to end: projects, core and helpers, messaging, plan and kanban, shared assets, docs and
-the rules register, connections (GitHub, Azure DevOps, servers), providers, costs and recovery.
+the rules register, connections (GitHub, Azure DevOps, servers), providers, costs and recovery, on
+OpenCode and (in beta) on GitHub Copilot CLI.
 What's planned and what's open for help is in [docs/roadmap.md](docs/roadmap.md); what changed in
 each version is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Documentation
 
-- [docs/](docs/README.md): architecture, the agent protocol, the OpenCode API notes, development
-  and security. Written for both people and coding agents.
+- [docs/](docs/README.md): architecture, the agent protocol, the agent runtimes' API notes (OpenCode,
+  GitHub Copilot CLI), development and security. Written for both people and coding agents.
 - [AGENTS.md](AGENTS.md): the short entry point for an AI agent working on this repository.
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to set up, make changes and open a pull request.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.
@@ -263,6 +282,14 @@ Contributions are welcome, whether you write the code yourself or with an AI age
 has an [AGENTS.md](AGENTS.md) for them). Start with [CONTRIBUTING.md](CONTRIBUTING.md), then pick a
 [good first issue](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or anything labelled [help wanted](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22). Every roadmap item has an issue:
 say there that you're taking it.
+
+## Contributors
+
+Thanks to everyone who has contributed to Symbio:
+
+<a href="https://github.com/linkzy/symbio/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=linkzy/symbio" alt="Contributors" />
+</a>
 
 ## License
 

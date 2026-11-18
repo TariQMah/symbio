@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Ask a question
+    url: https://github.com/linkzy/symbio/discussions/new?category=q-a
+    about: How do I…? Is it supposed to…? Ask in Discussions.
+  - name: Share an idea or feedback
+    url: https://github.com/linkzy/symbio/discussions/new?category=ideas
+    about: Suggestions and what you think of Symbio, in Discussions.
   - name: Report a security vulnerability
     url: https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability
     about: Please report security issues privately (Security → Report a vulnerability on this repository), not as a public issue.
