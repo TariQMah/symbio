@@ -35,6 +35,11 @@ script, unless marked otherwise. Re-verify when either changes, and update this 
 - `client.resumeSession(id, config)` continues a session, also from a new runtime process (it
   remembered a file it created and an answer it got). Handlers and MCP servers are given again.
 - `client.listSessions()`, `client.deleteSession(id)` (removes it from disk).
+- `client.getSessionMetadata(id)` → `{ sessionId, startTime, modifiedTime, summary, isRemote,
+  context: { workingDirectory }, clientName, … }` (verified): after Symbio restarts, the session's
+  folder comes from `context.workingDirectory` (not `cwd`, which is the name in the session's own
+  `workspace.yaml`). Symbio's tools are registered per folder, so without it a reopened session
+  would have none.
 - **New instructions for an open session:** `resumeSession(id, { systemMessage, … })` on a
   session that is already open returns a new session object that uses them from the next turn
   ("Your name is Alpha" → resumed with "Bravo" → it answered Bravo). Symbio reopens a session

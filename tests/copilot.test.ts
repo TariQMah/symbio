@@ -82,6 +82,19 @@ function fakeSdk() {
   return { client, created, resumed, sent, configs, play, hooks, cancelled };
 }
 
+test("after Symbio restarts, a session reopens in its folder with the new run's tools", async () => {
+  // A new Symbio: a new runtime object, nothing known about the session but its id.
+  const sdk = fakeSdk();
+  sdk.client.getSessionMetadata = async () => ({ sessionId: "ses_old", context: { workingDirectory: "C:/work/book" } });
+  const runtime = new CopilotRuntime(mkdtempSync(path.join(os.tmpdir(), "sym-cp-test-")), async () => sdk.client);
+  await runtime.start();
+  await runtime.ensureTools("C:/work/book", "http://127.0.0.1:4310/mcp/new-run");
+  await runtime.prompt("ses_old", "Hello again", "queue");
+  const config = sdk.resumed[0].config;
+  assert.equal(config.workingDirectory, "C:/work/book");
+  assert.equal(config.mcpServers.symbio?.url, "http://127.0.0.1:4310/mcp/new-run", "Symbio's tools, at this run's address");
+});
+
 async function setup() {
   const sdk = fakeSdk();
   const runtime = new CopilotRuntime(mkdtempSync(path.join(os.tmpdir(), "sym-cp-test-")), async () => sdk.client);

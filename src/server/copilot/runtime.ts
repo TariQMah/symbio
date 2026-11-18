@@ -637,7 +637,13 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     if (!pending) {
       pending = (async () => {
         const state = this.state_(sessionId);
-        if (!state.directory) state.directory = (await this.api().getSessionMetadata(sessionId).catch(() => null))?.context?.cwd ?? null;
+        // After Symbio restarts, the folder (which Symbio's tools are registered for) comes from Copilot's
+        // record of the session: `context.workingDirectory` (verified; docs/copilot-api.md).
+        if (!state.directory) {
+          const context = (await this.api().getSessionMetadata(sessionId).catch(() => null))?.context;
+          state.directory = context?.workingDirectory ?? context?.cwd ?? null;
+          if (!state.directory) console.error(`[copilot] no folder for session ${sessionId}: it opens without Symbio's tools`);
+        }
         const session = await this.api().resumeSession(sessionId, this.config(sessionId, state));
         state.stale = false;
         this.attach(sessionId, session);

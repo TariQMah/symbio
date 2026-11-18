@@ -82,7 +82,8 @@ class FakeClient {
   }
   async getSessionMetadata(id) {
     const state = sessions.get(id);
-    return state ? { sessionId: id, context: { cwd: state.directory } } : undefined;
+    // As Copilot answers (verified): the folder is context.workingDirectory.
+    return state ? { sessionId: id, context: { workingDirectory: state.directory } } : undefined;
   }
 }
 

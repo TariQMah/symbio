@@ -5,6 +5,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0-beta.3]
+
+Beta: try it with `sym update --to 0.15.0-beta.3`.
+
+- Fixed: **after Symbio restarted, agents on GitHub Copilot CLI lost Symbio's tools** (messages, tasks, the plan…): the
+  sessions reopened without knowing their folder, which the tools are registered for. They reopen with them now.
 - **Give feedback**: Settings → Feedback links to the repository's Discussions (Ideas for suggestions, Q&A for questions), so you can share what you think without filing a bug. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#21)!
 - **Report a problem**: a link in the top bar and in Settings opens a new GitHub bug report with Symbio's version, the agent runtimes installed and your OS filled in. Nothing about your projects (names, paths, logs, keys) is added. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#22)!
 

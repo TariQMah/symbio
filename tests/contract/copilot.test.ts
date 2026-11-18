@@ -32,13 +32,13 @@ const sessions: string[] = [];
 let missingModelSession = "";
 
 // A tool server like Symbio's, recording who calls it.
-const mcpCalls: { session?: string; method: string }[] = [];
+const mcpCalls: { session?: string; method: string; token?: string }[] = [];
 const mcpApp = new Hono();
 mcpApp.all("/mcp/:token", async (c) => {
   const body = await c.req.raw.clone().json().catch(() => null);
-  mcpCalls.push({ session: c.req.header("x-symbio-session"), method: body?.method ?? c.req.method });
+  mcpCalls.push({ session: c.req.header("x-symbio-session"), method: body?.method ?? c.req.method, token: c.req.param("token") });
   return handleMcp(c, (token) =>
-    token === "contract" ? { ctx: {}, tools: [{ name: "ping", description: "Answers pong", inputSchema: { type: "object", properties: {} }, run: () => "pong" }] } : null,
+    token === "contract" || token === "after-symbio-restart" ? { ctx: {}, tools: [{ name: "ping", description: "Answers pong", inputSchema: { type: "object", properties: {} }, run: () => "pong" }] } : null,
   );
 });
 const mcpServer = createServer(getRequestListener(mcpApp.fetch));
@@ -158,4 +158,28 @@ test("after a restart, a session opens again with its folder and Symbio's tools 
   const reopened = mcpCalls.slice(callsBefore);
   assert.ok(reopened.some((c) => c.method === "tools/list" && c.session === id), "the reopened session lists Symbio's tools");
   for (const call of mcpCalls) assert.ok(sessions.includes(call.session ?? ""), `MCP ${call.method} without a session header`);
+});
+
+test("after Symbio restarts, a session opens with the tools URL of the new run", async (t) => {
+  if (skip) return t.skip(skip);
+  const id = missingModelSession;
+  assert.ok(id, "needs the missing-model session");
+  // A new Symbio: a new runtime object on the same Copilot folder, and a new tools URL (tokens are per run).
+  await runtime.stop();
+  const again = new CopilotRuntime(path.join(root, "copilot"));
+  const seen: any[] = [];
+  again.on("event", (e) => seen.push(e));
+  await again.start();
+  try {
+    const url = toolsUrl.replace("/mcp/contract", "/mcp/after-symbio-restart");
+    await again.ensureTools(work, url);
+    const callsBefore = mcpCalls.length;
+    await again.prompt(id, "After a restart", "queue");
+    await until("the turn to end", () => seen.some((e) => e.data.sessionID === id && e.type === "session.execution.failed"));
+    const calls = mcpCalls.slice(callsBefore);
+    assert.ok(calls.some((c) => c.method === "tools/list" && c.token === "after-symbio-restart"), `tools listed from the new URL (calls: ${JSON.stringify(calls)})`);
+  } finally {
+    await again.stop();
+    await runtime.start();
+  }
 });
