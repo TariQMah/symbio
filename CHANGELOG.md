@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Report a problem**: a link in the top bar and in Settings opens a new GitHub bug report with Symbio's version, OpenCode's version and your OS filled in. Nothing about your projects (names, paths, logs, keys) is added.
+
 ## [0.14.3]
 
 - **Costs and token counts are hidden by default**, so people passing by don't see what projects spend: the line under the
