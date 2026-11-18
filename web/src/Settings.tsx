@@ -7,6 +7,7 @@ import { ProvidersSection } from "./Providers";
 import { CostsSection, PricesSection } from "./Usage";
 import { RemoteSection } from "./Remote";
 import { UpdatesSection } from "./Updates";
+import { FeedbackSection } from "./Feedback";
 import { Dialog, EmptyState } from "./ui";
 
 /** Where the user was before Settings (a project, the project list…). */
@@ -179,6 +180,8 @@ export function Settings() {
       <RemoteSection />
 
       <UpdatesSection />
+
+      <FeedbackSection />
 
       <AnimatePresence>
         {editing && (

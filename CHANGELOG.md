@@ -6,6 +6,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - A project's usage can be grouped **by agent, provider or model**, and narrowed to one provider, with the total for what is shown.
+- **Give feedback**: Settings → Feedback links to the repository's Discussions (Ideas for suggestions, Q&A for questions), so you can share what you think without filing a bug.
 
 ## [0.14.3]
 
