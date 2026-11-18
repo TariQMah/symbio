@@ -10,7 +10,7 @@ import { ftpCheck, type FtpSecurity, type FtpTarget } from "./ftp.js";
 import { SecretVault } from "./secrets.js";
 import { sftpCheck, sshExec, type SshTarget } from "./ssh.js";
 import { globalDir, newId } from "./store.js";
-import { replaceFile } from "./fsutil.js";
+import { writeFileAtomic } from "./fsutil.js";
 
 export type ConnectionType = "github" | "azure" | "server" | "ftp";
 
@@ -368,10 +368,7 @@ export class Connections {
   }
 
   private async save() {
-    await fs.mkdir(globalDir, { recursive: true });
-    const tmp = `${this.file}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(this.list, null, 2));
-    await replaceFile(tmp, this.file);
+    await writeFileAtomic(this.file, JSON.stringify(this.list, null, 2));
   }
 }
 

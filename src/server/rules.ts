@@ -9,7 +9,7 @@ import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { docsRoot } from "./docs.js";
 import type { Project } from "./store.js";
-import { replaceFile } from "./fsutil.js";
+import { writeFileAtomic } from "./fsutil.js";
 
 export const CONFIRMATIONS = ["found", "checked-by-agent", "checked-by-human", "contested"] as const;
 export const STATUSES = ["done", "partial", "missing", "not-applicable"] as const;
@@ -102,10 +102,7 @@ async function change<T>(project: Project, fn: (reg: Register) => T): Promise<T>
   const run = (queues.get(file) ?? Promise.resolve()).then(async () => {
     const reg = await readRegister(project);
     const result = fn(reg);
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(reg, null, 2) + "\n");
-    await replaceFile(tmp, file);
+    await writeFileAtomic(file, JSON.stringify(reg, null, 2) + "\n");
     return result;
   });
   queues.set(file, run.catch(() => {}));

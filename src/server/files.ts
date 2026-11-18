@@ -8,7 +8,7 @@ import { createReadStream, existsSync, promises as fs, realpathSync } from "node
 import path from "node:path";
 import { Readable } from "node:stream";
 import { newId, type Agent, type Project } from "./store.js";
-import { replaceFile } from "./fsutil.js";
+import { writeFileAtomic } from "./fsutil.js";
 
 export type FileKind = "markdown" | "text" | "image" | "video" | "audio" | "pdf" | "other";
 
@@ -182,9 +182,6 @@ export async function addShared(project: Project, agent: Agent, given: string, c
     at: Date.now(),
   };
   list.push(entry);
-  await fs.mkdir(path.dirname(sharedIndex(project)), { recursive: true });
-  const tmp = `${sharedIndex(project)}.${process.pid}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(list.slice(-1000), null, 2));
-  await replaceFile(tmp, sharedIndex(project));
+  await writeFileAtomic(sharedIndex(project), JSON.stringify(list.slice(-1000), null, 2));
   return entry;
 }

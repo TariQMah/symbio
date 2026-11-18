@@ -3,7 +3,8 @@ import { promises as fsp, existsSync, mkdtempSync, readFileSync, writeFileSync }
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { replaceFile } from "../src/server/fsutil.js";
+import { promises as fs } from "node:fs";
+import { replaceFile, writeFileAtomic } from "../src/server/fsutil.js";
 
 test("replacing a file waits out Windows briefly holding it (EPERM), and gives up on real errors", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "sym-fsutil-"));
@@ -36,4 +37,13 @@ test("replacing a file waits out Windows briefly holding it (EPERM), and gives u
   writeFileSync(tmp, "x");
   await assert.rejects(replaceFile(tmp, path.join(dir, "missing", "file.json")), /ENOENT/);
   assert.ok(!existsSync(tmp), "temporary file removed");
+});
+
+test("writes to the same file at once all succeed, in order, leaving no temporary files", async () => {
+  // An agent calling several tools in parallel saves the same register several times at once.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "sym-fsutil-"));
+  const file = path.join(dir, "assets.json");
+  await Promise.all(Array.from({ length: 20 }, (_, i) => writeFileAtomic(file, `v${i}`)));
+  assert.equal(readFileSync(file, "utf8"), "v19", "the last one asked wins");
+  assert.deepEqual(await fs.readdir(dir), ["assets.json"]);
 });

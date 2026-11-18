@@ -5,6 +5,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Fixed: **a tool call could fail with "ENOENT … rename …"** when an agent called several of Symbio's tools at once
+  (shared assets, questions, the plan): two saves of the same file used the same temporary file. Saves of a file now
+  run one after the other, each with its own.
+
 ## [0.15.0-beta.3]
 
 Beta: try it with `sym update --to 0.15.0-beta.3`.

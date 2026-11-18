@@ -4,7 +4,7 @@ import { promises as fs, existsSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { replaceFile } from "./fsutil.js";
+import { writeFileAtomic } from "./fsutil.js";
 import type { RuntimeKind } from "./runtime/types.js";
 
 export type AgentRole = "coordinator" | "worker";
@@ -221,10 +221,7 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
 }
 
 async function writeJson(file: string, value: unknown) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(value, null, 2));
-  await replaceFile(tmp, file);
+  await writeFileAtomic(file, JSON.stringify(value, null, 2));
 }
 
 export class Store {

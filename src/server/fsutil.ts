@@ -1,6 +1,7 @@
 // Saving files safely: written to a temporary file next to the target, then moved over it, so a
 // crash never leaves half a file.
 
+import path from "node:path";
 import { promises as fs } from "node:fs";
 
 // Windows refuses to replace a file another process has open (an antivirus scan, the search
@@ -23,4 +24,28 @@ export async function replaceFile(tmp: string, dest: string): Promise<void> {
       await new Promise((r) => setTimeout(r, 25 * 2 ** attempt));
     }
   }
+}
+
+const writes = new Map<string, Promise<void>>();
+let tmpCount = 0;
+
+/**
+ * Writes a file atomically (a temporary file, then a rename). Writes to the same file run one after
+ * the other, in the order asked, each with its own temporary file: two at once (an agent calling
+ * several tools in parallel) would otherwise share one, and the second rename would find it gone.
+ */
+export function writeFileAtomic(file: string, data: string | Uint8Array): Promise<void> {
+  const run = (writes.get(file) ?? Promise.resolve())
+    .catch(() => {})
+    .then(async () => {
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      const tmp = `${file}.${process.pid}.${++tmpCount}.tmp`;
+      await fs.writeFile(tmp, data);
+      await replaceFile(tmp, file);
+    });
+  writes.set(file, run);
+  void run.finally(() => {
+    if (writes.get(file) === run) writes.delete(file);
+  }).catch(() => {});
+  return run;
 }

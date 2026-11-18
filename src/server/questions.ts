@@ -4,7 +4,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { replaceFile } from "./fsutil.js";
+import { writeFileAtomic } from "./fsutil.js";
 
 export interface Question {
   id: string; // "Q12"
@@ -113,10 +113,7 @@ export class QuestionStore {
   }
 
   private async save() {
-    await fs.mkdir(path.dirname(this.file), { recursive: true });
-    const tmp = `${this.file}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(this.questions, null, 2));
-    await replaceFile(tmp, this.file);
+    await writeFileAtomic(this.file, JSON.stringify(this.questions, null, 2));
   }
 }
 

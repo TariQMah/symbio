@@ -3,7 +3,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { replaceFile } from "./fsutil.js";
+import { writeFileAtomic } from "./fsutil.js";
 
 export const TASK_STATUSES = ["todo", "in-progress", "blocked", "review", "done"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -226,10 +226,7 @@ export class PlanStore {
   }
 
   private async save() {
-    await fs.mkdir(path.dirname(this.file), { recursive: true });
-    const tmp = `${this.file}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(this.plan, null, 2));
-    await replaceFile(tmp, this.file);
+    await writeFileAtomic(this.file, JSON.stringify(this.plan, null, 2));
   }
 }
 
