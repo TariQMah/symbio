@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Give feedback**: Settings → Feedback links to the repository's Discussions (Ideas for suggestions, Q&A for questions), so you can share what you think without filing a bug.
+
 ## [0.14.3]
 
 - **Costs and token counts are hidden by default**, so people passing by don't see what projects spend: the line under the
