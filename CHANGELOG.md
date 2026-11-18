@@ -5,6 +5,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0-beta.2]
+
+Beta: try it with `sym update --to 0.15.0-beta.2`.
+
 - Fixed: **agent runtimes were restarted for memory their agents' commands used.** Builds, dev servers and compiler
   servers agents start were counted as the runtime's memory, so on a busy project it was restarted again and again
   (four times in five minutes on a real one), interrupting every agent and stopping those commands. Only the runtime's
