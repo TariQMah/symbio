@@ -23,6 +23,9 @@ test("Plan blocks starting work and changing files; Act lets it; the selector an
     await page.locator(".composer textarea").fill(lines.join("\n"));
     await page.locator(".composer button[title=Send]").click();
     await until("the message to be sent", async () => (await page.locator(".composer textarea").inputValue()) === "");
+    // Sent isn't delivered yet: wait for it in core's conversation, then for the turn to end
+    // (otherwise "idle" can pass before core even started, as seen on a slow CI machine).
+    await until("core to get the message", async () => (await history(symbio, project.id, core.id)).includes(JSON.stringify(lines[0]).slice(1, -1)));
     await idle(symbio, project.id);
   };
   const spawn = `@core tool spawn_agent ${JSON.stringify({ name: "builder", purpose: "Builds", task: "@builder say on it", workspace: "shared" })}`;
