@@ -39,11 +39,19 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    Symbio at work without it looking like a chat site; the current look stays the default. Built on
    the colors and sizes `styles.css` already keeps as tokens, so a theme is mostly a set of token
    values (plus a few layout tweaks), and adding one later is easy.
-4. **Notifications.** When something needs the human (an open question, an approval, a plan to review, a
+4. **Usage by provider and model.** In a project's Usage section, filter and group by provider and by
+   model (e.g. everything spent on one provider across all agents and models), with totals for the
+   selection, besides the per-agent view there is today. The data is already kept per agent and
+   model (`usageByModel`); this is about showing it. *(good first contribution)*
+5. **Task priorities.** A priority on each task in the plan (e.g. urgent, high, normal, low), shown
+   on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
+   change it (its plan tools take it), the human can change it on the board, and core is told when
+   the human does, so it picks up urgent work first. Helpers see it with their task.
+6. **Notifications.** When something needs the human (an open question, an approval, a plan to review, a
    stuck agent) or a task finishes, send it where they are: browser/phone notifications, and
    optionally a messaging app (e.g. Telegram) or e-mail, with per-project choices. Essential for
    steering Symbio away from the computer.
-5. **Talk to Symbio.** A spoken conversation with core, hands-free: e.g. from a phone connected to
+7. **Talk to Symbio.** A spoken conversation with core, hands-free: e.g. from a phone connected to
    the car over Bluetooth, with Symbio working on the computer at home (remote access). Not just
    dictation into the chat box:
    - Only what core says to the human is read aloud: never tool calls, command output, messages
@@ -58,28 +66,28 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    Builds on the phone layout and on telling apart, in core's replies, what's for the human from
    the team's work. To check first: the browsers' own speech recognition and voices (quality,
    languages, whether they keep working with the screen off) against a speech service.
-6. **Budgets per project.** A spending limit per project (and optionally per day), with a warning
+8. **Budgets per project.** A spending limit per project (and optionally per day), with a warning
    at a threshold and the team paused when it's reached, using the cost tracking Symbio already
    has.
-7. **Scheduled work.** Ask core for recurring jobs ("refresh the data every night", "check the site
+9. **Scheduled work.** Ask core for recurring jobs ("refresh the data every night", "check the site
    every Monday"): Symbio wakes core at the set time with the job, and the human sees the runs and
    their results.
-8. **Linux and macOS.** Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
+10. **Linux and macOS.** Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
    Keychain on macOS); headless Linux (a server or container) has no keyring, so it needs a
    fallback, such as a key file readable only by the user.
-9. **Make it showable.** Before inviting others: a sample project to try in five minutes, a
+11. **Make it showable.** Before inviting others: a sample project to try in five minutes, a
    two-minute video of core running a team on a non-coding project, and a short GitHub Pages site
    with screenshots. First audience: the OpenCode community.
-10. **Create a project from a git repository.** In the New project dialog, an option to clone a
+12. **Create a project from a git repository.** In the New project dialog, an option to clone a
    repository (GitHub, Azure DevOps or any git URL, using the matching connection when it's private)
    into a folder and open it as a project, e.g. to continue on another computer. Tucked under an
    advanced option, so it doesn't get in the way of people who don't use git.
-11. **Rules register on import.** When importing an existing project, offer to build the register
+13. **Rules register on import.** When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-12. **Translations.** The UI in other languages, starting with Portuguese. *(good first
+14. **Translations.** The UI in other languages, starting with Portuguese. *(good first
     contribution, once the strings are extracted)*
-13. **A public demo.** A container on a VPS with a light model, connections and other sensitive
+15. **A public demo.** A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
 ## Ideas
