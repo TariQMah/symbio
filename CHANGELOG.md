@@ -7,6 +7,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 - A project's usage can be grouped **by agent, provider or model**, and narrowed to one provider, with the total for what is shown.
 - **Give feedback**: Settings → Feedback links to the repository's Discussions (Ideas for suggestions, Q&A for questions), so you can share what you think without filing a bug.
+- **Report a problem**: a link in the top bar and in Settings opens a new GitHub bug report with Symbio's version, OpenCode's version and your OS filled in. Nothing about your projects (names, paths, logs, keys) is added.
 
 ## [0.14.3]
 

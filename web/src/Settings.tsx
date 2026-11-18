@@ -8,6 +8,7 @@ import { CostsSection, PricesSection } from "./Usage";
 import { RemoteSection } from "./Remote";
 import { UpdatesSection } from "./Updates";
 import { FeedbackSection } from "./Feedback";
+import { ReportProblemSection } from "./ReportProblem";
 import { Dialog, EmptyState } from "./ui";
 
 /** Where the user was before Settings (a project, the project list…). */
@@ -182,6 +183,7 @@ export function Settings() {
       <UpdatesSection />
 
       <FeedbackSection />
+      <ReportProblemSection />
 
       <AnimatePresence>
         {editing && (
