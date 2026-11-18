@@ -83,7 +83,9 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    fallback, such as a key file readable only by the user.
 13. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
    two-minute video of core running a team on a non-coding project, and a short GitHub Pages site
-   with screenshots. First audience: the OpenCode community.
+   with screenshots ([#19](https://github.com/linkzy/symbio/issues/19)). First audience: the
+   OpenCode and GitHub Copilot CLI communities. Done: the README's animation of a real session, and
+   a social preview image.
 14. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
    repository (GitHub, Azure DevOps or any git URL, using the matching connection when it's private)
    into a folder and open it as a project, e.g. to continue on another computer. Tucked under an

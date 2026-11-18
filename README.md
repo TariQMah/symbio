@@ -21,7 +21,10 @@ It isn't tied to one AI tool either. The agents run on an **agent runtime** you 
 OpenRouter, local models…), or **GitHub Copilot CLI** (beta), with your Copilot subscription. You
 install only the ones you use, and a project can move from one to the other.
 
-![core summarizing the plan it proposed for a travel guidebook](docs/images/chat.png)
+![A team of agents writing a pocket travel guide: core proposes a plan, helpers research and write in parallel, a question comes to the human, the board fills up](docs/images/symbio-demo.gif)
+
+*A real session, sped up: a pocket guide to Porto written by core and four helpers on GitHub Copilot
+CLI with Claude Haiku 5.5 (about 9 million tokens, mostly cached: roughly $0.20).*
 
 > **Built with AI.** Symbio was designed and written in collaboration with AI coding agents, and
 > it's meant to be worked on the same way. The documentation for agents (and for humans who want the
@@ -61,6 +64,12 @@ helper works on its own branch; the shared `notes` folder is held by it until it
 place. Here Symbio was restarted mid-task, and it told the helper to pick up where it left off.
 
 ![Messages between core, the helper, you and Symbio](docs/images/messages.png)
+
+**6. Answer when the team needs you.** Decisions come to you as questions, with context and
+suggested answers (here from the Porto guide in the animation above). Answer when you have a
+moment; the agent that asked carries on.
+
+![An open question from core, with its context and suggested answers](docs/images/needs-you.png)
 
 ## What it does
 
