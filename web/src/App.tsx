@@ -9,6 +9,7 @@ import { leaveSettings, Settings } from "./Settings";
 import { EmptyState, Logo } from "./ui";
 import { RemoteBanner } from "./Remote";
 import { UpdateBadge, useUpdate } from "./Updates";
+import { ReportProblemLink } from "./ReportProblem";
 
 function useHashRoute() {
   const [hash, setHash] = useState(location.hash);
@@ -151,6 +152,7 @@ export function App() {
             <SettingsIcon size={15} />
             <span className="btn-label">Settings</span>
           </a>
+          <ReportProblemLink />
           <UpdateBadge />
           <RuntimeBadges runtime={runtime} only={projectRuntime} />
         </div>
