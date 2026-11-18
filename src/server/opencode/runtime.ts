@@ -430,14 +430,19 @@ async function waitFor(check: () => Promise<boolean>, timeoutMs: number) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Memory of a process and its descendants, in bytes (Windows/Linux/macOS best effort); null when unknown. */
+/**
+ * Memory of a runtime's process and its descendants, in bytes (Windows/Linux/macOS best effort);
+ * null when unknown. Commands agents run (each under a shell the runtime starts: a build, a dev
+ * server, a compiler server that stays up) aren't the runtime's memory, and restarting the runtime
+ * wouldn't free it, only cut them off: shells and what runs under them aren't counted.
+ */
 export async function processTreeMemory(pid: number): Promise<number | null> {
   try {
     if (process.platform === "win32") {
       // List every process once ("pid parent bytes" per line) and sum the tree here.
       const { stdout } = await execFileAsync(
         "powershell.exe",
-        ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.WorkingSetSize)\" }"],
+        ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.WorkingSetSize) $($_.Name)\" }"],
         { encoding: "utf8", windowsHide: true, timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
       );
       return sumProcessTree(stdout, pid) || null;
@@ -449,14 +454,23 @@ export async function processTreeMemory(pid: number): Promise<number | null> {
   }
 }
 
-/** Sums the memory of a process and all its descendants from "pid parent bytes" lines. */
+/** Shells a runtime runs agents' commands in (see processTreeMemory). */
+const SHELL = /^(pwsh|powershell|cmd|bash|sh|zsh|dash|fish)(\.exe)?$/i;
+
+/**
+ * Sums the memory of a process and its descendants from "pid parent bytes [name]" lines, leaving
+ * out shells (other than the root) and everything under them.
+ */
 export function sumProcessTree(listing: string, root: number): number {
   const children = new Map<number, number[]>();
   const memory = new Map<number, number>();
+  const shells = new Set<number>();
   for (const line of listing.split(/\r?\n/)) {
-    const [pid, parent, bytes] = line.trim().split(/\s+/).map(Number);
+    const [pidText, parentText, bytesText, ...name] = line.trim().split(/\s+/);
+    const [pid, parent, bytes] = [pidText, parentText, bytesText].map(Number);
     if (!pid) continue;
     memory.set(pid, bytes || 0);
+    if (SHELL.test(name.join(" "))) shells.add(pid);
     if (!children.has(parent)) children.set(parent, []);
     children.get(parent)!.push(pid);
   }
@@ -467,6 +481,7 @@ export function sumProcessTree(listing: string, root: number): number {
     const pid = stack.pop()!;
     if (seen.has(pid)) continue; // pid reuse can create cycles
     seen.add(pid);
+    if (pid !== root && shells.has(pid)) continue;
     total += memory.get(pid) ?? 0;
     stack.push(...(children.get(pid) ?? []));
   }

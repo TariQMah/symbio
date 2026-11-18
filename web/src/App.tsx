@@ -52,7 +52,10 @@ export function App() {
         setRuntime((r) => ({
           ...e,
           memoryMB: e.memoryMB ?? r?.memoryMB ?? null,
-          runtimes: e.runtimes?.map((x) => ({ ...x, memoryMB: x.memoryMB ?? r?.runtimes?.find((y) => y.kind === x.kind)?.memoryMB ?? null })),
+          runtimes: e.runtimes?.map((x) => ({
+            ...x,
+            memoryMB: x.state === "running" ? (x.memoryMB ?? r?.runtimes?.find((y) => y.kind === x.kind)?.memoryMB ?? null) : null,
+          })),
         }));
       }
     });

@@ -43,6 +43,17 @@ test("process tree memory", () => {
   assert.equal(sumProcessTree(listing, 10), 130);
   assert.equal(sumProcessTree(listing, 12), 3, "a leaf (no children) terminates");
   assert.equal(sumProcessTree("5 6 1\n6 5 2", 5), 3, "cycles from pid reuse terminate");
+  // Agents' commands run under shells: a build or a dev server isn't the runtime's memory.
+  const withCommands = [
+    "10 1 800 copilot-runtime.exe",
+    "11 10 15 conhost.exe",
+    "12 10 90 pwsh.exe",
+    "13 12 300 dotnet.exe",
+    "14 13 2000 MSBuild.exe",
+    "15 10 50 typescript language server.exe",
+  ].join("\r\n");
+  assert.equal(sumProcessTree(withCommands, 10), 865, "the runtime and its own helpers, not the shells' commands");
+  assert.equal(sumProcessTree("10 1 800 pwsh.exe\n11 10 5 conhost.exe", 10), 805, "a runtime that is itself a shell still counts");
 });
 
 test("agents can't read Symbio's backups", () => {

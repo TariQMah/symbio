@@ -5,6 +5,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Fixed: **agent runtimes were restarted for memory their agents' commands used.** Builds, dev servers and compiler
+  servers agents start were counted as the runtime's memory, so on a busy project it was restarted again and again
+  (four times in five minutes on a real one), interrupting every agent and stopping those commands. Only the runtime's
+  own memory counts now. Also, a stopped runtime no longer shows its last memory reading in the top bar.
 - A project's usage can be grouped **by agent, provider or model**, and narrowed to one provider, with the total for what is shown. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#15)!
 
 ## [0.15.0-beta.1]

@@ -163,7 +163,9 @@ costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
   every allowed model except the core-only ones) and is told why. Retries count: four failed retries, or two
   when they timed out (each timeout already costs minutes of waiting). If every allowed model failed recently,
   the agent stops with a visible problem; adding a model resumes it.
-- **Memory recycling.** Each runtime's memory is measured (the whole process tree). Above
+- **Memory recycling.** Each runtime's memory is measured (its process tree, without the shells it
+  runs agents' commands in and what runs under them: builds and servers agents start aren't the
+  runtime's, and restarting it would only cut them off). Above
   `SYMBIO_RECYCLE_MB` it is restarted once every agent is idle; above `SYMBIO_RECYCLE_HARD_MB` it
   is restarted anyway and agents resume.
 - **Loop guard.** Conversational messages between the same two agents are limited per 30 minutes

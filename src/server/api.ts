@@ -123,7 +123,8 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   api.post("/connections/:id/test", async (c) => c.json(await connections.test(c.req.param("id"))));
 
-  const memoryMB = (r: AgentRuntime) => (r.lastMemory ? Math.round(r.lastMemory / 1024 / 1024) : null);
+  // Only while it runs: the last reading of a stopped runtime is history.
+  const memoryMB = (r: AgentRuntime) => (r.state === "running" && r.lastMemory ? Math.round(r.lastMemory / 1024 / 1024) : null);
   // OpenCode's status (the default runtime), plus every runtime's, for the top bar: a project's page
   // shows the runtime its agents run on.
   const runtimeInfo = () => ({
