@@ -88,10 +88,16 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
 13. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-14. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages, starting with Portuguese. *(good first
+14. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language. *(good first
     contribution, once the strings are extracted)*
 15. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
+
+**Small improvements**, each with an issue and where to start, open to anyone: copy buttons in the
+chat (#23), the browser tab showing what needs you (#24), unread markers on agents (#25), opening a
+folder in VS Code (#26), day separators (#27), find in a chat (#28), keyboard shortcuts (#29),
+filtering the plan board (#30), exporting a chat (#31) or usage (#32), and an accessibility pass
+(#33). All [good first issues](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 
 ## Ideas
 
