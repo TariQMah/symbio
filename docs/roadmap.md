@@ -88,8 +88,7 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
 13. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-14. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language. *(good first
-    contribution, once the strings are extracted)*
+14. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
 15. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
