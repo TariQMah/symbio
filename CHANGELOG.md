@@ -5,52 +5,44 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- Fixed: **a tool call could fail with "ENOENT … rename …"** when an agent called several of Symbio's tools at once
-  (shared assets, questions, the plan): two saves of the same file used the same temporary file. Saves of a file now
-  run one after the other, each with its own.
-
-## [0.15.0-beta.3]
-
-Beta: try it with `sym update --to 0.15.0-beta.3`.
-
-- Fixed: **after Symbio restarted, agents on GitHub Copilot CLI lost Symbio's tools** (messages, tasks, the plan…): the
-  sessions reopened without knowing their folder, which the tools are registered for. They reopen with them now.
-- **Give feedback**: Settings → Feedback links to the repository's Discussions (Ideas for suggestions, Q&A for questions), so you can share what you think without filing a bug. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#21)!
-- **Report a problem**: a link in the top bar and in Settings opens a new GitHub bug report with Symbio's version, the agent runtimes installed and your OS filled in. Nothing about your projects (names, paths, logs, keys) is added. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#22)!
-
-## [0.15.0-beta.2]
-
-Beta: try it with `sym update --to 0.15.0-beta.2`.
-
-- Fixed: **agent runtimes were restarted for memory their agents' commands used.** Builds, dev servers and compiler
-  servers agents start were counted as the runtime's memory, so on a busy project it was restarted again and again
-  (four times in five minutes on a real one), interrupting every agent and stopping those commands. Only the runtime's
-  own memory counts now. Also, a stopped runtime no longer shows its last memory reading in the top bar.
-- A project's usage can be grouped **by agent, provider or model**, and narrowed to one provider, with the total for what is shown. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#15)!
-
-## [0.15.0-beta.1]
-
-Beta: try it with `sym update --to 0.15.0-beta.1` (installed copies stay on 0.14.x until 0.15.0 is out).
+## [0.15.0]
 
 - **GitHub Copilot CLI as an agent runtime** (preview): in New project → Models, choose whether the agents run on
   OpenCode or on GitHub Copilot CLI, with its own models and your Copilot subscription. Symbio uses your existing
-  Copilot login (`copilot login`), or you sign in from Settings → **GitHub Copilot CLI** with a code on GitHub; it keeps
-  its sessions apart from your own Copilot history. Symbio's rules still apply to every command an agent runs and every
+  Copilot login (`copilot login`), or you sign in from Settings → **Agent runtimes** with a code on GitHub; it keeps its
+  sessions apart from your own Copilot history. Symbio's rules still apply to every command an agent runs and every
   file it reads or writes; background processes, model prices and the chat's steps work as with OpenCode. Models you
   added to the Copilot CLI with your own key (e.g. Azure AI Foundry, in Copilot's `providers.json`) are offered too.
+- **Symbio no longer comes with OpenCode: you install the agent runtimes you use.** On the first run, the Projects page
+  asks for one and offers OpenCode and GitHub Copilot CLI, each with an Install button (also in Settings → **Agent
+  runtimes**, where you can remove them). Symbio downloads the version it's tested with into its own folder; nothing
+  else on the computer changes. New projects offer only the installed runtimes. **If you have OpenCode projects,
+  Symbio installs OpenCode again by itself on the first start after this update** (a few minutes). `sym doctor` lists
+  the installed runtimes.
 - **Move a project to another agent runtime**: Project settings → **Agent runtime** → *Switch runtime…* moves the whole
   team, e.g. from OpenCode to GitHub Copilot CLI. Each agent first writes its own handoff (optional), then continues in a
   new session on the other runtime with its name, folder, branch, tasks and assets; the project's models are carried
   over where the other runtime has them. A progress bar shows how it goes; if a session can't be created there, nothing
   changes. Earlier conversations stay readable. Best done when the team is idle; agents will behave differently there.
-- **Symbio no longer comes with OpenCode: you install the agent runtimes you use.** On the first run, the Projects page
-  asks for one and offers OpenCode and GitHub Copilot CLI, each with an Install button (also in Settings → **Agent
-  runtimes**, where you can remove them). Symbio downloads the version it's tested with into its own folder; nothing
-  else on the computer changes. New projects offer only the installed runtimes. If you already have OpenCode projects,
-  Symbio installs OpenCode again by itself after the update. `sym doctor` lists the installed runtimes.
 - **OpenCode and Copilot start only when needed**: when a project's agents run on them, or when something asks for them
   (a project's page, New project's models, Settings). Using only Copilot no longer keeps OpenCode running. The top bar
   shows the runtime of the project you're looking at, and elsewhere the ones running.
+- A project's usage can be grouped **by agent, provider or model**, and narrowed to one provider, with the total for what
+  is shown. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#15)!
+- **Report a problem**: a link in the top bar and in Settings opens a new GitHub bug report with Symbio's version, the
+  agent runtimes installed and your OS filled in. Nothing about your projects (names, paths, logs, keys) is added.
+  Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#22)!
+- **Give feedback**: Settings → Feedback links to the repository's Discussions (Ideas for suggestions, Q&A for
+  questions), so you can share what you think without filing a bug. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#21)!
+- Fixed: **agent runtimes were restarted for memory their agents' commands used.** Builds, dev servers and compiler
+  servers agents start were counted as the runtime's memory, so on a busy project it was restarted again and again
+  (four times in five minutes on a real one), interrupting every agent and stopping those commands. Only the runtime's
+  own memory counts now. This is likely much of why OpenCode restarted so often on long projects.
+- Fixed: **a tool call could fail with "ENOENT … rename …"** when an agent called several of Symbio's tools at once
+  (shared assets, questions, the plan): two saves of the same file used the same temporary file. Saves of a file now
+  run one after the other, each with its own.
+
+(Pre-releases 0.15.0-beta.1 to beta.3 had these changes as they were made.)
 
 ## [0.14.3]
 

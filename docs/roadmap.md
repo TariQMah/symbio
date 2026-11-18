@@ -7,26 +7,12 @@ welcome (open an issue). Each item in Next has an issue with where to start; tho
 
 ## Now
 
-**GitHub Copilot CLI as an agent runtime** (branch `copilot-runtime`). Done: the runtime-neutral
-layer, the Copilot runtime, choosing it per project in New project, signing in from Settings,
-background processes, prices, briefs worded for each runtime, and every end-to-end test on both
-runtimes, memory recycling and crash recovery for Copilot too, and no bundled runtime: the human
-installs the ones they use (first-run cards, Settings → Agent runtimes), so a machine can have only
-Copilot or only OpenCode, and moving an existing project from one runtime to the other (Project
-settings → Agent runtime). Left: a beta, trying the move on a real project, then merging into `next`.
+Nothing in progress: the next items are open to anyone (see their issues). After 0.15.0, the likely
+next step for the maintainers is reasoning effort per model, then themes.
 
 ## Next
 
-1. **GitHub Copilot CLI as an agent runtime.** Choose per project whether the team runs on OpenCode or
-   on GitHub Copilot CLI (driven through the official Copilot SDK), and later other agent CLIs. First
-   a runtime-neutral layer: one `Runtime` interface (sessions, delivery, interrupts, models, briefs,
-   permissions, questions, usage, changes, processes) with Symbio's own events and history, which the
-   team logic and the chat use instead of OpenCode's formats; OpenCode becomes one adapter. Then the
-   Copilot adapter: sessions per agent folder, Symbio's tools as a per-session MCP server, permission
-   requests answered by Symbio's rules, questions to the human, GitHub sign-in or own provider keys,
-   and costs shown as premium requests (Copilot bills each prompt, so wake-ups matter). Also the base
-   for Claude Code and Codex (see Ideas).
-2. **Reasoning effort per model.** ([#1](https://github.com/linkzy/symbio/issues/1)) Many models can think less or more (low, medium, high…): choose it
+1. **Reasoning effort per model.** ([#1](https://github.com/linkzy/symbio/issues/1)) Many models can think less or more (low, medium, high…): choose it
    per model in a project's models (e.g. core on Sonnet *high*, helpers on Sonnet *medium*), and per
    agent from the model menu in its chat. Kept by Symbio, so it survives fresh sessions, model
    fallback and runtime switches; a level the runtime doesn't offer falls back to the model's
@@ -35,24 +21,24 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    verified live (listing and choosing variants) and written down in opencode-api.md first. Higher
    effort costs more tokens, so the price simulator mentions it. Both stand-in runtimes take it, so
    the end-to-end tests cover it on each.
-3. **Themes.** ([#2](https://github.com/linkzy/symbio/issues/2)) A choice of looks in Settings, kept in the browser, starting with one that looks like
+2. **Themes.** ([#2](https://github.com/linkzy/symbio/issues/2)) A choice of looks in Settings, kept in the browser, starting with one that looks like
    VS Code (its dark and light editor colors, denser lists, a more editor-like chat), for using
    Symbio at work without it looking like a chat site; the current look stays the default. Built on
    the colors and sizes `styles.css` already keeps as tokens, so a theme is mostly a set of token
    values (plus a few layout tweaks), and adding one later is easy.
-4. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
+3. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
    change it (its plan tools take it), the human can change it on the board, and core is told when
    the human does, so it picks up urgent work first. Helpers see it with their task.
-5. **Commits without AI co-author lines** ([#20](https://github.com/linkzy/symbio/issues/20)): a
+4. **Commits without AI co-author lines** ([#20](https://github.com/linkzy/symbio/issues/20)): a
    project setting to keep `Co-authored-by` lines naming AI tools (GitHub Copilot CLI adds one) out
    of the project's commits: agents are told not to add them, and Symbio removes any left when it
    merges a helper's work.
-6. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
+5. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
    stuck agent) or a task finishes, send it where they are: browser/phone notifications, and
    optionally a messaging app (e.g. Telegram) or e-mail, with per-project choices. Essential for
    steering Symbio away from the computer.
-7. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
+6. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
    the car over Bluetooth, with Symbio working on the computer at home (remote access). Not just
    dictation into the chat box:
    - Only what core says to the human is read aloud: never tool calls, command output, messages
@@ -67,29 +53,29 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    Builds on the phone layout and on telling apart, in core's replies, what's for the human from
    the team's work. To check first: the browsers' own speech recognition and voices (quality,
    languages, whether they keep working with the screen off) against a speech service.
-8. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
+7. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
    at a threshold and the team paused when it's reached, using the cost tracking Symbio already
    has.
-9. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
+8. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
    every Monday"): Symbio wakes core at the set time with the job, and the human sees the runs and
    their results.
-10. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
+9. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
    Keychain on macOS); headless Linux (a server or container) has no keyring, so it needs a
    fallback, such as a key file readable only by the user.
-11. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
+10. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
    two-minute video of core running a team on a non-coding project, and a short GitHub Pages site
    with screenshots ([#19](https://github.com/linkzy/symbio/issues/19)). First audience: the
    OpenCode and GitHub Copilot CLI communities. Done: the README's animation of a real session, and
    a social preview image.
-12. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
+11. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
    repository (GitHub, Azure DevOps or any git URL, using the matching connection when it's private)
    into a folder and open it as a project, e.g. to continue on another computer. Tucked under an
    advanced option, so it doesn't get in the way of people who don't use git.
-13. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
+12. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-14. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
-15. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
+13. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
+14. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
 **Small improvements**, each with an issue and where to start, open to anyone: copy buttons in the
@@ -161,9 +147,11 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
-- **Next release** — A project's usage by agent, provider or model, narrowed to one provider (#3, the
-  first outside contribution); Report a problem (#16) and Give feedback (#17) links. All three by
-  [@P1LOTRX](https://github.com/P1LOTRX).
+- **0.15.0** — GitHub Copilot CLI as a second agent runtime, chosen per project; no bundled runtime
+  (install the ones you use from Symbio); moving a project from one runtime to the other; runtimes
+  start only when needed; every end-to-end test runs on both runtimes. Also usage by provider and
+  model (#3, the first outside contribution), Report a problem (#16) and Give feedback (#17), all by
+  [@P1LOTRX](https://github.com/P1LOTRX); runtimes no longer restarted for their agents' builds.
 - **0.14.3** — Costs and token counts hidden by default; the daily disk check measures helpers' build outputs
   correctly.
 - **0.14.2** — Your own helpers (create one from the team list and talk to it directly); the price simulator
@@ -228,7 +216,7 @@ Problems people ran into, to fix.
 
 - Tested on Windows 11 only.
 - One person per Symbio: no accounts or sharing; each person runs their own.
-- Two agent runtimes: OpenCode and GitHub Copilot CLI (beta); see Ideas for Claude Code and Codex.
+- Two agent runtimes: OpenCode and GitHub Copilot CLI (preview); see Ideas for Claude Code and Codex.
 - Agent safety rules are pattern-based, not a sandbox (see [security.md](security.md)).
 - Relies on experimental OpenCode APIs (instructions, MCP registration), which may change between
   OpenCode releases.

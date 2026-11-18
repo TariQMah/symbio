@@ -18,7 +18,7 @@ safety); the agents decide how to organize the work.
 
 It isn't tied to one AI tool either. The agents run on an **agent runtime** you choose per project:
 [OpenCode](https://opencode.ai), with the model providers you connect (OpenAI, Anthropic, Azure,
-OpenRouter, local models…), or **GitHub Copilot CLI** (beta), with your Copilot subscription. You
+OpenRouter, local models…), or **GitHub Copilot CLI** (preview), with your Copilot subscription. You
 install only the ones you use, and a project can move from one to the other.
 
 ![A team of agents writing a pocket travel guide: core proposes a plan, helpers research and write in parallel, a question comes to the human, the board fills up](docs/images/symbio-demo.gif)
@@ -273,7 +273,7 @@ All optional, set as environment variables:
 Symbio is young and changing quickly, shaped by people using it for real work. The core workflow
 works end to end: projects, core and helpers, messaging, plan and kanban, shared assets, docs and
 the rules register, connections (GitHub, Azure DevOps, servers), providers, costs and recovery, on
-OpenCode and (in beta) on GitHub Copilot CLI.
+OpenCode and (in preview) on GitHub Copilot CLI.
 What's planned and what's open for help is in [docs/roadmap.md](docs/roadmap.md); what changed in
 each version is in [CHANGELOG.md](CHANGELOG.md).
 
