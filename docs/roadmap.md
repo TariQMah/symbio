@@ -2,7 +2,8 @@
 
 What we're working on, what comes next and ideas we've collected, in priority order rather than
 by date: priorities change as people use Symbio, and items move up or down. Suggestions are
-welcome (open an issue). Items marked *(good first contribution)* are small and self-contained.
+welcome (open an issue). Each item in Next has an issue with where to start; those labelled
+[good first issue](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) are small and self-contained.
 
 ## Now
 
@@ -25,7 +26,7 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    requests answered by Symbio's rules, questions to the human, GitHub sign-in or own provider keys,
    and costs shown as premium requests (Copilot bills each prompt, so wake-ups matter). Also the base
    for Claude Code and Codex (see Ideas).
-2. **Reasoning effort per model.** Many models can think less or more (low, medium, high…): choose it
+2. **Reasoning effort per model.** ([#1](https://github.com/linkzy/symbio/issues/1)) Many models can think less or more (low, medium, high…): choose it
    per model in a project's models (e.g. core on Sonnet *high*, helpers on Sonnet *medium*), and per
    agent from the model menu in its chat. Kept by Symbio, so it survives fresh sessions, model
    fallback and runtime switches; a level the runtime doesn't offer falls back to the model's
@@ -34,24 +35,24 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    verified live (listing and choosing variants) and written down in opencode-api.md first. Higher
    effort costs more tokens, so the price simulator mentions it. Both stand-in runtimes take it, so
    the end-to-end tests cover it on each.
-3. **Themes.** A choice of looks in Settings, kept in the browser, starting with one that looks like
+3. **Themes.** ([#2](https://github.com/linkzy/symbio/issues/2)) A choice of looks in Settings, kept in the browser, starting with one that looks like
    VS Code (its dark and light editor colors, denser lists, a more editor-like chat), for using
    Symbio at work without it looking like a chat site; the current look stays the default. Built on
    the colors and sizes `styles.css` already keeps as tokens, so a theme is mostly a set of token
    values (plus a few layout tweaks), and adding one later is easy.
-4. **Usage by provider and model.** In a project's Usage section, filter and group by provider and by
+4. **Usage by provider and model.** ([#3](https://github.com/linkzy/symbio/issues/3)) In a project's Usage section, filter and group by provider and by
    model (e.g. everything spent on one provider across all agents and models), with totals for the
    selection, besides the per-agent view there is today. The data is already kept per agent and
-   model (`usageByModel`); this is about showing it. *(good first contribution)*
-5. **Task priorities.** A priority on each task in the plan (e.g. urgent, high, normal, low), shown
+   model (`usageByModel`); this is about showing it.
+5. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
    change it (its plan tools take it), the human can change it on the board, and core is told when
    the human does, so it picks up urgent work first. Helpers see it with their task.
-6. **Notifications.** When something needs the human (an open question, an approval, a plan to review, a
+6. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
    stuck agent) or a task finishes, send it where they are: browser/phone notifications, and
    optionally a messaging app (e.g. Telegram) or e-mail, with per-project choices. Essential for
    steering Symbio away from the computer.
-7. **Talk to Symbio.** A spoken conversation with core, hands-free: e.g. from a phone connected to
+7. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
    the car over Bluetooth, with Symbio working on the computer at home (remote access). Not just
    dictation into the chat box:
    - Only what core says to the human is read aloud: never tool calls, command output, messages
@@ -66,28 +67,28 @@ settings → Agent runtime). Left: a beta, trying the move on a real project, th
    Builds on the phone layout and on telling apart, in core's replies, what's for the human from
    the team's work. To check first: the browsers' own speech recognition and voices (quality,
    languages, whether they keep working with the screen off) against a speech service.
-8. **Budgets per project.** A spending limit per project (and optionally per day), with a warning
+8. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
    at a threshold and the team paused when it's reached, using the cost tracking Symbio already
    has.
-9. **Scheduled work.** Ask core for recurring jobs ("refresh the data every night", "check the site
+9. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
    every Monday"): Symbio wakes core at the set time with the job, and the human sees the runs and
    their results.
-10. **Linux and macOS.** Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
+10. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
    Keychain on macOS); headless Linux (a server or container) has no keyring, so it needs a
    fallback, such as a key file readable only by the user.
-11. **Make it showable.** Before inviting others: a sample project to try in five minutes, a
+11. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
    two-minute video of core running a team on a non-coding project, and a short GitHub Pages site
    with screenshots. First audience: the OpenCode community.
-12. **Create a project from a git repository.** In the New project dialog, an option to clone a
+12. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
    repository (GitHub, Azure DevOps or any git URL, using the matching connection when it's private)
    into a folder and open it as a project, e.g. to continue on another computer. Tucked under an
    advanced option, so it doesn't get in the way of people who don't use git.
-13. **Rules register on import.** When importing an existing project, offer to build the register
+13. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-14. **Translations.** The UI in other languages, starting with Portuguese. *(good first
+14. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages, starting with Portuguese. *(good first
     contribution, once the strings are extracted)*
-15. **A public demo.** A container on a VPS with a light model, connections and other sensitive
+15. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
 ## Ideas
@@ -205,7 +206,7 @@ Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Known issues
 
-Problems people ran into, to fix. Those marked *(good first contribution)* are small.
+Problems people ran into, to fix.
 
 - **OpenCode restarts often on long projects.** Its memory grows with long sessions; on one project
   it was restarted 15+ times in a day. Symbio recovers and agents continue, but turns are cut
@@ -217,7 +218,7 @@ Problems people ran into, to fix. Those marked *(good first contribution)* are s
 
 - Tested on Windows 11 only.
 - One person per Symbio: no accounts or sharing; each person runs their own.
-- OpenCode is the only agent runtime (see Ideas: Claude Code and Codex).
+- Two agent runtimes: OpenCode and GitHub Copilot CLI (beta); see Ideas for Claude Code and Codex.
 - Agent safety rules are pattern-based, not a sandbox (see [security.md](security.md)).
 - Relies on experimental OpenCode APIs (instructions, MCP registration), which may change between
   OpenCode releases.

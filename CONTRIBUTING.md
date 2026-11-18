@@ -3,8 +3,14 @@
 Thanks for your interest! Bug reports, ideas, documentation and code are all welcome, whether you
 write them yourself or with an AI agent.
 
-Looking for something to work on? [docs/roadmap.md](docs/roadmap.md) lists what's next in priority
-order and collected ideas; items marked *(good first contribution)* are small and self-contained.
+Looking for something to work on? Each item of the [roadmap](docs/roadmap.md) has an issue, with
+where to start in the code: [good first issues](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) are small and self-contained,
+[help wanted](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) are bigger. Comment on the issue to say you're taking it (and ask anything
+there), so two people don't do the same work. The `area:` labels say which part of Symbio an issue
+is about.
+
+You don't need any API key or subscription to work on Symbio: the end-to-end tests run against
+stand-ins for OpenCode and GitHub Copilot CLI, and so does CI on your pull request.
 
 ## Reporting bugs and suggesting features
 
@@ -67,6 +73,4 @@ By contributing, you agree that your contributions are licensed under the projec
 
 ## Code of conduct
 
-Be respectful and constructive. Assume good intent, critique ideas rather than people, and help
-newcomers. Harassment of any kind isn't tolerated; maintainers may remove content or contributors
-that break this.
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).

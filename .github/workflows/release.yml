@@ -9,7 +9,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write # the GitHub release with the version's changelog
   id-token: write # lets npm verify this workflow (and adds provenance to the package)
 
 jobs:
@@ -55,3 +55,14 @@ jobs:
           tag=latest
           case "$GITHUB_REF_NAME" in *-*) tag=next ;; esac
           npm publish --access public --tag "$tag" --ignore-scripts # checks already ran above
+      # A GitHub release too, with the version's section of CHANGELOG.md, so people watching the
+      # repository's releases hear about it. Pre-releases are marked as such.
+      - name: GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" > release-notes.md
+          flags=""
+          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md $flags

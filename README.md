@@ -1,9 +1,14 @@
 # Symbio
 
+[![CI](https://github.com/linkzy/symbio/actions/workflows/ci.yml/badge.svg)](https://github.com/linkzy/symbio/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/symbio)](https://www.npmjs.com/package/symbio)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![good first issues](https://img.shields.io/github/issues/linkzy/symbio/good%20first%20issue?label=good%20first%20issues)](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+
 **Run a team of AI agents on your project, from your browser.**
 
-Symbio is a local web app that coordinates several [OpenCode](https://opencode.ai) agents working on
-the same folder. You talk to one lead agent, **core**. It works out the scope with you, proposes a
+Symbio is a local web app that coordinates several AI agents working on the same folder, on
+[OpenCode](https://opencode.ai) or GitHub Copilot CLI (beta). You talk to one lead agent, **core**. It works out the scope with you, proposes a
 plan, and hands the work to helper agents, each in its own copy of the project. The agents message
 each other directly, ask you when they need a decision, and you watch it all happen on a live board.
 
@@ -254,8 +259,10 @@ each version is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
-Contributions are welcome, whether you write the code yourself or with an AI agent. Start with
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome, whether you write the code yourself or with an AI agent (the repository
+has an [AGENTS.md](AGENTS.md) for them). Start with [CONTRIBUTING.md](CONTRIBUTING.md), then pick a
+[good first issue](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or anything labelled [help wanted](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22). Every roadmap item has an issue:
+say there that you're taking it.
 
 ## License
 

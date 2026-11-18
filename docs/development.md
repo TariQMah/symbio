@@ -134,7 +134,8 @@ docs/                  This documentation
 4. Commit, tag the commit with the version (`git tag v<version>`) and push the tag. The **Release**
    workflow (`.github/workflows/release.yml`) checks that the tag matches `package.json`, runs the
    type-check, tests and build, and publishes to npm through trusted publishing: no npm token is
-   stored anywhere, and the package gets provenance. It's authorized on npmjs.com → symbio →
+   stored anywhere, and the package gets provenance. It then creates the GitHub release, with the
+   version's section of `CHANGELOG.md` (`scripts/release-notes.mjs`; pre-releases marked as such). It's authorized on npmjs.com → symbio →
    Settings → Trusted Publisher (GitHub Actions, user `linkzy`, repo `symbio`, workflow
    `release.yml`).
 
