@@ -67,6 +67,22 @@ test("project usage sums every agent, including stopped ones, and lists unpriced
   assert.deepEqual(report.unpriced, ["p/b"], "a suggestion isn't a price until the user accepts it");
 });
 
+test("project usage is also grouped by model and by provider (the part before the first slash)", () => {
+  const project: any = {
+    agents: [
+      { id: "1", name: "core", status: "idle", model: "a/x", usageByModel: { "a/x": u(0, 100, 0, 0), "b/c/y": u(0, 10, 0, 0) } },
+      { id: "2", name: "w", status: "idle", model: "a/z", usageByModel: { "a/x": u(0, 50, 0, 0), "a/z": u(0, 5, 0, 0) } },
+    ],
+  };
+  const r = projectUsage(project, {});
+  assert.deepEqual(r.byProvider.map((p) => [p.provider, p.tokens]), [["a", 155], ["b", 10]]);
+  assert.deepEqual(r.byModel.map((m) => [m.model, m.provider, m.tokens]), [["a/x", "a", 150], ["b/c/y", "b", 10], ["a/z", "a", 5]]);
+  // Without a price, "no price" (null) rather than $0; with some priced usage, the priced part.
+  const priced = projectUsage(project, { "a/x": { price: { input: 0, output: 1_000_000, cacheRead: 0, cacheWrite: 0 }, source: "yours" } } as any);
+  assert.deepEqual(priced.byModel.map((m) => [m.model, m.cost]), [["a/x", 150], ["b/c/y", null], ["a/z", null]]);
+  assert.deepEqual(priced.byProvider.map((p) => [p.provider, p.cost]), [["a", 150], ["b", null]]);
+});
+
 test("sub-agent sessions count for the agent that started them, under their own model, once", () => {
   const agent: any = { id: "a", name: "core", model: "foundry/opus", status: "idle" };
   accountUsage(agent, u(0, 100, 1000, 10));

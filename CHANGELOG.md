@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- A project's usage can be grouped **by agent, provider or model**, and narrowed to one provider, with the total for what is shown. Thanks [@P1LOTRX](https://github.com/P1LOTRX) (#15)!
+
 ## [0.15.0-beta.1]
 
 Beta: try it with `sym update --to 0.15.0-beta.1` (installed copies stay on 0.14.x until 0.15.0 is out).

@@ -590,6 +590,9 @@ export interface HousekeepingReport {
 
 export interface ProjectUsage {
   agents: { id: string; name: string; status: string; sessions: number; tokens: number; cost: number; byModel: { model: string; usage: Usage; tokens: number; cost: number | null }[] }[];
+  /** cost: null when none of the usage has a price. */
+  byModel: { model: string; provider: string; usage: Usage; tokens: number; cost: number | null }[];
+  byProvider: { provider: string; usage: Usage; tokens: number; cost: number | null }[];
   total: Usage;
   tokens: number;
   cost: number;

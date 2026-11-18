@@ -167,6 +167,9 @@ export function resolvePrices(refs: string[], book: Record<string, Price>, catal
 
 const rank = (provider: string) => (provider === "anthropic" ? 0 : provider === "openai" ? 0 : provider === "opencode" ? 1 : 2);
 
+/** The provider of a model reference ("provider/model"): the part before the first "/". */
+export const providerOf = (model: string) => (model.includes("/") ? model.slice(0, model.indexOf("/")) : model);
+
 /** Usage report for a project: per agent and model, with estimated costs. */
 export function projectUsage(project: Project, prices: ReturnType<typeof resolvePrices>) {
   let total = emptyUsage();
@@ -194,7 +197,34 @@ export function projectUsage(project: Project, prices: ReturnType<typeof resolve
       cost: byModel.reduce((s, m) => s + (m.cost ?? 0), 0),
     };
   });
-  return { agents, total, tokens: tokensOf(total), cost: totalCost, unpriced: [...unpriced] };
+  // The same usage across all agents, per model and per provider.
+  // cost: null while none of the usage counted has a price ("no price", as on the per-agent rows).
+  const models = new Map<string, { model: string; provider: string; usage: Usage; tokens: number; cost: number | null }>();
+  const providers = new Map<string, { provider: string; usage: Usage; tokens: number; cost: number | null }>();
+  for (const agent of agents) {
+    for (const m of agent.byModel) {
+      const provider = providerOf(m.model);
+      const byModel = models.get(m.model) ?? { model: m.model, provider, usage: emptyUsage(), tokens: 0, cost: null };
+      const byProvider = providers.get(provider) ?? { provider, usage: emptyUsage(), tokens: 0, cost: null };
+      for (const row of [byModel, byProvider]) {
+        row.usage = addUsage(row.usage, m.usage);
+        row.tokens += m.tokens;
+        if (m.cost !== null) row.cost = (row.cost ?? 0) + m.cost;
+      }
+      models.set(m.model, byModel);
+      providers.set(provider, byProvider);
+    }
+  }
+  const byTokens = (a: { tokens: number }, b: { tokens: number }) => b.tokens - a.tokens;
+  return {
+    agents,
+    byModel: [...models.values()].sort(byTokens),
+    byProvider: [...providers.values()].sort(byTokens),
+    total,
+    tokens: tokensOf(total),
+    cost: totalCost,
+    unpriced: [...unpriced],
+  };
 }
 
 /**
