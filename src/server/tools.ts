@@ -105,13 +105,13 @@ const shareFile: Tool = {
 
 const listTeam: Tool = {
   name: "list_team",
-  description: "List the agents on this project: name, role, purpose, status and model.",
+  description: "List the agents on this project: name, role, purpose, status, model and reasoning effort.",
   inputSchema: obj({}),
   run(_args, { project }) {
     return project.agents
       .map(
         (a) =>
-          `- ${a.name} (${a.role}${a.status === "stopped" ? ", stopped" : `, ${a.status}`}) — ${a.purpose ?? "coordinates the project"}${a.repo ? ` · repository ${a.repo}` : ""} · model ${a.model}${a.modelPinned ? ` (pinned by ${a.modelPinned.by === "human" ? "the human" : "you"})` : ""}`,
+          `- ${a.name} (${a.role}${a.status === "stopped" ? ", stopped" : `, ${a.status}`}) — ${a.purpose ?? "coordinates the project"}${a.repo ? ` · repository ${a.repo}` : ""} · model ${a.model}${a.modelPinned ? ` (pinned by ${a.modelPinned.by === "human" ? "the human" : "you"})` : ""}${effortText(project, a)}`,
       )
       .join("\n");
   },
@@ -181,6 +181,7 @@ const spawnAgent: Tool = {
           "Keep it on that model: if the model fails, it waits and retries it instead of switching to another allowed model. " +
           "Use it when the human wants that model for the work (e.g. to see how it does); otherwise leave it off.",
       },
+      effort: str("Optional reasoning effort level its model takes (e.g. 'low', 'medium', 'high'); defaults to the project's setting for the model"),
       workspace: { type: "string", enum: ["own", "shared"], description: "Where it works (git projects); defaults to the project's setting" },
       repo: str("In a project made of several repositories: the one it works in (e.g. 'server'); its own copy comes from it"),
     },
@@ -196,7 +197,23 @@ const spawnAgent: Tool = {
       taskId: args.task_id ? String(args.task_id) : undefined,
       model: args.model ? String(args.model) : undefined,
       pinModel: args.pin_model === true,
+      effort: args.effort ? String(args.effort) : undefined,
     });
+  },
+};
+
+const setEffort: Tool = {
+  name: "set_effort",
+  description:
+    "Set a helper's reasoning effort level (how much its model thinks: e.g. 'low', 'medium', 'high'; higher costs more tokens), " +
+    "or clear it to use the project's setting for its model. A level its model doesn't take is refused with the ones it does. " +
+    "You can't change a level the human set.",
+  inputSchema: obj({ agent: str("Helper name"), level: str("The level, or 'default' for the project's setting") }, ["agent", "level"]),
+  async run({ agent: name, level }, { team, project }) {
+    const target = team.findAgent(project, name);
+    if (!target || target.role === "coordinator") throw new Error(`No helper agent named "${name}".`);
+    const value = String(level ?? "").trim();
+    return team.setEffort(project, target, !value || value === "default" ? null : value, "coordinator");
   },
 };
 
@@ -755,6 +772,7 @@ const COORDINATOR_ONLY = [
   assignTask,
   spawnAgent,
   pinModel,
+  setEffort,
   stopAgent,
   mergeWork,
   cleanBuildOutputs,
@@ -860,3 +878,10 @@ function planGuard(tool: Tool): Tool {
 
 export const workerTools: Tool[] = COMMON.map(withInbox);
 export const coordinatorTools: Tool[] = [...COMMON, ...COORDINATOR_ONLY.map(coordinatorOnly)].map(planGuard).map(withInbox);
+
+/** An agent's reasoning effort, for list_team: its own level, or the project's for its model. */
+function effortText(project: Project, a: Agent): string {
+  if (a.effort) return ` · effort ${a.effort.level} (set by ${a.effort.by === "human" ? "the human" : "you"})`;
+  const level = project.modelEfforts?.[a.model];
+  return level ? ` · effort ${level}` : "";
+}

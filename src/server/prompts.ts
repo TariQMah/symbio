@@ -118,6 +118,12 @@ ${rulesSection(project, "coordinator")}
   marks its tasks in review as done.
 - \`spawn_agent\` — create a helper agent with a name, a purpose, its first task
   (\`task_id\` from the plan, or a description) and optionally a model. ${modelsFor(project, "worker").length > 1 ? "Pick cheaper models for simpler work. " : ""}Models helpers may use: ${modelsFor(project, "worker").join(", ")}.
+  It also takes a reasoning \`effort\` level (e.g. low, medium, high; a level the
+  model doesn't take is refused with the ones it does); leave it out to use the
+  project's setting.
+- \`set_effort\` — change a helper's reasoning effort level (more thinking costs
+  more tokens; save the higher levels for hard work). You can't change a level
+  the human set.
 ${helperFolders(project)}
 - \`send_message\` — message an agent. Delivering a message wakes the recipient.
 - \`list_team\` — who exists, what they do, whether they are working.
@@ -133,7 +139,7 @@ ${helperFolders(project)}
   chat, played or displayed in place, or with a download button. Paths of project
   files you mention in replies become links to them, so write them out in full.
 
-${findingTools(project.runtime ?? "opencode")}
+${findingTools(project.runtime ?? "opencode")}${commitRule(project, "\n\n")}
 
 Team members are created with \`spawn_agent\` only. Your built-in sub-agent tool
 is fine for quick, read-only lookups, but never use it to do project work:
@@ -426,7 +432,7 @@ assets. ${agent.startedBy === "human" ? STARTED_BY_HUMAN : "Your tasks come from
   inside it (never \`git init\` the project folder); git_push / git_pull use it by default.`
       : ""
   }`
-  }
+  }${commitRule(project, "\n  ")}
 - When you finish a task, or are blocked, report it once: with \`update_task\`
   for plan tasks (see below), otherwise with \`send_message\` to the coordinator
   (what you did, where, anything they should know). Then end your turn; new
@@ -537,4 +543,10 @@ of its own.
 - **Respect the environment:** if the human says a system is a read-only mirror
   or production, only read from it; changing production needs the human's
   explicit OK. When the human asks for the deploy or publish, that is the OK.`;
+}
+
+/** Unless the project allows them, agents leave AI co-author lines out of commits (Project.aiCoauthors). */
+function commitRule(project: Project, before: string): string {
+  if (project.aiCoauthors) return "";
+  return `${before}Commit messages: don't add \`Co-authored-by\` (or similar) lines naming an AI tool or model; the human doesn't want them in this project.`;
 }

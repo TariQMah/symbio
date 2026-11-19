@@ -47,7 +47,7 @@ export interface SdkSession {
   readonly sessionId: string;
   send(options: { prompt: string; mode?: "enqueue" | "immediate" }): Promise<string>;
   abort(): Promise<void>;
-  setModel(model: string): Promise<unknown>;
+  setModel(model: string, options?: { reasoningEffort?: string }): Promise<unknown>;
   getEvents(): Promise<any[]>;
   on(handler: (event: any) => void): () => void;
   disconnect(): Promise<void>;
@@ -115,6 +115,7 @@ interface OpenPermission {
 export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements AgentRuntime {
   readonly kind = "copilot";
   readonly label = "GitHub Copilot CLI";
+  commitCoauthors?: (directory: string) => boolean;
   state: RuntimeState = "stopped";
   version: string | null = null;
   lastError: string | null = null;
@@ -265,6 +266,8 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       providerID: m.provider,
       id: m.id,
       name: m.name ?? m.id,
+      // Copilot doesn't list levels for the user's own models; it passes the level on (verified).
+      efforts: [...OWN_MODEL_EFFORTS],
       raw: {
         providerID: m.provider,
         id: m.id,
@@ -278,6 +281,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
         providerID: COPILOT_PROVIDER,
         id: String(m.id),
         name: String(m.name ?? m.id),
+        efforts: Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.map(String) : [],
         raw: {
           ...m,
           providerID: COPILOT_PROVIDER,
@@ -302,6 +306,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       sessionId,
       name: sessionName(opts.title),
       model: modelId(opts.model),
+      ...(opts.effort ? { reasoningEffort: opts.effort } : {}),
     });
     this.attach(sessionId, session);
     return sessionId;
@@ -358,8 +363,16 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     if (live) await live.session.abort();
   }
 
-  async switchModel(sessionId: string, model: string): Promise<void> {
-    await (await this.session(sessionId)).setModel(modelId(model));
+  async switchModel(sessionId: string, model: string, effort?: string | null): Promise<void> {
+    const session = await this.session(sessionId);
+    if (effort) {
+      await session.setModel(modelId(model), { reasoningEffort: effort });
+      return;
+    }
+    // A model change without a level keeps the session's last one (verified): back to the model's default.
+    const info = (await this.listModels().catch(() => [])).find((m) => `${m.providerID}/${m.id}` === model || m.id === modelId(model));
+    const fallback = info?.raw?.defaultReasoningEffort ?? (info?.efforts.includes("medium") ? "medium" : undefined);
+    await session.setModel(modelId(model), fallback ? { reasoningEffort: fallback } : undefined);
   }
 
   async queued(sessionId: string): Promise<string[]> {
@@ -617,6 +630,8 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     return {
       ...(own.models.length ? { providers: own.providers, models: own.models } : {}),
       clientName: "symbio",
+      // Copilot adds a Co-authored-by line to commits unless told not to (docs/copilot-api.md).
+      coauthorEnabled: state.directory ? (this.commitCoauthors?.(state.directory) ?? false) : false,
       streaming: true,
       enableFileChangeTracking: true,
       ...(state.directory ? { workingDirectory: state.directory } : {}),
@@ -847,6 +862,9 @@ export function userProviders(userHome = process.env.SYMBIO_COPILOT_USER_HOME ??
 }
 
 /** "copilot/gpt-6-luna" → "gpt-6-luna"; the user's own models keep their "<provider>/<id>". */
+/** Levels offered for the user's own (BYOK) models: Copilot lists none for them, and takes these (verified with Claude on Azure AI Foundry). */
+export const OWN_MODEL_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+
 export function modelId(ref: string): string {
   return ref.startsWith(`${COPILOT_PROVIDER}/`) ? ref.slice(COPILOT_PROVIDER.length + 1) : ref;
 }

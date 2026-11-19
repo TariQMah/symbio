@@ -3,6 +3,8 @@
 export interface ModelRef {
   providerID: string;
   id: string;
+  /** The model's reasoning effort level (one of its variants); unset: its default. */
+  variant?: string;
 }
 
 export interface OpencodeEvent {
@@ -186,8 +188,9 @@ function safeJson(text: string): unknown {
   }
 }
 
-export function parseModel(ref: string): ModelRef {
+export function parseModel(ref: string, variant?: string | null): ModelRef {
   const slash = ref.indexOf("/");
   if (slash <= 0) throw new Error(`Invalid model "${ref}", expected provider/model`);
-  return { providerID: ref.slice(0, slash), id: ref.slice(slash + 1) };
+  // A variant is the model's reasoning effort level (verified: Model.Ref.variant, docs/opencode-api.md).
+  return { providerID: ref.slice(0, slash), id: ref.slice(slash + 1), ...(variant ? { variant } : {}) };
 }

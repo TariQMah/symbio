@@ -13,6 +13,10 @@ export interface Agent {
   model: string;
   /** Pinned to its model: when it fails, it waits and retries it instead of switching. */
   modelPinned?: { by: "human" | "coordinator"; at: number } | null;
+  /** The runtime its session lives in (unset: OpenCode); a project moved to another runtime keeps stopped agents on the old one. */
+  runtime?: RuntimeKind;
+  /** Its own reasoning effort level (over the project's level for its model). */
+  effort?: { level: string; by: "human" | "coordinator" } | null;
   /** Pinned and waiting for its model: when the next retry is. */
   modelWait?: { until: number; attempt: number; since: number; error: string } | null;
   status: AgentStatus;
@@ -185,6 +189,10 @@ export interface Project {
   /** Models core may use (unset: all allowed) and models only core may use (store.ts modelsFor). */
   coreModels?: string[];
   coreOnlyModels?: string[];
+  /** Reasoning effort level per model; others use their default. */
+  modelEfforts?: Record<string, string>;
+  /** Agents may add Co-authored-by lines naming the AI to commits (off by default). */
+  aiCoauthors?: boolean;
   docsLocation: DocsLocation;
   origin: "new" | "existing";
   connections: ProjectConnection[];
@@ -270,6 +278,8 @@ export interface ModelInfo {
   name: string;
   vision: boolean;
   free: boolean;
+  /** Reasoning effort levels the model takes; empty: none to choose. */
+  efforts: string[];
 }
 
 export interface RuntimeInfo {
@@ -684,7 +694,12 @@ export const api = {
     call<{ path: string; content: string }>("GET", `/projects/${id}/docs/file?path=${encodeURIComponent(path)}`),
   writeDoc: (id: string, path: string, content: string) =>
     call<{ ok: true }>("PUT", `/projects/${id}/docs/file`, { path, content }),
-  updateProject: (id: string, patch: Partial<Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy">>) =>
+  updateProject: (
+    id: string,
+    patch: Partial<
+      Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy" | "aiCoauthors">
+    > & { modelEfforts?: Record<string, string | null> },
+  ) =>
     call<Project>("PATCH", `/projects/${id}`, patch),
   connections: () => call<ConnectionView[]>("GET", "/connections"),
   createConnection: (body: Record<string, unknown>) => call<ConnectionView>("POST", "/connections", body),
@@ -730,6 +745,8 @@ export const api = {
     call<Project>("POST", `/projects/${projectId}/agents/${agentId}/rename`, { name }),
   setAgentModel: (projectId: string, agentId: string, model: string) =>
     call<Project>("POST", `/projects/${projectId}/agents/${agentId}/model`, { model }),
+  setAgentEffort: (projectId: string, agentId: string, level: string | null) =>
+    call<Agent>("POST", `/projects/${projectId}/agents/${agentId}/effort`, { level }),
   pinAgentModel: (projectId: string, agentId: string, pinned: boolean) =>
     call<Agent>("POST", `/projects/${projectId}/agents/${agentId}/pin`, { pinned }),
   restartAgent: (projectId: string, agentId: string) => call<Project>("POST", `/projects/${projectId}/agents/${agentId}/restart`),

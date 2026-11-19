@@ -5,6 +5,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.0]
+
+- **Reasoning effort.** Models that can think less or more (low, medium, high…, as each lists them) get a level per
+  model in Project settings → **Reasoning effort**, and agents can have their own from the menu next to the model in
+  their chat. core can give helpers a level too (`spawn_agent effort`, `set_effort`), but not change one you set.
+  The level survives fresh sessions, model fallback and moving the project to another runtime; a model that doesn't
+  take it runs at its default. Works on both runtimes (OpenCode's model *variants*; Copilot's `reasoningEffort`,
+  including your own providers' models).
+- **No AI co-author lines in commits.** Agents are told not to add `Co-authored-by` lines naming an AI, and GitHub
+  Copilot CLI's own line is turned off. To allow them, Project settings → Team → **AI co-authors in commits**.
+
 ## [0.20.0]
 
 - **Workbench, more like an editor.** The plan, messages, docs, files and settings are icons in the activity bar

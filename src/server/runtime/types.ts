@@ -39,6 +39,11 @@ export interface RuntimeModel {
   providerID: string;
   id: string;
   name: string;
+  /**
+   * The reasoning effort levels the model takes ("low", "high"…), in the runtime's order; empty when
+   * it has none to choose (docs/opencode-api.md: variants; docs/copilot-api.md: reasoningEffort).
+   */
+  efforts: string[];
   /** The runtime's own record, for price and capability lookups (costs.ts, api.ts). */
   raw: any;
 }
@@ -79,6 +84,8 @@ export interface NewSession {
   permissions: PermissionRule[];
   /** Symbio's MCP tool server for the session's folder. */
   toolsUrl: string;
+  /** A reasoning effort level the model takes (one of its `efforts`); unset: the model's default. */
+  effort?: string;
 }
 
 export interface AgentRuntime extends EventEmitter<RuntimeEvents> {
@@ -90,6 +97,11 @@ export interface AgentRuntime extends EventEmitter<RuntimeEvents> {
   readonly lastError: string | null;
   readonly restarts: number;
   readonly lastMemory: number | null;
+  /**
+   * Whether agents working in a folder may add a `Co-authored-by` line naming the AI to their commits
+   * (a project setting; off unless the project allows it). Set by the team; read when a session opens.
+   */
+  commitCoauthors?: (directory: string) => boolean;
 
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -115,7 +127,8 @@ export interface AgentRuntime extends EventEmitter<RuntimeEvents> {
   /** Adds text to the conversation without starting a turn; the agent sees it on its next turn. */
   note(sessionId: string, text: string): Promise<void>;
   interrupt(sessionId: string): Promise<void>;
-  switchModel(sessionId: string, model: string): Promise<void>;
+  /** Changes the session's model and reasoning effort (null: the model's default). */
+  switchModel(sessionId: string, model: string, effort?: string | null): Promise<void>;
 
   /** Ids of queued prompts not yet in the conversation. */
   queued(sessionId: string): Promise<string[]>;

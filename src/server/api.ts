@@ -273,6 +273,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
         name: m.name,
         vision: modelSupportsImages(m.raw),
         free: isFree(m.raw),
+        efforts: m.efforts,
       })),
     );
   });
@@ -586,7 +587,30 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       reviewBy?: ReviewBy;
       coreModels?: string[];
       coreOnlyModels?: string[];
+      modelEfforts?: Record<string, string | null>;
+      aiCoauthors?: boolean;
     }>();
+    if (body.modelEfforts && typeof body.modelEfforts === "object") {
+      try {
+        const runtime = await team.runtimeFor(project);
+        for (const [model, level] of Object.entries(body.modelEfforts)) {
+          if (!project.allowedModels.includes(model) && !body.allowedModels?.includes(model)) throw new Error(`${model} isn't one of the project's models.`);
+          if (level === null) continue;
+          const levels = await team.levelsOf(runtime, model);
+          if (typeof level !== "string" || !levels.includes(level)) {
+            throw new Error(levels.length ? `${model} takes these reasoning effort levels: ${levels.join(", ")}.` : `${model} has no reasoning effort levels to choose.`);
+          }
+        }
+      } catch (err) {
+        return c.json({ error: (err as Error).message }, 400);
+      }
+      await team.setModelEfforts(project, body.modelEfforts);
+    }
+    const coauthorsChanged = typeof body.aiCoauthors === "boolean" && body.aiCoauthors !== (project.aiCoauthors === true);
+    if (coauthorsChanged) {
+      if (body.aiCoauthors) project.aiCoauthors = true;
+      else delete project.aiCoauthors;
+    }
     if (body.reviewBy === "core" || body.reviewBy === "every" || body.reviewBy === "marked") await team.setReviewBy(project, body.reviewBy);
     if (body.coreMode === "auto" || body.coreMode === "plan" || body.coreMode === "act") await team.setCoreMode(project, body.coreMode);
     if (typeof body.subRepositories === "boolean") {
@@ -651,8 +675,8 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     }
     await store.update(project);
     bus.publish({ type: "project.updated", projectId: project.id });
-    if (body.allowedModels?.length || rolesChanged || body.name?.trim() || body.connections) {
-      // Briefs mention the project name and allowed models.
+    if (body.allowedModels?.length || rolesChanged || body.name?.trim() || body.connections || coauthorsChanged) {
+      // Briefs mention the project name, allowed models and whether commits may name the AI.
       for (const agent of project.agents.filter((a) => a.status !== "stopped")) {
         await team.refreshInstructions(project, agent).catch(() => {});
       }
@@ -1011,6 +1035,20 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     if (typeof body.pinned !== "boolean") return c.json({ error: "pinned (true/false) is required" }, 400);
     try {
       await team.pinModel(project, agent, body.pinned, "human");
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    return c.json(agent);
+  });
+
+  // An agent's own reasoning effort level (null: the project's level for its model).
+  api.post("/projects/:id/agents/:agentId/effort", async (c) => {
+    const project = withProject(c.req.param("id"));
+    const agent = withAgent(project, c.req.param("agentId"));
+    const body = await c.req.json<{ level?: string | null }>();
+    if (body.level !== null && typeof body.level !== "string") return c.json({ error: "level (a level the model takes, or null) is required" }, 400);
+    try {
+      await team.setEffort(project, agent, body.level || null, "human");
     } catch (err) {
       return c.json({ error: (err as Error).message }, 400);
     }

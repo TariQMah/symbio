@@ -23,7 +23,7 @@ import path from "node:path";
 
 const MODELS = [
   { id: "auto", name: "Auto" },
-  { id: "scripted", name: "Scripted", capabilities: { supports: { vision: true } } },
+  { id: "scripted", name: "Scripted", capabilities: { supports: { vision: true, reasoningEffort: true } }, supportedReasoningEfforts: ["low", "medium", "high"] },
   { id: "scripted-2", name: "Scripted 2", capabilities: { supports: {} } },
   { id: "unavailable", name: "Unavailable", capabilities: { supports: {} } },
   { id: "flaky", name: "Flaky", capabilities: { supports: {} } },
@@ -58,6 +58,7 @@ class FakeClient {
       name: config.name ?? "",
       directory: config.workingDirectory ?? process.cwd(),
       model: config.model ?? "scripted",
+      effort: config.reasoningEffort ?? null,
       config,
       events: [],
       handlers: new Set(),
@@ -105,8 +106,10 @@ function view(state) {
       state.ctl.aborted = true;
       state.ctl.onAbort?.();
     },
-    async setModel(model) {
+    async setModel(model, options) {
       state.model = model;
+      // Like Copilot: without a level, the session keeps its last one (verified).
+      if (options?.reasoningEffort) state.effort = options.reasoningEffort;
       record(state, "session.model_change", { newModel: model });
     },
     async getEvents() {
@@ -253,6 +256,11 @@ async function callSymbio(state, name, args) {
 
 async function runStep(state, step, ctl) {
   switch (step.kind) {
+    // "@core effort": says the reasoning effort level its session is on; "@core coauthor": whether Copilot would add its line.
+    case "effort":
+      return say(state, `effort: ${state.effort ?? "default"}`);
+    case "coauthor":
+      return say(state, `coauthor: ${state.config.coauthorEnabled === false ? "off" : "on"}`);
     case "say":
       return say(state, step.rest);
     case "wait":

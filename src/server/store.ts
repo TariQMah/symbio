@@ -41,6 +41,11 @@ export interface Agent {
    * switching to another allowed model. Set by the human (chat header) or core (spawn_agent, pin_model).
    */
   modelPinned?: { by: "human" | "coordinator"; at: number } | null;
+  /**
+   * The agent's own reasoning effort level, over the project's level for its model (modelEfforts).
+   * Used while its model takes that level; otherwise the model's default. Set by the human or core.
+   */
+  effort?: { level: string; by: "human" | "coordinator" } | null;
   /** A pinned agent waiting for its model to respond again: the next retry, which one, since when. */
   modelWait?: { until: number; attempt: number; since: number; error: string; alerted?: boolean } | null;
   status: AgentStatus;
@@ -88,6 +93,13 @@ export interface Project {
   coreModels?: string[];
   /** Allowed models only core may use (the locks): helpers never get them. */
   coreOnlyModels?: string[];
+  /** Reasoning effort level per model ("low", "high"…, as the model lists them); a model not here uses its default. */
+  modelEfforts?: Record<string, string>;
+  /**
+   * Whether agents may add `Co-authored-by` lines naming the AI to their commits. Off (unset) by
+   * default: they're told not to, and GitHub Copilot CLI is configured not to.
+   */
+  aiCoauthors?: boolean;
   docsLocation: DocsLocation;
   /** Whether the folder was empty ("new") or had content ("existing") when the project was created. */
   origin: "new" | "existing";

@@ -41,7 +41,7 @@ Symbio stops a server left behind by a previous run, if it's still running.
 | A session's file changes over a range of turns | `GET /api/session/{id}/diff?from=<user message id>&to=<user message id>&context=<lines>` → `data: [{file, status, additions, deletions, patch}]` |
 | Add to the conversation without a turn | `POST /api/session/{id}/synthetic` `{text, delivery, resume}` |
 | Interrupt (watchdog, pause) | `POST /api/session/{id}/interrupt` |
-| Switch model | `POST /api/session/{id}/model` `{model: {providerID, id}}` |
+| Switch model | `POST /api/session/{id}/model` `{model: {providerID, id, variant?}}` |
 | Pending inbox items / cancel one | `GET /api/session/{id}/inbox`, `DELETE /api/session/{id}/inbox/{itemID}` |
 | Briefs (per-session instructions) | `PUT` / `DELETE /api/experimental/session/{id}/instructions/entries/{key}` `{value}` |
 | Permission requests | events `permission.asked` / `permission.replied`; reply `POST /api/session/{id}/permission/{requestID}/reply` with `once`, `always` or `reject` |
@@ -59,6 +59,20 @@ Symbio stops a server left behind by a previous run, if it's still running.
 Event types Symbio reacts to include `session.execution.started` / `.succeeded` / `.failed` (busy
 and idle), `session.text.*`, `session.reasoning.*`, `session.tool.*` (live output), retry events,
 `session.usage.updated` (tokens and cost), `permission.asked` and form events.
+
+## Reasoning effort (variants)
+
+Verified on 2.1.4 (the free models of a fresh install; contract test):
+
+- `GET /api/model` gives each model `variants: [{id, settings: {reasoningEffort}}]`, e.g.
+  `low` / `high` / `max`, or `none` … `max`; an empty array when there's nothing to choose. The ids are
+  the levels Symbio offers (`opencode/runtime.ts` `variantsOf`).
+- A model reference takes one: `{providerID, id, variant}` (the OpenAPI schema `Model.Ref`), on
+  `POST /api/session` and `POST /api/session/{id}/model`. `GET /api/session/{id}` shows it in `model`.
+- A switch without `variant` puts the session back on the model's default (it then reads
+  `variant: "default"`).
+- A turn's assistant message records the variant it ran with (`model.variant`); one ran on `max`
+  showed reasoning in its content.
 
 ## Behaviors worth knowing
 

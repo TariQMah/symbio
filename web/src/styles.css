@@ -1067,3 +1067,8 @@ button.wb-status-item.attention:hover { background: var(--amber); color: var(--o
 .wb-resizer:focus-visible { outline: none; }
 body.resizing { cursor: col-resize; user-select: none; }
 body.resizing iframe { pointer-events: none; }
+
+/* Reasoning effort (Effort.tsx): next to the model in a chat header, and per model in project settings. */
+.effort-select { margin-left: 4px; }
+.effort-row { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.effort-row select { width: 150px; flex: none; }

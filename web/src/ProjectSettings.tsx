@@ -8,6 +8,7 @@ import { RemoveDialog } from "./ProjectMenu";
 import { UsageSection } from "./Usage";
 import { HousekeepingSection } from "./Housekeeping";
 import { RuntimeSection } from "./SwitchRuntime";
+import { EffortSection } from "./Effort";
 
 /** Project configuration: name, connections, models, remembered permissions, removal. */
 export function ProjectSettings({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
@@ -19,6 +20,7 @@ export function ProjectSettings({ project, onChanged }: { project: Project; onCh
         <Connections project={project} onChanged={onChanged} />
         <RuntimeSection project={project} />
         <Models project={project} onChanged={onChanged} />
+      <EffortSection project={project} onChanged={onChanged} />
         <Team project={project} onChanged={onChanged} />
         <UsageSection project={project} />
         <HousekeepingSection project={project} />
@@ -178,6 +180,7 @@ function Team({ project, onChanged }: { project: Project; onChanged: (p: Project
           </span>
         </div>
         {project.subRepositories !== undefined && <RepositoriesChoice project={project} onChanged={onChanged} />}
+        <CoauthorsChoice project={project} onChanged={onChanged} />
         <div className="field">
           <span>Who reviews the work</span>
           <div className="seg">
@@ -235,6 +238,39 @@ function Team({ project, onChanged }: { project: Project; onChanged: (p: Project
         }}
       />
     </section>
+  );
+}
+
+/** Whether commits may name the AI as a co-author (Project.aiCoauthors; off by default). Applies at once. */
+function CoauthorsChoice({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function choose(on: boolean) {
+    if (on === !!project.aiCoauthors) return;
+    setBusy(true);
+    try {
+      onChanged(await api.updateProject(project.id, { aiCoauthors: on }));
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="field">
+      <span>AI co-authors in commits</span>
+      <div className="seg">
+        <button className={!project.aiCoauthors ? "on" : ""} disabled={busy} onClick={() => choose(false)}>
+          Leave them out
+        </button>
+        <button className={project.aiCoauthors ? "on" : ""} disabled={busy} onClick={() => choose(true)}>
+          Allow them
+        </button>
+      </div>
+      <span className="hint">
+        Some agent runtimes add a <code>Co-authored-by</code> line naming the AI to every commit (GitHub Copilot CLI does).
+        "Leave them out": agents are told not to add one, and Copilot's own line is turned off. Commits made before keep theirs.
+      </span>
+    </div>
   );
 }
 

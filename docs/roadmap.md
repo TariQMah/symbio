@@ -8,32 +8,19 @@ welcome (open an issue). Each item in Next has an issue with where to start; tho
 ## Now
 
 Nothing in progress: the next items are open to anyone (see their issues). The likely next step
-for the maintainers is reasoning effort per model.
+for the maintainers is task priorities.
 
 ## Next
 
-1. **Reasoning effort per model.** ([#1](https://github.com/linkzy/symbio/issues/1)) Many models can think less or more (low, medium, high…): choose it
-   per model in a project's models (e.g. core on Sonnet *high*, helpers on Sonnet *medium*), and per
-   agent from the model menu in its chat. Kept by Symbio, so it survives fresh sessions, model
-   fallback and runtime switches; a level the runtime doesn't offer falls back to the model's
-   default. GitHub Copilot CLI lists each model's levels and takes one per session or model change
-   (`reasoningEffort`, seen in the SDK's types); OpenCode records a model *variant* per turn, to be
-   verified live (listing and choosing variants) and written down in opencode-api.md first. Higher
-   effort costs more tokens, so the price simulator mentions it. Both stand-in runtimes take it, so
-   the end-to-end tests cover it on each.
-2. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
+1. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
    change it (its plan tools take it), the human can change it on the board, and core is told when
    the human does, so it picks up urgent work first. Helpers see it with their task.
-3. **Commits without AI co-author lines** ([#20](https://github.com/linkzy/symbio/issues/20)): a
-   project setting to keep `Co-authored-by` lines naming AI tools (GitHub Copilot CLI adds one) out
-   of the project's commits: agents are told not to add them, and Symbio removes any left when it
-   merges a helper's work.
-4. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
+2. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
    stuck agent) or a task finishes, send it where they are: browser/phone notifications, and
    optionally a messaging app (e.g. Telegram) or e-mail, with per-project choices. Essential for
    steering Symbio away from the computer.
-5. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
+3. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
    the car over Bluetooth, with Symbio working on the computer at home (remote access). Not just
    dictation into the chat box:
    - Only what core says to the human is read aloud: never tool calls, command output, messages
@@ -48,29 +35,29 @@ for the maintainers is reasoning effort per model.
    Builds on the phone layout and on telling apart, in core's replies, what's for the human from
    the team's work. To check first: the browsers' own speech recognition and voices (quality,
    languages, whether they keep working with the screen off) against a speech service.
-6. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
+4. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
    at a threshold and the team paused when it's reached, using the cost tracking Symbio already
    has.
-7. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
+5. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
    every Monday"): Symbio wakes core at the set time with the job, and the human sees the runs and
    their results.
-8. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
+6. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
    Keychain on macOS); headless Linux (a server or container) has no keyring, so it needs a
    fallback, such as a key file readable only by the user.
-9. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
+7. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
    two-minute video of core running a team on a non-coding project, and a short GitHub Pages site
    with screenshots ([#19](https://github.com/linkzy/symbio/issues/19)). First audience: the
    OpenCode and GitHub Copilot CLI communities. Done: the README's animation of a real session, and
    a social preview image.
-10. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
+8. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
    repository (GitHub, Azure DevOps or any git URL, using the matching connection when it's private)
    into a folder and open it as a project, e.g. to continue on another computer. Tucked under an
    advanced option, so it doesn't get in the way of people who don't use git.
-11. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
+9. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-12. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
-13. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
+10. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
+11. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
 **Small improvements**, each with an issue and where to start, open to anyone: copy buttons in the
@@ -143,6 +130,8 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.21.0** — Reasoning effort per model and per agent (#1); AI co-author lines left out of commits unless
+  the project allows them (#20).
 - **0.20.0** — Workbench: views in the activity bar, closable tabs, resizable side bar and chat.
 - **0.19.0** — Import a VS Code color theme (#2, step 4 of 4).
 - **0.18.0** — The Workbench layout (activity bar, side bar, the work in the middle, the chat on the right,

@@ -102,6 +102,26 @@ test("sessions: create, read, permissions, model, children", async () => {
   assert.ok(Array.isArray(children?.data), "listing child sessions returns data[]");
 });
 
+test("reasoning effort: models list variants, and a session's model takes one (created and switched)", async (t) => {
+  const listed = await runtime.listModels();
+  const withLevels = listed.find((m) => m.efforts.length >= 2);
+  if (!withLevels) return t.skip("no model with variants in this OpenCode's free catalog");
+  const ref = `${withLevels.providerID}/${withLevels.id}`;
+  const [first, second] = withLevels.efforts;
+  const id = await runtime.createSession({ title: "contract · effort", directory: work, model: ref, permissions: [], toolsUrl: "http://127.0.0.1:1/mcp/none", effort: first });
+  try {
+    const read = async () => (await client.request("GET", `/api/session/${id}`))?.data?.model;
+    assert.equal((await read())?.variant, first, "the variant it was created with");
+    await runtime.switchModel(id, ref, second);
+    assert.equal((await read())?.variant, second, "switched");
+    await runtime.switchModel(id, ref, null);
+    // A switch without a variant records "default" (verified on 2.1.4).
+    assert.ok([undefined, "default"].includes((await read())?.variant), "back to the model's default");
+  } finally {
+    await client.request("DELETE", `/api/session/${id}`).catch(() => {});
+  }
+});
+
 test("instructions (experimental): set and remove an entry", async () => {
   await client.setInstruction(sessionId, "symbio-role", "You are a contract test.");
   await client.setInstruction(sessionId, "symbio-role", "Replaced.");

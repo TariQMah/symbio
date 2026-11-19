@@ -37,7 +37,19 @@ const newId = (prefix) => `${prefix}_${Date.now().toString(16)}${(++seq).toStrin
 const now = () => Date.now();
 
 const MODELS = [
-  { providerID: "fake", id: "scripted", name: "Scripted", cost: { input: 1, output: 2 }, limit: { context: 200000 }, capabilities: { input: { image: true } } },
+  // Reasoning effort levels are "variants", as OpenCode 2.x lists them (docs/opencode-api.md).
+  {
+    providerID: "fake",
+    id: "scripted",
+    name: "Scripted",
+    cost: { input: 1, output: 2 },
+    limit: { context: 200000 },
+    capabilities: { input: { image: true } },
+    variants: [
+      { id: "low", settings: { reasoningEffort: "low" } },
+      { id: "high", settings: { reasoningEffort: "high" } },
+    ],
+  },
   { providerID: "fake", id: "scripted-2", name: "Scripted 2", cost: { input: 1, output: 2 }, limit: { context: 200000 } },
   { providerID: "fake", id: "unavailable", name: "Unavailable", cost: { input: 0, output: 0 }, limit: { context: 200000 } },
   { providerID: "fake", id: "flaky", name: "Flaky", cost: { input: 0, output: 0 }, limit: { context: 200000 } },
@@ -178,6 +190,12 @@ const denied = (session, action, resource) => session.permissions.some((r) => r.
 
 async function runStep(session, step, ctl) {
   switch (step.kind) {
+    // "@core effort": says the reasoning effort level its session is on.
+    case "effort":
+      return sayStep(session, `effort: ${session.model.variant ?? "default"}`);
+    // "@core coauthor": whether the agent was told to leave AI co-author lines out of commits.
+    case "coauthor":
+      return sayStep(session, `coauthor: ${Object.values(session.instructions).some((v) => String(v).includes("Co-authored-by")) ? "off" : "on"}`);
     case "say":
       return sayStep(session, step.rest);
     case "wait":

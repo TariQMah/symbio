@@ -244,6 +244,20 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "unpins a helper; use it when the human wants a specific model for the work. The human can pin from the helper's chat, " +
       "and only they can unpin what they pinned. list_team shows pins.",
   },
+  {
+    id: "2026-11-19-reasoning-effort",
+    text:
+      "Reasoning effort: many models can think less or more (low, medium, high…). The human can set a level per model in the " +
+      "project's settings and per agent from its chat. spawn_agent takes effort, and set_effort changes a helper's level (or " +
+      "'default' for the project's setting); a level the model doesn't take is refused with the ones it does. Higher levels cost " +
+      "more tokens: save them for hard work. You can't change a level the human set. list_team shows each agent's level.",
+  },
+  {
+    id: "2026-11-19-no-ai-coauthors",
+    text:
+      "Commits: unless the human allows it in the project's settings, commit messages must not have Co-authored-by (or similar) " +
+      "lines naming an AI tool or model. On GitHub Copilot CLI, Symbio also turns off the line Copilot adds by itself.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

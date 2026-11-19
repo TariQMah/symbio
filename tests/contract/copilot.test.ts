@@ -97,6 +97,22 @@ test("the user's own providers (providers.json in their Copilot folder) are offe
   assert.equal(current.modelId, ref, "the session runs on it (no turn: that would bill the user's provider)");
 });
 
+test("reasoning effort: models list their levels, and a session takes one when created and when its model changes", async (t) => {
+  if (skip) return t.skip(skip);
+  const models = await runtime.listModels();
+  const withLevels = models.find((m) => m.providerID === "copilot" && m.efforts.length >= 2);
+  assert.ok(withLevels, "Copilot's models list their levels (supportedReasoningEfforts)");
+  const ref = `copilot/${withLevels.id}`;
+  const [first, second] = withLevels.efforts;
+  // No turn: nothing is billed.
+  const id = await runtime.createSession({ title: "Contract · effort", directory: work, model: ref, permissions: AGENT_PERMISSIONS, toolsUrl, effort: first });
+  sessions.push(id);
+  const current = () => (runtime as any).open.get(id).session.rpc.model.getCurrent();
+  assert.equal((await current()).reasoningEffort, first, "the level it was created with");
+  await runtime.switchModel(id, ref, second);
+  assert.equal((await current()).reasoningEffort, second, "changed with the model");
+});
+
 test("signing in starts a GitHub device-code flow, and can be cancelled", async (t) => {
   if (skip) return t.skip(skip);
   const code = await runtime.beginSignIn();

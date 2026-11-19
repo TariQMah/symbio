@@ -131,6 +131,29 @@ nothing (`totalNanoAiu: 0`; the provider bills). Symbio reads the file where it 
 session opens (never copied), gives its entries to every session, and lists its models after
 Copilot's; keys never leave the server.
 
+## Reasoning effort
+
+- `listModels()`: models that take levels have `capabilities.supports.reasoningEffort: true` and
+  `supportedReasoningEfforts` (e.g. `["low","medium","high","xhigh","max"]`, some with `"none"`);
+  `defaultReasoningEffort` was absent for all of them (1.0.112). Your own providers' models list
+  neither.
+- A session takes a level when created (`reasoningEffort`) and when its model changes
+  (`session.setModel(id, { reasoningEffort })`); `rpc.model.getCurrent()` reports it (contract test).
+  Resuming a session keeps its level.
+- `setModel(id)` without a level **keeps the session's last one**, so Symbio passes `medium` (or the
+  model's default, when listed) to go back to the default. A new session with no level ran at
+  `medium` (seen in `assistant.usage`).
+- Your own providers' models take a level too (verified with Claude Haiku on Azure AI Foundry:
+  `assistant.usage.reasoningEffort` was the level given, `low` through `max`, and higher levels
+  produced more output tokens). Copilot doesn't check the level for them (an unknown one was
+  passed on as is), so Symbio offers `low` … `max` for them.
+
+## Co-author lines in commits
+
+The runtime tells its agent to add a `Co-authored-by` trailer to commits it writes unless the
+session is created or opened with `coauthorEnabled: false` (SDK `SessionConfig`; default `true`).
+Symbio passes `false` unless the project allows AI co-authors (`Project.aiCoauthors`).
+
 ## Signing in
 
 `session.rpc.accounts.login.begin({ kind: "githubDotCom", method: "device-code" })` →
@@ -192,6 +215,8 @@ only, so it costs nothing.
 | Background processes | `rpc.tasks.list` / `rpc.tasks.cancel`, ids `<session>:<task>` |
 | Prices | `billing.tokenPrices` / 100, as dollars per million tokens; your own providers' models from the price book |
 | Your own providers | `providers.json` in your Copilot folder, read as it is, given to every session (`providers` + `models`) |
+| Reasoning effort | `reasoningEffort` on `createSession` / `setModel`; levels from `supportedReasoningEfforts` (`low` … `max` for your own providers' models) |
+| Co-author lines | `coauthorEnabled: false` unless the project allows them |
 | Briefs | Symbio's tools named as Copilot shows them (`symbio-<name>`) |
 
 | Memory, crashes | the runtime process (`copilot-runtime.exe --headless --stdio`, the client's `cliProcess`, not public API) measured like OpenCode's and recycled by the watchdog; `processExitPromise` marks it crashed and starts it again |

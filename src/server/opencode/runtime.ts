@@ -160,7 +160,7 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
 
   async listModels(): Promise<RuntimeModel[]> {
     const models = await this.api().listModels();
-    return models.map((m: any) => ({ providerID: String(m.providerID), id: String(m.id), name: String(m.name ?? m.id), raw: m }));
+    return models.map((m: any) => ({ providerID: String(m.providerID), id: String(m.id), name: String(m.name ?? m.id), efforts: variantsOf(m), raw: m }));
   }
 
   async createSession(opts: NewSession): Promise<string> {
@@ -168,7 +168,7 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
     const session = await this.api().createSession({
       title: opts.title,
       directory: opts.directory,
-      model: parseModel(opts.model),
+      model: parseModel(opts.model, opts.effort),
       permissions: opts.permissions,
     });
     return session.id;
@@ -201,8 +201,9 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
     await this.api().interrupt(sessionId);
   }
 
-  async switchModel(sessionId: string, model: string): Promise<void> {
-    await this.api().switchModel(sessionId, parseModel(model));
+  async switchModel(sessionId: string, model: string, effort?: string | null): Promise<void> {
+    // Without a variant the session goes back to the model's default (verified).
+    await this.api().switchModel(sessionId, parseModel(model, effort));
   }
 
   async queued(sessionId: string): Promise<string[]> {
@@ -486,4 +487,12 @@ export function sumProcessTree(listing: string, root: number): number {
     stack.push(...(children.get(pid) ?? []));
   }
   return total;
+}
+
+/** A model's variants (its reasoning effort levels): `[{id, settings}]` in OpenCode 2.x (verified), an object in some builds. */
+export function variantsOf(model: any): string[] {
+  const v = model?.variants;
+  if (Array.isArray(v)) return v.map((x: any) => (typeof x === "string" ? x : x?.id)).filter((x: unknown): x is string => typeof x === "string" && !!x);
+  if (v && typeof v === "object") return Object.keys(v);
+  return [];
 }

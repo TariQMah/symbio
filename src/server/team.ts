@@ -103,6 +103,7 @@ export class Team implements TeamCore {
 
   /** The agent runtimes, by kind. The first one given is the default (OpenCode). */
   readonly runtimes = new Map<RuntimeKind, AgentRuntime>();
+  private readonly levelCache = new Map<RuntimeKind, { at: number; levels: Map<string, string[]> }>();
   /** The default runtime: OpenCode. */
   readonly runtime: AgentRuntime;
 
@@ -115,6 +116,7 @@ export class Team implements TeamCore {
     this.runtime = list[0];
     for (const runtime of list) {
       this.runtimes.set(runtime.kind, runtime);
+      runtime.commitCoauthors = (directory) => this.coauthorsAllowed(directory);
       runtime.on("event", (e) => this.onEvent(e));
       runtime.on("state", (state) => {
         const kind = runtime.kind;
@@ -523,6 +525,7 @@ export class Team implements TeamCore {
       model: project.coordinatorModel,
       permissions: this.permissionsFor(project, { role: "coordinator" }),
       toolsUrl: this.toolsUrl(project, project.directory),
+      effort: await this.effortFor(project, null, project.coordinatorModel, runtime),
     });
 
     const agent: Agent = {
@@ -567,6 +570,8 @@ export class Team implements TeamCore {
       byHuman?: boolean;
       /** Keep it on its model: never switched to another when it fails (see ModelFallback). */
       pinModel?: boolean;
+      /** Its own reasoning effort level (one its model takes). */
+      effort?: string;
     },
   ): Promise<string> {
     if (!opts.byHuman && !opts.task && !opts.taskId) throw new Error("Give the helper a task: a plan task_id, or a task description.");
@@ -607,14 +612,20 @@ export class Team implements TeamCore {
           "(it gets its own copy of that repository), or use workspace \"shared\" to have it work in the project folder.",
       );
     }
-    const workspace = await createWorkspace(project, name, mode, repo);
     const runtime = await this.runtimeFor(project);
+    const effort = opts.effort?.trim() ? { level: opts.effort.trim(), by: opts.byHuman ? ("human" as const) : ("coordinator" as const) } : null;
+    if (effort) {
+      const levels = await this.levelsOf(runtime, model);
+      if (!levels.includes(effort.level)) throw new Error(levelError(model, effort.level, levels));
+    }
+    const workspace = await createWorkspace(project, name, mode, repo);
     const sessionId = await runtime.createSession({
       title: `${project.name} · ${name}`,
       directory: workspace.directory,
       model,
       permissions: AGENT_PERMISSIONS,
       toolsUrl: this.toolsUrl(project, workspace.directory),
+      effort: await this.effortFor(project, { effort }, model, runtime),
     });
     const agent: Agent = {
       id: newId("agt"),
@@ -630,6 +641,7 @@ export class Team implements TeamCore {
       workSince: Date.now(),
       model,
       ...(opts.pinModel ? { modelPinned: { by: opts.byHuman ? ("human" as const) : ("coordinator" as const), at: Date.now() } } : {}),
+      ...(effort ? { effort } : {}),
       status: "idle",
       lastActivity: Date.now(),
       createdAt: Date.now(),
@@ -759,6 +771,7 @@ export class Team implements TeamCore {
       model: agent.model,
       permissions: this.permissionsFor(project, agent),
       toolsUrl: this.toolsUrl(project, agent.directory),
+      effort: await this.effortFor(project, agent, agent.model, runtime),
     });
     agent.previousSessions = [...(agent.previousSessions ?? []), { sessionId: oldSession, endedAt: Date.now(), runtime: runtimeOf(agent) }];
     agent.sessionId = sessionId;
@@ -895,6 +908,7 @@ export class Team implements TeamCore {
           model,
           permissions: this.permissionsFor(project, agent),
           toolsUrl: this.toolsUrl(project, agent.directory),
+          effort: await this.effortFor(project, agent, model, target),
         });
         created.push({ agent, sessionId, model, handoff });
         this.switches.advance(progress);
@@ -1014,6 +1028,7 @@ export class Team implements TeamCore {
       model,
       permissions: this.permissionsFor(project, agent),
       toolsUrl: this.toolsUrl(project, agent.directory),
+      effort: await this.effortFor(project, agent, model, target),
     });
     accountUsage(agent, agent.usage ?? emptyUsage());
     agent.previousSessions = [
@@ -1354,7 +1369,8 @@ export class Team implements TeamCore {
   }
 
   async setModel(project: Project, agent: Agent, model: string) {
-    await this.rt(agent).switchModel(agent.sessionId, model);
+    const runtime = this.rt(agent);
+    await runtime.switchModel(agent.sessionId, model, (await this.effortFor(project, agent, model, runtime)) ?? null);
     agent.model = model;
     // Waiting for a pinned model that was just replaced: nothing to wait for any more (the pin follows the new one).
     if (agent.modelWait) {
@@ -1401,6 +1417,82 @@ export class Team implements TeamCore {
       await this.fallback.onFailure(project, agent, { type: "provider.error", message: waiting });
     }
     return text;
+  }
+
+  // ---------------------------------------------------------------- reasoning effort
+
+  /** The reasoning effort levels a model takes in a runtime (cached for a few minutes). */
+  async levelsOf(runtime: AgentRuntime, model: string): Promise<string[]> {
+    let cache = this.levelCache.get(runtime.kind);
+    if (!cache || Date.now() - cache.at > 5 * 60_000 || !cache.levels.has(model)) {
+      const models = await runtime.listModels().catch(() => null);
+      if (models) {
+        cache = { at: Date.now(), levels: new Map(models.map((m) => [`${m.providerID}/${m.id}`, m.efforts ?? []])) };
+        this.levelCache.set(runtime.kind, cache);
+      }
+    }
+    return cache?.levels.get(model) ?? [];
+  }
+
+  /**
+   * The level an agent's session uses on a model: its own level, else the project's for the model,
+   * when the model takes it; otherwise none (the model's default).
+   */
+  async effortFor(project: Project, agent: Pick<Agent, "effort"> | null, model: string, runtime: AgentRuntime): Promise<string | undefined> {
+    const wanted = [agent?.effort?.level, project.modelEfforts?.[model]].filter((l): l is string => !!l);
+    if (!wanted.length) return undefined;
+    const levels = await this.levelsOf(runtime, model);
+    return wanted.find((l) => levels.includes(l));
+  }
+
+  /** Sets an agent's own reasoning effort level (null: back to the project's level for its model). core can't change the human's. */
+  async setEffort(project: Project, agent: Agent, level: string | null, by: "human" | "coordinator"): Promise<string> {
+    if (agent.status === "stopped") throw new Error(`${agent.name} is stopped.`);
+    if (by === "coordinator" && agent.effort?.by === "human" && agent.effort.level !== level) {
+      throw new Error(`The human set ${agent.name}'s reasoning effort to ${agent.effort.level}; only they can change it.`);
+    }
+    const runtime = this.rt(agent);
+    if (level) {
+      const levels = await this.levelsOf(runtime, agent.model);
+      if (!levels.includes(level)) throw new Error(levelError(agent.model, level, levels));
+    }
+    agent.effort = level ? { level, by } : null;
+    const effective = await this.effortFor(project, agent, agent.model, runtime);
+    await runtime.switchModel(agent.sessionId, agent.model, effective ?? null);
+    await this.store.update(project);
+    bus.publish({ type: "project.updated", projectId: project.id });
+    const text = `${agent.name}'s reasoning effort: ${effective ?? "the model's default"}${level ? "" : " (as set for its model in the project)"}.`;
+    await this.log(project, { from: "symbio", to: "human", kind: "system", text: `${text} (${by === "human" ? "by the human" : "by core"})` });
+    const coordinator = this.coordinator(project);
+    if (by === "human" && coordinator && coordinator.id !== agent.id && active(coordinator)) {
+      await this.note(project, coordinator, `Symbio: the human set ${text}`);
+    }
+    return text;
+  }
+
+  /** Sets the project's level per model and applies it to the agents on those models that have no level of their own. */
+  async setModelEfforts(project: Project, efforts: Record<string, string | null>) {
+    const next = { ...(project.modelEfforts ?? {}) };
+    for (const [model, level] of Object.entries(efforts)) {
+      if (level) next[model] = level;
+      else delete next[model];
+    }
+    const changed = Object.keys(efforts);
+    project.modelEfforts = Object.keys(next).length ? next : undefined;
+    await this.store.update(project);
+    for (const agent of project.agents.filter((a) => active(a) && !a.effort && changed.includes(a.model))) {
+      const runtime = this.runtimes.get(runtimeOf(agent));
+      if (runtime?.state !== "running") continue; // applied when its session next changes
+      const effort = await this.effortFor(project, agent, agent.model, runtime);
+      await runtime.switchModel(agent.sessionId, agent.model, effort ?? null).catch((err) => console.error(`[team] effort for ${agent.name}:`, err.message));
+    }
+    bus.publish({ type: "project.updated", projectId: project.id });
+  }
+
+  /** Whether agents working in this folder may add AI co-author lines to commits (the project's setting). */
+  coauthorsAllowed(directory: string): boolean {
+    const same = (a: string) => path.resolve(a).toLowerCase() === path.resolve(directory).toLowerCase();
+    return this.store.list().some((p) => p.aiCoauthors === true && (same(p.directory) || p.agents.some((a) => same(a.directory))));
   }
 
   history(agent: Agent) {
@@ -1699,3 +1791,8 @@ export class Team implements TeamCore {
 
 export type { PendingPermission } from "./team/permissions.js";
 export type { HousekeepingReport } from "./team/housekeeper.js";
+
+const levelError = (model: string, level: string, levels: string[]) =>
+  levels.length
+    ? `${model} doesn't take the reasoning effort "${level}". Its levels: ${levels.join(", ")}.`
+    : `${model} has no reasoning effort levels to choose.`;

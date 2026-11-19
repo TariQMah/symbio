@@ -118,7 +118,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 The UI (`web/src/`) is React + Vite with Motion for animation and lucide icons. `api.ts` is its
 client; `ProjectView.tsx` holds the project screen (team sidebar and tabs), `Chat.tsx` renders a
 live session (with `steps.ts` labelling the team's steps in plain words, and `files.tsx` and `paths.ts` turning paths
-into links, showing shared files as cards and the viewer page that opens them), `Kanban.tsx` the plan, `Explorer.tsx` the project's folders and files (read-only), `Messages.tsx` the message log, `Attachments.tsx` attachments in the chat and the Files tab, `Docs.tsx` the Docs tab and
+into links, showing shared files as cards and the viewer page that opens them), `Effort.tsx` reasoning effort (in a chat header and project settings), `Kanban.tsx` the plan, `Explorer.tsx` the project's folders and files (read-only), `Messages.tsx` the message log, `Attachments.tsx` attachments in the chat and the Files tab, `Docs.tsx` the Docs tab and
 `Rules.tsx` the rules register in it, `Inbox.tsx` the *Needs you* drawer, `Usage.tsx` tokens and
 costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
 `Settings.tsx`/`Providers.tsx` the global settings. `styles.css` holds the design tokens (colors,
@@ -175,6 +175,15 @@ bar), from the same pieces.
   won't fix (the model is gone, the key is refused) are reported at once. Unpinning a waiting agent
   switches it right away; only the human can unpin what they pinned; a runtime switch, or the model
   leaving the project's models, releases the pin.
+- **Reasoning effort.** Each runtime lists the levels a model takes (`RuntimeModel.efforts`: OpenCode's
+  variants, Copilot's `supportedReasoningEfforts`). A session runs at the agent's own level
+  (`Agent.effort`: from its chat, or core's `spawn_agent effort` / `set_effort`; core can't change the
+  human's), else the project's level for the model (`Project.modelEfforts`, in its settings), when the
+  model takes it; otherwise at the model's default (`Team.effortFor`). It's given when a session is
+  created and with every model change, so it survives fresh sessions, fallback and runtime switches.
+- **AI co-authors in commits.** Unless the project allows them (`Project.aiCoauthors`, off by
+  default), the briefs tell agents to leave `Co-authored-by` lines naming an AI out of commits, and
+  Copilot sessions are opened with `coauthorEnabled: false` (`AgentRuntime.commitCoauthors`).
 - **Memory recycling.** Each runtime's memory is measured (its process tree, without the shells it
   runs agents' commands in and what runs under them: builds and servers agents start aren't the
   runtime's, and restarting it would only cut them off). Above
