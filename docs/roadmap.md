@@ -81,8 +81,8 @@ next step for the maintainers is reasoning effort per model, then themes.
 **Small improvements**, each with an issue and where to start, open to anyone: copy buttons in the
 chat (#23), the browser tab showing what needs you (#24), unread markers on agents (#25), opening a
 folder in VS Code (#26), day separators (#27), find in a chat (#28), keyboard shortcuts (#29),
-filtering the plan board (#30), exporting a chat (#31) or usage (#32), and an accessibility pass
-(#33). All [good first issues](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+filtering the plan board (#30), exporting a chat (#31) or usage (#32), an accessibility pass
+(#33), and the projects list showing what needs you in each project (#34). All [good first issues](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 
 ## Ideas
 
