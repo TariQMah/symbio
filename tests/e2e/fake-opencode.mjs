@@ -40,6 +40,7 @@ const MODELS = [
   { providerID: "fake", id: "scripted", name: "Scripted", cost: { input: 1, output: 2 }, limit: { context: 200000 }, capabilities: { input: { image: true } } },
   { providerID: "fake", id: "scripted-2", name: "Scripted 2", cost: { input: 1, output: 2 }, limit: { context: 200000 } },
   { providerID: "fake", id: "unavailable", name: "Unavailable", cost: { input: 0, output: 0 }, limit: { context: 200000 } },
+  { providerID: "fake", id: "flaky", name: "Flaky", cost: { input: 0, output: 0 }, limit: { context: 200000 } },
 ];
 
 /** @type {Map<string, any>} */
@@ -254,6 +255,13 @@ async function drain(session) {
       if (session.model.id === "unavailable") {
         outcome = "failed";
         error = { type: "provider.no-route", message: `Model unavailable: ${session.model.providerID}/${session.model.id}` };
+        break;
+      }
+      // "fake/flaky" is overloaded for each session's first turn, then answers (a passing outage).
+      if (session.model.id === "flaky" && !session.flakyFailed) {
+        session.flakyFailed = true;
+        outcome = "failed";
+        error = { type: "provider.error", status: 503, message: "Service overloaded, try again later" };
         break;
       }
       if (item.type === "synthetic" && !item.resume) continue;

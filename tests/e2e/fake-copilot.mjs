@@ -26,6 +26,7 @@ const MODELS = [
   { id: "scripted", name: "Scripted", capabilities: { supports: { vision: true } } },
   { id: "scripted-2", name: "Scripted 2", capabilities: { supports: {} } },
   { id: "unavailable", name: "Unavailable", capabilities: { supports: {} } },
+  { id: "flaky", name: "Flaky", capabilities: { supports: {} } },
 ];
 
 /** Sessions outlive a client, like Copilot's stored sessions (a runtime restart resumes them). */
@@ -318,6 +319,13 @@ async function drain(state) {
       const known = MODELS.some((m) => m.id === state.model) || (state.config.models ?? []).some((m) => `${m.provider}/${m.id}` === state.model);
       if (state.model === "unavailable" || !known) {
         emit(state, "session.error", { errorType: "query", message: `Execution failed: Model "${state.model}" is not available.` });
+        emit(state, "session.idle", {}, false);
+        continue;
+      }
+      // "flaky" is overloaded for each session's first turn, then answers (a passing outage).
+      if (state.model === "flaky" && !state.flakyFailed) {
+        state.flakyFailed = true;
+        emit(state, "session.error", { errorType: "server", statusCode: 503, message: "Service overloaded, try again later" });
         emit(state, "session.idle", {}, false);
         continue;
       }

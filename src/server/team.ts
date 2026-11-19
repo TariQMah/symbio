@@ -140,6 +140,7 @@ export class Team implements TeamCore {
   startWatchdog() {
     this.watchdog.start();
     this.housekeeper.start();
+    this.fallback.resumeWaits();
   }
 
   /**
@@ -555,7 +556,18 @@ export class Team implements TeamCore {
   async spawnWorker(
     project: Project,
     coordinator: Agent,
-    opts: { name: string; purpose: string; task?: string; taskId?: string; model?: string; workspace?: HelperWorkspace; repo?: string; byHuman?: boolean },
+    opts: {
+      name: string;
+      purpose: string;
+      task?: string;
+      taskId?: string;
+      model?: string;
+      workspace?: HelperWorkspace;
+      repo?: string;
+      byHuman?: boolean;
+      /** Keep it on its model: never switched to another when it fails (see ModelFallback). */
+      pinModel?: boolean;
+    },
   ): Promise<string> {
     if (!opts.byHuman && !opts.task && !opts.taskId) throw new Error("Give the helper a task: a plan task_id, or a task description.");
     if (opts.taskId) {
@@ -617,6 +629,7 @@ export class Team implements TeamCore {
       base: workspace.base,
       workSince: Date.now(),
       model,
+      ...(opts.pinModel ? { modelPinned: { by: opts.byHuman ? ("human" as const) : ("coordinator" as const), at: Date.now() } } : {}),
       status: "idle",
       lastActivity: Date.now(),
       createdAt: Date.now(),
@@ -902,6 +915,7 @@ export class Team implements TeamCore {
 
     // 5. The switch itself: no step from here can fail halfway in a way that leaves agents split.
     this.switches.step(progress, "Switching the project");
+    const unpinned: string[] = [];
     for (const { agent, sessionId, model } of created) {
       const was = runtimeOf(agent);
       accountUsage(agent, agent.usage ?? emptyUsage());
@@ -912,6 +926,11 @@ export class Team implements TeamCore {
       agent.runtime = opts.to;
       agent.sessionId = sessionId;
       agent.model = model;
+      // A pin is to a model of the old runtime: it doesn't carry over.
+      if (agent.modelPinned) unpinned.push(agent.name);
+      agent.modelPinned = null;
+      agent.modelWait = null;
+      this.fallback.cancelRetry(agent.id);
       agent.usage = emptyUsage();
       agent.usageSeen = emptyUsage();
       if (active(agent)) agent.status = "idle";
@@ -952,7 +971,8 @@ export class Team implements TeamCore {
       kind: "system",
       text:
         `The project moved from ${fromLabel} to ${target.label}: every agent continues in a new session there, from a handoff note. ` +
-        `Their earlier conversations are still readable in their chats${progress.withoutHandoff.length ? `. Without their own handoff (Symbio's note only): ${progress.withoutHandoff.join(", ")}` : ""}.`,
+        `Their earlier conversations are still readable in their chats${progress.withoutHandoff.length ? `. Without their own handoff (Symbio's note only): ${progress.withoutHandoff.join(", ")}` : ""}.` +
+        (unpinned.length ? ` No longer pinned to a model (pins are to the old runtime's models): ${unpinned.join(", ")}.` : ""),
     });
     if (!wasPaused) await this.resume(project);
     const coordinator = this.coordinator(project);
@@ -1003,6 +1023,8 @@ export class Team implements TeamCore {
     agent.runtime = target.kind;
     agent.sessionId = sessionId;
     agent.model = model;
+    agent.modelPinned = null;
+    agent.modelWait = null;
     agent.usage = emptyUsage();
     agent.usageSeen = emptyUsage();
     this.docsSynced.delete(agent.id);
@@ -1334,9 +1356,51 @@ export class Team implements TeamCore {
   async setModel(project: Project, agent: Agent, model: string) {
     await this.rt(agent).switchModel(agent.sessionId, model);
     agent.model = model;
+    // Waiting for a pinned model that was just replaced: nothing to wait for any more (the pin follows the new one).
+    if (agent.modelWait) {
+      this.fallback.cancelRetry(agent.id);
+      agent.modelWait = null;
+      agent.problem = null;
+      if (agent.status === "error") this.setStatus(project, agent, "idle");
+    }
     if (agent.role === "coordinator") project.coordinatorModel = model;
     await this.store.update(project);
     bus.publish({ type: "project.updated", projectId: project.id });
+  }
+
+  /**
+   * Pins an agent to its model (it waits and retries when the model fails, instead of switching) or
+   * unpins it. core can't unpin what the human pinned. Unpinned while waiting, it switches at once.
+   */
+  async pinModel(project: Project, agent: Agent, pinned: boolean, by: "human" | "coordinator"): Promise<string> {
+    if (agent.status === "stopped") throw new Error(`${agent.name} is stopped.`);
+    if (!pinned && agent.modelPinned?.by === "human" && by === "coordinator") {
+      throw new Error(`The human pinned ${agent.name} to ${agent.model}; only they can unpin it.`);
+    }
+    if (pinned === !!agent.modelPinned) return pinned ? `${agent.name} is already pinned to ${agent.model}.` : `${agent.name} isn't pinned.`;
+    const waiting = agent.modelWait && agent.problem ? agent.modelWait.error : null;
+    agent.modelPinned = pinned ? { by, at: Date.now() } : null;
+    if (!pinned) {
+      this.fallback.cancelRetry(agent.id);
+      agent.modelWait = null;
+    }
+    await this.store.update(project);
+    bus.publish({ type: "project.updated", projectId: project.id });
+    const text = pinned
+      ? `${agent.name} is pinned to ${agent.model}: if the model fails, it waits and retries it instead of switching to another.`
+      : `${agent.name} is no longer pinned to ${agent.model}: if the model fails, it switches to another allowed model.`;
+    await this.log(project, { from: "symbio", to: "human", kind: "system", text: `${text} (${by === "human" ? "by the human" : "by core"})` });
+    // core is told about its helpers' pins the human changed (a note: no turn).
+    const coordinator = this.coordinator(project);
+    if (by === "human" && coordinator && coordinator.id !== agent.id && active(coordinator)) {
+      await this.note(project, coordinator, `Symbio: the human ${pinned ? "pinned" : "unpinned"} ${agent.name}${pinned ? ` to ${agent.model}` : ""}.`);
+    }
+    // Unpinned while waiting for its model: switch now, as an unpinned agent would have.
+    if (!pinned && waiting) {
+      agent.problem = null;
+      await this.fallback.onFailure(project, agent, { type: "provider.error", message: waiting });
+    }
+    return text;
   }
 
   history(agent: Agent) {

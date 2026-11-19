@@ -645,6 +645,8 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     // Agents on a model their role may no longer use move to their role's default.
     for (const agent of project.agents) {
       if (agent.status === "stopped" || modelsFor(project, agent.role).includes(agent.model)) continue;
+      // Its pinned model was taken away: the pin goes with it.
+      if (agent.modelPinned) await team.pinModel(project, agent, false, "human").catch(() => {});
       await team.setModel(project, agent, defaultModel(project, agent.role)).catch((err) => console.error(`[models] ${agent.name}:`, err.message));
     }
     await store.update(project);
@@ -999,6 +1001,20 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     }
     const name = (body.name ?? "").trim().toLowerCase().replace(/\s+/g, "-");
     return c.json(project.agents.find((a) => a.name === name), 201);
+  });
+
+  // Pins an agent to its model (it waits and retries instead of switching when the model fails), or unpins it.
+  api.post("/projects/:id/agents/:agentId/pin", async (c) => {
+    const project = withProject(c.req.param("id"));
+    const agent = withAgent(project, c.req.param("agentId"));
+    const body = await c.req.json<{ pinned?: boolean }>();
+    if (typeof body.pinned !== "boolean") return c.json({ error: "pinned (true/false) is required" }, 400);
+    try {
+      await team.pinModel(project, agent, body.pinned, "human");
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    return c.json(agent);
   });
 
   api.post("/projects/:id/agents/:agentId/stop", async (c) => {

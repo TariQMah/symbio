@@ -953,3 +953,10 @@ tr.file-view-target > td, tr.file-view-target > th { background: rgba(212, 160, 
 .copilot-login { display: inline-flex; align-items: center; gap: 8px; }
 .sign-in-code { display: flex; flex-direction: column; gap: 8px; padding: 4px 12px 12px 56px; }
 .device-code { font-size: 22px; letter-spacing: 3px; color: var(--text); }
+
+/* Pinned models: the pin in a chat's header, the marker in the team list, the wait notice. */
+.pin-model { vertical-align: -3px; margin-left: 4px; color: var(--text-3); }
+.pin-model.on { color: var(--accent-text); }
+.agent-pin { display: inline-flex; margin-left: 5px; color: var(--accent-text); vertical-align: -1px; }
+.banner.amber { background: var(--amber-soft); }
+.banner.amber svg { color: var(--amber); }

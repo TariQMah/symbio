@@ -111,7 +111,7 @@ const listTeam: Tool = {
     return project.agents
       .map(
         (a) =>
-          `- ${a.name} (${a.role}${a.status === "stopped" ? ", stopped" : `, ${a.status}`}) — ${a.purpose ?? "coordinates the project"}${a.repo ? ` · repository ${a.repo}` : ""} · model ${a.model}`,
+          `- ${a.name} (${a.role}${a.status === "stopped" ? ", stopped" : `, ${a.status}`}) — ${a.purpose ?? "coordinates the project"}${a.repo ? ` · repository ${a.repo}` : ""} · model ${a.model}${a.modelPinned ? ` (pinned by ${a.modelPinned.by === "human" ? "the human" : "you"})` : ""}`,
       )
       .join("\n");
   },
@@ -175,6 +175,12 @@ const spawnAgent: Tool = {
       task_id: str("The plan task to start with (e.g. 'T2'). Preferred when there is a plan."),
       task: str("Its first task as text (when there is no plan task), or extra instructions for task_id"),
       model: str("Optional provider/model from the allowed list; defaults to your own model"),
+      pin_model: {
+        type: "boolean",
+        description:
+          "Keep it on that model: if the model fails, it waits and retries it instead of switching to another allowed model. " +
+          "Use it when the human wants that model for the work (e.g. to see how it does); otherwise leave it off.",
+      },
       workspace: { type: "string", enum: ["own", "shared"], description: "Where it works (git projects); defaults to the project's setting" },
       repo: str("In a project made of several repositories: the one it works in (e.g. 'server'); its own copy comes from it"),
     },
@@ -189,7 +195,21 @@ const spawnAgent: Tool = {
       task: args.task ? String(args.task) : undefined,
       taskId: args.task_id ? String(args.task_id) : undefined,
       model: args.model ? String(args.model) : undefined,
+      pinModel: args.pin_model === true,
     });
+  },
+};
+
+const pinModel: Tool = {
+  name: "pin_model",
+  description:
+    "Pin a helper to its current model (if the model fails, it waits and retries it, never switching to another) or unpin it " +
+    "(it switches to another allowed model when its model fails, the default). You can't unpin a helper the human pinned.",
+  inputSchema: obj({ agent: str("Helper name"), pinned: { type: "boolean", description: "true to pin, false to unpin" } }, ["agent", "pinned"]),
+  async run({ agent: name, pinned }, { team, project }) {
+    const target = team.findAgent(project, name);
+    if (!target || target.role === "coordinator") throw new Error(`No helper agent named "${name}".`);
+    return team.pinModel(project, target, pinned === true, "coordinator");
   },
 };
 
@@ -734,6 +754,7 @@ const COORDINATOR_ONLY = [
   addTask,
   assignTask,
   spawnAgent,
+  pinModel,
   stopAgent,
   mergeWork,
   cleanBuildOutputs,

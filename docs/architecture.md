@@ -77,7 +77,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `team/asset-protocol.ts` | The shared-asset protocol: request (free ones granted at once), grant, deny, release |
 | `team/watchdog.ts` | Hung agents interrupted and told why, OpenCode restarted before its memory makes it crash, interrupted agents woken after a restart |
 | `team/switch.ts` | Moving a project to another runtime: progress (the `runtime.switch` event), the handoff request |
-| `team/fallback.ts` | Failing providers: switch to the next allowed model, a fresh session when the conversation is too large, resuming stuck agents |
+| `team/fallback.ts` | Failing providers: switch to the next allowed model (or, for a pinned agent, wait and retry its own), a fresh session when the conversation is too large, resuming stuck agents |
 | `team/review.ts` | The human's review of finished tasks (`reviewBy`): the gate on done, approve, send back |
 | `team/questions.ts` | The team's open questions for the human: asking (repeats refused), answering several at once, setting aside |
 | `team/quiet-helpers.ts` | Helpers that end their turn without reporting: reminded once, then core is told |
@@ -163,6 +163,12 @@ costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
   every allowed model except the core-only ones) and is told why. Retries count: four failed retries, or two
   when they timed out (each timeout already costs minutes of waiting). If every allowed model failed recently,
   the agent stops with a visible problem; adding a model resumes it.
+  **Pinned agents** (`Agent.modelPinned`: the pin in an agent's chat, or core's `spawn_agent pin_model` /
+  `pin_model`) never switch: they wait and retry the same model (15 s, 30 s, 1, 2, 5, then every 10 minutes;
+  `Agent.modelWait`, rescheduled after a restart), with the human told once after an hour. Errors waiting
+  won't fix (the model is gone, the key is refused) are reported at once. Unpinning a waiting agent
+  switches it right away; only the human can unpin what they pinned; a runtime switch, or the model
+  leaving the project's models, releases the pin.
 - **Memory recycling.** Each runtime's memory is measured (its process tree, without the shells it
   runs agents' commands in and what runs under them: builds and servers agents start aren't the
   runtime's, and restarting it would only cut them off). Above

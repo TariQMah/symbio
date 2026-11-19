@@ -7,7 +7,7 @@ import { OpenQuestions, useQuestions } from "./Questions";
 import { openQuestions } from "./Messages";
 import { AgentForms } from "./FormCard";
 import { ReviewActions, ReviewGuide, TaskChanges, waitingForReview } from "./Review";
-import { Avatar, Drawer, timeAgo } from "./ui";
+import { Avatar, Drawer, timeAgo, waitsForPinnedModel } from "./ui";
 
 export interface InboxData {
   approvals: Approval[];
@@ -47,7 +47,7 @@ export function useInbox(project: Project | null, log: LoggedMessage[] | null, p
   const questions = openQuestions(log ?? []);
   const teamQuestions = useQuestions(id);
   const openCount = teamQuestions.filter((q) => q.state === "open").length;
-  const stuck = project?.agents.filter((a) => a.problem && a.status !== "stopped").length ?? 0;
+  const stuck = project?.agents.filter((a) => a.problem && a.status !== "stopped" && !waitsForPinnedModel(a)).length ?? 0;
   const planWaiting = plan?.status === "proposed" ? 1 : 0;
   const toReview = plan?.tasks.filter(waitingForReview) ?? [];
   return {
@@ -75,7 +75,7 @@ export function InboxDrawer({
   onOpenAgent: (agentId: string) => void;
   onOpenTab: (tab: "plan" | "settings") => void;
 }) {
-  const stuck = project.agents.filter((a) => a.problem && a.status !== "stopped");
+  const stuck = project.agents.filter((a) => a.problem && a.status !== "stopped" && !waitsForPinnedModel(a));
   const nameOf = (id: string) => project.agents.find((a) => a.id === id)?.name ?? id;
 
   return (

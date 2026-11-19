@@ -131,6 +131,8 @@ const PROVIDER = RUNTIME === "copilot" ? "copilot" : "fake";
 export const MODEL = `${PROVIDER}/scripted`;
 export const MODEL_2 = `${PROVIDER}/scripted-2`;
 export const UNAVAILABLE_MODEL = `${PROVIDER}/unavailable`;
+/** Overloaded for each session's first turn, then answers: a passing outage. */
+export const FLAKY_MODEL = `${PROVIDER}/flaky`;
 
 // What each runtime tells the model, in its own words, for assertions on an agent's history.
 /** A tool call Symbio's rules refused ("edit", "shell"). */

@@ -120,7 +120,9 @@ moment; the agent that asked carries on.
   organization, a server (SSH, SFTP) or an FTP account. They ask Symbio to push, open pull requests, call the API or deploy, and Symbio does it with credentials the agents never
   see. Each connection can require your approval for every action.
 - **Resilient.** A supervisor restarts the agent runtime if it crashes, a watchdog unsticks hung agents, and
-  when a model fails (quota, outage) the agent switches to the next allowed model and carries on.
+  when a model fails (quota, outage) the agent switches to the next allowed model and carries on. Want
+  an agent to stay on its model (say, to see how that model does)? Pin it in its chat: it then waits and
+  retries that model instead.
 - **Long-running teams stay healthy.** Agents can continue in a fresh session with a handoff note
   (when you ask, after each finished task, or automatically when a conversation grows too large to
   send). A daily check backs up Symbio's state and tells you and core about work that exists only

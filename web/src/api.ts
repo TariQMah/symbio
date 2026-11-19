@@ -11,6 +11,10 @@ export interface Agent {
   repo?: string;
   branch?: string | null;
   model: string;
+  /** Pinned to its model: when it fails, it waits and retries it instead of switching. */
+  modelPinned?: { by: "human" | "coordinator"; at: number } | null;
+  /** Pinned and waiting for its model: when the next retry is. */
+  modelWait?: { until: number; attempt: number; since: number; error: string } | null;
   status: AgentStatus;
   problem?: string | null;
   usage?: { cost: number; input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number };
@@ -718,6 +722,8 @@ export const api = {
     call<Project>("POST", `/projects/${projectId}/agents/${agentId}/rename`, { name }),
   setAgentModel: (projectId: string, agentId: string, model: string) =>
     call<Project>("POST", `/projects/${projectId}/agents/${agentId}/model`, { model }),
+  pinAgentModel: (projectId: string, agentId: string, pinned: boolean) =>
+    call<Agent>("POST", `/projects/${projectId}/agents/${agentId}/pin`, { pinned }),
   restartAgent: (projectId: string, agentId: string) => call<Project>("POST", `/projects/${projectId}/agents/${agentId}/restart`),
   moveToProjectFolder: (projectId: string, agentId: string) =>
     call<Project>("POST", `/projects/${projectId}/agents/${agentId}/move-to-project-folder`),

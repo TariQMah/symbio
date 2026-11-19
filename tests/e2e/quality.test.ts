@@ -31,9 +31,10 @@ test("a model locked to core isn't given to helpers; select all and none", async
   await picker.locator("button", { hasText: "None" }).click();
   await picker.locator(".model-summary", { hasText: "Select the models" }).waitFor();
   await picker.locator("button", { hasText: "Select all" }).click();
-  await picker.locator(".model-summary", { hasText: "3 selected, for everyone" }).waitFor();
-  // The stand-in's third model always fails: take it out again.
+  await picker.locator(".model-summary", { hasText: "4 selected, for everyone" }).waitFor();
+  // The stand-in's other two models fail (always, or on each first turn): take them out again.
   await picker.locator(".model-row", { hasText: "Unavailable" }).click();
+  await picker.locator(".model-row", { hasText: "Flaky" }).click();
   await picker.locator(".model-summary", { hasText: "2 selected, for everyone" }).waitFor();
 
   // Lock Scripted (core's model) to core: helpers get Scripted 2 only.

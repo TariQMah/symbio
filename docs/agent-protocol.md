@@ -166,7 +166,8 @@ core only:
 | `submit_plan` | Propose (or revise) the plan for approval |
 | `add_task` | Add a task to the approved plan |
 | `assign_task` | Give a task to an existing helper |
-| `spawn_agent` | Create a helper with a name, purpose, first task, and optionally a model, where it works (`workspace`: own / shared) and, in a folder of several repositories, which one (`repo`) |
+| `spawn_agent` | Create a helper with a name, purpose, first task, and optionally a model (and `pin_model` to keep it on that model), where it works (`workspace`: own / shared) and, in a folder of several repositories, which one (`repo`) |
+| `pin_model` | Pin a helper to its model (it waits and retries it when it fails, instead of switching) or unpin it; not a pin the human made |
 | `stop_agent` | Stop a helper; its assets are released |
 | `clean_build_outputs` | Delete an idle helper's git-ignored build folders (bin, obj, node_modules…) to free disk space |
 | `merge_work` | Merge a helper's committed work; refuses ungranted asset changes unless forced |

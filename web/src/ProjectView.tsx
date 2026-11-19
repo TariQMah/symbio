@@ -16,6 +16,7 @@ import {
   Settings2,
   Users,
   Plus,
+  Pin,
 } from "lucide-react";
 import { UsageLine } from "./Usage";
 import { useCostsShown } from "./privacy";
@@ -29,7 +30,7 @@ import { NewHelperDialog } from "./NewHelper";
 import { Messages, useProjectLog } from "./Messages";
 import { ProjectMenu } from "./ProjectMenu";
 import { ProjectSettings } from "./ProjectSettings";
-import { Avatar, EmptyState, statusText } from "./ui";
+import { Avatar, EmptyState, statusText, waitsForPinnedModel } from "./ui";
 
 type Tab = "chat" | "plan" | "messages" | "docs" | "files" | "settings";
 
@@ -107,7 +108,8 @@ export function ProjectView({ projectId }: { projectId: string }) {
   const rank = (a: Agent) => (a.role === "coordinator" ? 0 : a.problem ? 1 : a.status === "busy" ? 2 : a.status === "waiting" ? 3 : 4);
   const activeAgents = project.agents.filter((a) => a.status !== "stopped").sort((x, y) => rank(x) - rank(y));
   const stopped = project.agents.filter((a) => a.status === "stopped");
-  const stuck = activeAgents.filter((a) => a.problem);
+  // Pinned agents waiting for their model have their own notice (in their chat); the rest can't continue.
+  const stuck = activeAgents.filter((a) => a.problem && !waitsForPinnedModel(a));
   const nameOf = (id: string | null) => (id === null ? "core" : (project.agents.find((a) => a.id === id)?.name ?? "?"));
   const done = plan?.tasks.filter((t) => t.status === "done").length ?? 0;
 
@@ -356,8 +358,8 @@ export function ProjectView({ projectId }: { projectId: string }) {
 
 function AgentRow({ agent: a, active, onClick }: { agent: Agent; active: boolean; onClick: () => void }) {
   const costs = useCostsShown();
-  const sub = a.problem ? "Needs attention" : a.status === "idle" ? (a.purpose ?? (a.role === "coordinator" ? "Coordinates the team" : "Idle")) : statusText(a.status);
-  const subClass = a.problem ? "problem" : a.status === "busy" ? "working" : a.status === "waiting" ? "waiting" : "";
+  const sub = waitsForPinnedModel(a) ? `Waiting for ${a.model.split("/").pop()}` : a.problem ? "Needs attention" : a.status === "idle" ? (a.purpose ?? (a.role === "coordinator" ? "Coordinates the team" : "Idle")) : statusText(a.status);
+  const subClass = waitsForPinnedModel(a) ? "waiting" : a.problem ? "problem" : a.status === "busy" ? "working" : a.status === "waiting" ? "waiting" : "";
   return (
     <motion.button
       layout
@@ -368,11 +370,16 @@ function AgentRow({ agent: a, active, onClick }: { agent: Agent; active: boolean
       onClick={onClick}
       title={[a.purpose, a.model, costs && a.usage && `${formatTokens(usageTokens(a.usage))} tokens`].filter(Boolean).join("\n")}
     >
-      <Avatar name={a.name} status={a.problem ? "error" : a.status} />
+      <Avatar name={a.name} status={waitsForPinnedModel(a) ? "waiting" : a.problem ? "error" : a.status} />
       <span className="grow">
         <span className="agent-name">
           {a.name}
           {a.role === "coordinator" && <span className="tag accent">lead</span>}
+          {a.modelPinned && (
+            <span className="agent-pin" title={`Pinned to ${a.model}`} aria-label={`Pinned to ${a.model}`}>
+              <Pin size={11} />
+            </span>
+          )}
         </span>
         <span className={`agent-sub ellipsis ${subClass}`} style={{ display: "block" }}>
           {sub}

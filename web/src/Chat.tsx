@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, Brain, Check, CircleAlert, CircleStop, Folder, FolderInput, GitBranch, Info, Loader2, Pencil, RefreshCw, Repeat, RotateCcw, Wrench, X } from "lucide-react";
+import { ArrowUp, Brain, Check, CircleAlert, CircleStop, Folder, FolderInput, GitBranch, Info, Loader2, Pencil, Pin, PinOff, RefreshCw, Repeat, RotateCcw, Wrench, X } from "lucide-react";
 import { api, subscribe, type Agent, type Project, type CoreMode } from "./api";
 import { PendingForms } from "./FormCard";
 import { AttachButton, DropOverlay, MessageAttachments, PendingFiles, splitAttachmentNote, usePendingFiles } from "./Attachments";
-import { Avatar, statusText } from "./ui";
+import { Avatar, RetryIn, statusText, waitsForPinnedModel } from "./ui";
 import { callsFromCode, stepLabels, summarize, type StepLabel, type ToolCall } from "./steps";
 import { FileCard, Md } from "./files";
 import { modelsForRole } from "./ModelPicker";
@@ -327,12 +327,29 @@ export function Chat({ project, agent }: { project: Project; agent: Agent }) {
   return (
     <div className="chat" {...drop}>
       {dragging && <DropOverlay label={`Drop to attach to your message to ${agent.name}`} />}
+      {waitsForPinnedModel(agent) && (
+        <div className="banner amber pin-wait">
+          <Pin size={14} />
+          <div className="grow ellipsis" title={agent.problem ?? ""}>
+            <strong>Waiting for {agent.model}</strong>{" "}
+            <span className="muted">
+              — pinned, so it retries this model instead of switching. Next try <RetryIn until={agent.modelWait!.until} />.
+            </span>
+          </div>
+          <button className="btn sm" onClick={() => api.retryModels(project.id).catch((e) => alert(e.message))}>
+            Retry now
+          </button>
+          <button className="btn sm ghost" onClick={() => api.pinAgentModel(project.id, agent.id, false).catch((e) => alert(e.message))}>
+            Unpin
+          </button>
+        </div>
+      )}
       <div className="chat-head">
-        <Avatar name={agent.name} status={agent.status} size="lg" />
+        <Avatar name={agent.name} status={waitsForPinnedModel(agent) ? "waiting" : agent.status} size="lg" />
         <div className="grow">
           <AgentName project={project} agent={agent} />
           <div className="sub ellipsis">
-            {statusText(agent.status)} ·{" "}
+            {waitsForPinnedModel(agent) ? "Waiting for its model" : statusText(agent.status)} ·{" "}
             {agent.status === "stopped" ? (
               agent.model
             ) : (
@@ -349,6 +366,7 @@ export function Chat({ project, agent }: { project: Project; agent: Agent }) {
                 ))}
               </select>
             )}
+            {agent.status !== "stopped" && <PinButton project={project} agent={agent} />}
             {agent.branch ? (
               <>
                 {" · "}
@@ -929,5 +947,29 @@ function Thinking({ stuck, retry }: { stuck: boolean; retry: string | null }) {
       </span>
       {stuck ? "Looked stuck — recovering…" : (retry ?? "Working…")}
     </div>
+  );
+}
+
+/**
+ * Pins the agent to its model: when the model fails it waits and retries it instead of switching to
+ * another allowed model (the default).
+ */
+function PinButton({ project, agent }: { project: Project; agent: Agent }) {
+  const pinned = !!agent.modelPinned;
+  const by = agent.modelPinned?.by === "coordinator" ? " (by core)" : "";
+  return (
+    <button
+      className={`btn ghost icon xs pin-model ${pinned ? "on" : ""}`}
+      aria-label={pinned ? "Unpin the model" : "Pin the model"}
+      aria-pressed={pinned}
+      title={
+        pinned
+          ? `Pinned to ${agent.model}${by}: if it fails, ${agent.name} waits and retries it. Click to unpin (it then switches to another allowed model when this one fails).`
+          : `Pin ${agent.name} to ${agent.model}: if it fails, wait and retry it instead of switching to another model.`
+      }
+      onClick={() => api.pinAgentModel(project.id, agent.id, !pinned).catch((e) => alert(e.message))}
+    >
+      {pinned ? <Pin size={12} /> : <PinOff size={12} />}
+    </button>
   );
 }

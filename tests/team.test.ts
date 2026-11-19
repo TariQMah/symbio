@@ -207,6 +207,47 @@ test("where helpers work: project setting, per-helper choice, and moving a helpe
   assert.equal(await git(project.directory, "branch", "--list", "symbio/branchy"), "", "its merged branch is deleted");
 });
 
+test("a pinned helper waits and retries its model instead of switching; unpinned, it switches", async () => {
+  const { project, team, calls, store, core, writer } = await setup();
+  project.allowedModels = ["p/m", "p/n"];
+  writer.sessionId = "ses_pinned_writer";
+  const outage = { type: "provider.error", status: 503, message: "Service unavailable: overloaded" };
+
+  await team.pinModel(project, writer, true, "human");
+  assert.match(notes(calls, core.sessionId).at(-1)!.body, /the human pinned writer to p\/m/, "core is told");
+  await assert.rejects(team.pinModel(project, writer, false, "coordinator"), /only they can unpin/);
+
+  const before = Date.now();
+  await team.fallback.onFailure(project, writer, outage);
+  assert.equal(writer.model, "p/m", "not switched");
+  assert.equal(writer.status, "error");
+  assert.ok(writer.modelWait && writer.modelWait.attempt === 0);
+  assert.ok(writer.modelWait!.until - before >= 15_000 && writer.modelWait!.until - before < 20_000, "first try again after about 15 seconds");
+
+  // The retry wakes it on the same model; failing again, it waits longer.
+  await team.fallback.retryPinned(project.id, writer.id);
+  assert.match(prompts(calls, "ses_pinned_writer").at(-1)!.body, /trying your pinned model p\/m again/);
+  assert.equal(writer.status, "busy");
+  await team.fallback.onFailure(project, writer, outage);
+  assert.equal(writer.modelWait!.attempt, 1);
+  assert.ok(writer.modelWait!.until - Date.now() > 25_000, "then about 30 seconds");
+
+  // Unpinned while waiting: it switches at once, as before.
+  await team.pinModel(project, writer, false, "human");
+  assert.equal(writer.model, "p/n", "switched to the other allowed model");
+  assert.equal(writer.modelWait, null);
+  assert.match(prompts(calls, "ses_pinned_writer").at(-1)!.body, /You were switched to p\/n/);
+
+  // A model that can't be used isn't retried forever: the human is told at once.
+  await team.pinModel(project, writer, true, "coordinator");
+  await team.fallback.onFailure(project, writer, { type: "provider.error", status: 404, message: 'Model "p/n" is not available.' });
+  assert.equal(writer.model, "p/n");
+  assert.equal(writer.modelWait, null, "no retries");
+  const log = await store.readMessages(project);
+  assert.ok(log.some((m: any) => m.kind === "alert" && /pinned to it, so it isn't switched/.test(m.text)));
+  team.fallback.cancelRetry(writer.id);
+});
+
 test("a conversation too large to send gets one fresh session, then an alert instead of a loop", async () => {
   const { project, team, calls, store } = await setup();
   const writer = project.agents[1];

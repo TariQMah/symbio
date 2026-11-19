@@ -36,6 +36,13 @@ export interface Agent {
   /** Start of the current unit of work; asset grants are checked from here. */
   workSince?: number;
   model: string; // provider/model
+  /**
+   * Pinned to its model: when the model fails, Symbio waits and retries it (modelWait) instead of
+   * switching to another allowed model. Set by the human (chat header) or core (spawn_agent, pin_model).
+   */
+  modelPinned?: { by: "human" | "coordinator"; at: number } | null;
+  /** A pinned agent waiting for its model to respond again: the next retry, which one, since when. */
+  modelWait?: { until: number; attempt: number; since: number; error: string; alerted?: boolean } | null;
   status: AgentStatus;
   /** Why the agent can't continue on its own (e.g. every allowed model failed); null when fine. */
   problem?: string | null;

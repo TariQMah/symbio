@@ -147,6 +147,8 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.15.1** — Pin an agent to its model: it waits and retries that model when it fails, instead of switching
+  (the pin in its chat; core's `pin_model`).
 - **0.15.0** — GitHub Copilot CLI as a second agent runtime, chosen per project; no bundled runtime
   (install the ones you use from Symbio); moving a project from one runtime to the other; runtimes
   start only when needed; every end-to-end test runs on both runtimes. Also usage by provider and

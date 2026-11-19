@@ -5,6 +5,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.1]
+
+- **Pin an agent to its model.** The pin next to the model in an agent's chat keeps it on that model: when the model
+  fails, the agent waits and tries it again (after 15 seconds, then longer, up to every 10 minutes) instead of being
+  switched to another allowed model. A notice in its chat counts down to the next try, with **Retry now** and
+  **Unpin**; the team list marks pinned agents. core can pin too (asking for a model "to see how it does" now carries
+  through: `spawn_agent` takes `pin_model`), but can't undo your pins. A model that can't be used at all (removed, key
+  refused) is reported at once instead of retried, and you're told if a pinned model is still failing after an hour.
+  Switching is still the default.
+
 ## [0.15.0]
 
 - **GitHub Copilot CLI as an agent runtime** (preview): in New project → Models, choose whether the agents run on

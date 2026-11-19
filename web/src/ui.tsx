@@ -1,6 +1,6 @@
 // Shared UI building blocks: avatars, status, dialogs, drawers, empty states, logo.
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { X } from "lucide-react";
 
@@ -171,3 +171,18 @@ export function timeAgo(ms: number) {
 export function clock(ms: number) {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
+
+/** "in 1:05", ticking each second, until a moment (a pinned agent's next try with its model). */
+export function RetryIn({ until }: { until: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const left = Math.max(0, Math.round((until - now) / 1000));
+  if (left === 0) return <>now</>;
+  return <>in {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</>;
+}
+
+/** A pinned agent waiting for its model (not one stuck because every model failed). */
+export const waitsForPinnedModel = (a: { modelPinned?: unknown; modelWait?: unknown; problem?: string | null }) => !!(a.modelPinned && a.modelWait && a.problem);

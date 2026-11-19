@@ -236,6 +236,14 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "in a new session on the other runtime from a handoff note, with its name, folder, branch, tasks and assets. Tool names and " +
       "behavior differ between runtimes, and background processes are stopped by the move: start again the ones you need.",
   },
+  {
+    id: "2026-11-19-model-pins",
+    text:
+      "Helpers can be pinned to their model: when it fails, a pinned helper waits and retries the same model (pauses growing up " +
+      "to 10 minutes) instead of being switched to another allowed model. spawn_agent takes pin_model, and pin_model pins or " +
+      "unpins a helper; use it when the human wants a specific model for the work. The human can pin from the helper's chat, " +
+      "and only they can unpin what they pinned. list_team shows pins.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */
