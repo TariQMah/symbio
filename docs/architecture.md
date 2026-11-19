@@ -121,7 +121,9 @@ live session (with `steps.ts` labelling the team's steps in plain words, and `fi
 into links, showing shared files as cards and the viewer page that opens them), `Kanban.tsx` the plan, `Messages.tsx` the message log, `Attachments.tsx` attachments in the chat and the Files tab, `Docs.tsx` the Docs tab and
 `Rules.tsx` the rules register in it, `Inbox.tsx` the *Needs you* drawer, `Usage.tsx` tokens and
 costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
-`Settings.tsx`/`Providers.tsx` the global settings.
+`Settings.tsx`/`Providers.tsx` the global settings. `styles.css` holds the design tokens (colors,
+radii, fonts) and every rule uses them; `themes.css` overrides them per theme under
+`html[data-theme="…"]`, and `theme.ts`/`Appearance.tsx` pick one and keep it in the browser.
 
 ## Lifecycle of a project
 

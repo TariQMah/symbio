@@ -1,0 +1,90 @@
+/* ==========================================================================
+   Themes: each one is a set of the tokens in styles.css (:root is "Symbio", the default).
+   A theme sets the base colors; the soft and mixed ones follow from them. Chosen in
+   Settings → Appearance and kept in the browser (theme.ts).
+   ========================================================================== */
+
+/* Dark Modern: the colors of VS Code's default dark theme, its square-ish corners and system font. */
+html[data-theme="dark-modern"] {
+  --bg: #1f1f1f;
+  --bg-sunken: #181818;
+  --panel: #181818;
+  --surface: #1f1f1f;
+  --surface-2: #2a2a2a;
+  --surface-hover: #2a2d2e;
+  --border: #2b2b2b;
+  --border-strong: #3c3c3c;
+  --border-hover: #474747;
+  --border-focus: #0078d4;
+  --scrollbar: #424242;
+  --scrollbar-hover: #4f4f4f;
+
+  --text: #cccccc;
+  --text-2: #9d9d9d;
+  --text-3: #6e7681;
+
+  --accent: #0078d4;
+  --accent-hover: #026ec1;
+  --accent-text: #4daafc;
+  --on-accent: #ffffff;
+  --purple: #c586c0;
+
+  --green: #2ea043;
+  --amber: #cca700;
+  --red: #f85149;
+  --blue: #3794ff;
+  --on-amber: #1f1f1f;
+  --danger-solid: #c72e2b;
+  --danger-solid-hover: #d73a37;
+
+  --r-sm: 2px;
+  --r: 4px;
+  --r-lg: 6px;
+  --font: "Segoe UI", system-ui, -apple-system, Ubuntu, sans-serif;
+  --mono: "Cascadia Code", Consolas, "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark;
+  font-feature-settings: normal;
+}
+
+/* Light Modern: the colors of VS Code's default light theme. */
+html[data-theme="light-modern"] {
+  --bg: #ffffff;
+  --bg-sunken: #f8f8f8;
+  --panel: #f8f8f8;
+  --surface: #ffffff;
+  --surface-2: #f3f3f3;
+  --surface-hover: #f2f2f2;
+  --border: #e5e5e5;
+  --border-strong: #cecece;
+  --border-hover: #b4b4b4;
+  --border-focus: #005fb8;
+  --scrollbar: #c8c8c8;
+  --scrollbar-hover: #a6a6a6;
+
+  --text: #3b3b3b;
+  --text-2: #616161;
+  --text-3: #8b8b8b;
+
+  --accent: #005fb8;
+  --accent-hover: #0258a8;
+  --accent-text: #005fb8;
+  --on-accent: #ffffff;
+  --purple: #8a3fa0;
+
+  --green: #2b8a3e;
+  --amber: #b07800;
+  --red: #c72e2b;
+  --blue: #1a6fd1;
+  --on-amber: #ffffff;
+  --danger-solid: #c72e2b;
+  --danger-solid-hover: #b42623;
+
+  --r-sm: 2px;
+  --r: 4px;
+  --r-lg: 6px;
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--border-strong);
+  --font: "Segoe UI", system-ui, -apple-system, Ubuntu, sans-serif;
+  --mono: "Cascadia Code", Consolas, "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light;
+  font-feature-settings: normal;
+}

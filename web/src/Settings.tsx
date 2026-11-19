@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Pencil, Plug, Plus, ShieldCheck, Trash2, X } from "lu
 import { api, type ConnectionView, type FtpSecurity } from "./api";
 import { ConnIcon } from "./ConnectionsPicker";
 import { ProvidersSection } from "./Providers";
+import { AppearanceSection } from "./Appearance";
 import { RuntimesSection, useRuntimes } from "./Runtimes";
 import { CostsSection, PricesSection } from "./Usage";
 import { RemoteSection } from "./Remote";
@@ -178,6 +179,8 @@ export function Settings() {
 
       {/* Model providers are OpenCode's: shown once it's installed. */}
       {openCodeInstalled && <ProvidersSection />}
+
+      <AppearanceSection />
 
       <CostsSection />
 

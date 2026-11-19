@@ -7,8 +7,8 @@ welcome (open an issue). Each item in Next has an issue with where to start; tho
 
 ## Now
 
-Nothing in progress: the next items are open to anyone (see their issues). After 0.15.0, the likely
-next step for the maintainers is reasoning effort per model, then themes.
+In progress: themes and a Workbench layout (item 2 below, step by step). The other items are
+open to anyone (see their issues).
 
 ## Next
 
@@ -21,11 +21,15 @@ next step for the maintainers is reasoning effort per model, then themes.
    verified live (listing and choosing variants) and written down in opencode-api.md first. Higher
    effort costs more tokens, so the price simulator mentions it. Both stand-in runtimes take it, so
    the end-to-end tests cover it on each.
-2. **Themes.** ([#2](https://github.com/linkzy/symbio/issues/2)) A choice of looks in Settings, kept in the browser, starting with one that looks like
-   VS Code (its dark and light editor colors, denser lists, a more editor-like chat), for using
-   Symbio at work without it looking like a chat site; the current look stays the default. Built on
-   the colors and sizes `styles.css` already keeps as tokens, so a theme is mostly a set of token
-   values (plus a few layout tweaks), and adding one later is easy.
+2. **Themes and a Workbench layout.** ([#2](https://github.com/linkzy/symbio/issues/2)) In four
+   steps, each released on its own: (1) themes in Settings → Appearance, kept in the browser, with
+   the current look as the default plus Dark Modern and Light Modern (VS Code's default colors),
+   *released in 0.16.0*; (2) an **Explorer** tab next to Plan, listing the project's files and folders
+   read-only (secrets hidden, as in the Files tab); (3) a **Workbench** layout like VS Code: an
+   activity bar and side bar for the tools (team, Explorer, plan, messages, docs, files), the work
+   in the middle, and the chat on the right with an agent switcher, plus a status bar; the
+   *Developer* preset is Dark Modern + Workbench, phones keep the classic layout; (4) importing a
+   VS Code color theme file, so people can bring their own.
 3. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
    change it (its plan tools take it), the human can change it on the board, and core is told when

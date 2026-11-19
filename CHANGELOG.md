@@ -5,6 +5,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.0]
+
+- **Themes.** Settings → **Appearance** has a choice of looks, kept in this browser: **Symbio** (the default, as
+  before), **Dark Modern** and **Light Modern** (the colors of VS Code's default dark and light themes, with squarer
+  corners and the system font). Every color in the UI now comes from a theme's tokens, so adding a theme is a set of
+  token values in `web/src/themes.css`. Coming next: an Explorer tab, a VS Code-like *Workbench* layout and importing
+  a VS Code color theme.
+
 ## [0.15.1]
 
 - **Pin an agent to its model.** The pin next to the model in an agent's chat keeps it on that model: when the model
