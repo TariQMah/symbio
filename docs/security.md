@@ -27,6 +27,8 @@ working around the human's control, and web pages in your browser reaching the l
   the key never goes in a file URL. Only images, video, audio, PDFs and plain text are shown in the
   browser; anything else downloads. The Explorer lists folders under the same rules: hidden files and
   folders aren't listed and can't be opened, and it's read-only (no writing, renaming or deleting).
+- **Imported color themes** (`web/src/vscodeTheme.ts`) stay in the browser and only plain hex colors
+  from them reach the page's style; anything else in the file is ignored.
 - Debug routes that pass OpenCode responses through (`/api/debug/opencode/*`, raw model data) are
   off unless Symbio is started with `SYMBIO_DEBUG=1`, because those responses can contain provider
   keys.

@@ -7,8 +7,8 @@ welcome (open an issue). Each item in Next has an issue with where to start; tho
 
 ## Now
 
-In progress: themes and a Workbench layout (item 2 below, step by step). The other items are
-open to anyone (see their issues).
+Nothing in progress: the next items are open to anyone (see their issues). The likely next step
+for the maintainers is reasoning effort per model.
 
 ## Next
 
@@ -21,28 +21,19 @@ open to anyone (see their issues).
    verified live (listing and choosing variants) and written down in opencode-api.md first. Higher
    effort costs more tokens, so the price simulator mentions it. Both stand-in runtimes take it, so
    the end-to-end tests cover it on each.
-2. **Themes and a Workbench layout.** ([#2](https://github.com/linkzy/symbio/issues/2)) In four
-   steps, each released on its own: (1) themes in Settings → Appearance, kept in the browser, with
-   the current look as the default plus Dark Modern and Light Modern (VS Code's default colors),
-   *released in 0.16.0*; (2) an **Explorer** tab next to Plan, listing the project's files and folders
-   read-only (secrets hidden, as in the Files tab), *released in 0.17.0*; (3) a **Workbench** layout like VS Code: an
-   activity bar and side bar for the tools (team, Explorer, plan, messages, docs, files), the work
-   in the middle, and the chat on the right with an agent switcher, plus a status bar; the
-   *Developer* preset is Dark Modern + Workbench, phones keep the classic layout, *released in 0.18.0*; (4) importing a
-   VS Code color theme file, so people can bring their own.
-3. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
+2. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
    change it (its plan tools take it), the human can change it on the board, and core is told when
    the human does, so it picks up urgent work first. Helpers see it with their task.
-4. **Commits without AI co-author lines** ([#20](https://github.com/linkzy/symbio/issues/20)): a
+3. **Commits without AI co-author lines** ([#20](https://github.com/linkzy/symbio/issues/20)): a
    project setting to keep `Co-authored-by` lines naming AI tools (GitHub Copilot CLI adds one) out
    of the project's commits: agents are told not to add them, and Symbio removes any left when it
    merges a helper's work.
-5. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
+4. **Notifications.** ([#5](https://github.com/linkzy/symbio/issues/5)) When something needs the human (an open question, an approval, a plan to review, a
    stuck agent) or a task finishes, send it where they are: browser/phone notifications, and
    optionally a messaging app (e.g. Telegram) or e-mail, with per-project choices. Essential for
    steering Symbio away from the computer.
-6. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
+5. **Talk to Symbio.** ([#6](https://github.com/linkzy/symbio/issues/6)) A spoken conversation with core, hands-free: e.g. from a phone connected to
    the car over Bluetooth, with Symbio working on the computer at home (remote access). Not just
    dictation into the chat box:
    - Only what core says to the human is read aloud: never tool calls, command output, messages
@@ -57,29 +48,29 @@ open to anyone (see their issues).
    Builds on the phone layout and on telling apart, in core's replies, what's for the human from
    the team's work. To check first: the browsers' own speech recognition and voices (quality,
    languages, whether they keep working with the screen off) against a speech service.
-7. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
+6. **Budgets per project.** ([#7](https://github.com/linkzy/symbio/issues/7)) A spending limit per project (and optionally per day), with a warning
    at a threshold and the team paused when it's reached, using the cost tracking Symbio already
    has.
-8. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
+7. **Scheduled work.** ([#8](https://github.com/linkzy/symbio/issues/8)) Ask core for recurring jobs ("refresh the data every night", "check the site
    every Monday"): Symbio wakes core at the set time with the job, and the human sees the runs and
    their results.
-9. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
+8. **Linux and macOS.** ([#9](https://github.com/linkzy/symbio/issues/9)) Test on both. The secret vault uses the OS keyring (Secret Service on Linux,
    Keychain on macOS); headless Linux (a server or container) has no keyring, so it needs a
    fallback, such as a key file readable only by the user.
-10. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
+9. **Make it showable.** ([#10](https://github.com/linkzy/symbio/issues/10)) Before inviting others: a sample project to try in five minutes, a
    two-minute video of core running a team on a non-coding project, and a short GitHub Pages site
    with screenshots ([#19](https://github.com/linkzy/symbio/issues/19)). First audience: the
    OpenCode and GitHub Copilot CLI communities. Done: the README's animation of a real session, and
    a social preview image.
-11. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
+10. **Create a project from a git repository.** ([#11](https://github.com/linkzy/symbio/issues/11)) In the New project dialog, an option to clone a
    repository (GitHub, Azure DevOps or any git URL, using the matching connection when it's private)
    into a folder and open it as a project, e.g. to continue on another computer. Tucked under an
    advanced option, so it doesn't get in the way of people who don't use git.
-12. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
+11. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-13. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
-14. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
+12. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
+13. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
 **Small improvements**, each with an issue and where to start, open to anyone: copy buttons in the
@@ -152,6 +143,11 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.19.0** — Import a VS Code color theme (#2, step 4 of 4).
+- **0.18.0** — The Workbench layout (activity bar, side bar, the work in the middle, the chat on the right,
+  a status bar) and the Developer look (Dark Modern + Workbench).
+- **0.17.0** — The Explorer tab: the project's folders and files, read-only, secrets hidden.
+- **0.16.0** — Themes: Symbio (the default), Dark Modern and Light Modern, in Settings → Appearance.
 - **0.15.1** — Pin an agent to its model: it waits and retries that model when it fails, instead of switching
   (the pin in its chat; core's `pin_model`).
 - **0.15.0** — GitHub Copilot CLI as a second agent runtime, chosen per project; no bundled runtime

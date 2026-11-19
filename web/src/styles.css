@@ -1047,3 +1047,10 @@ button.wb-status-item.attention:hover { background: var(--amber); color: var(--o
 .layout-preview.classic { grid-template-columns: 1fr 3fr; }
 .layout-preview.workbench { grid-template-columns: 6px 1fr 2fr 1.3fr; }
 .appearance-preset { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.theme-card-wrap { position: relative; display: flex; }
+.theme-card-wrap > .theme-card { flex: 1; }
+.theme-card-remove { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--r-sm); background: var(--surface); color: var(--text-2); border: 1px solid var(--border-strong); opacity: 0; cursor: pointer; padding: 0; }
+.theme-card-wrap:hover .theme-card-remove, .theme-card-remove:focus-visible { opacity: 1; }
+.theme-card-remove:hover { color: var(--red); }
+.appearance-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); margin: 4px 0 8px; }
+.appearance-preset + .appearance-label { margin-top: 22px; }

@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.0]
+
+- **Import a VS Code color theme.** Settings → Appearance → **Import a VS Code theme…** takes a color theme's `.json`
+  file (from a theme extension's `themes` folder, or what VS Code's *Developer: Generate Color Theme From Current
+  Settings* writes) and maps its workbench colors onto Symbio's; what it doesn't set comes from Dark Modern or Light
+  Modern. Imported themes are kept in this browser and can be removed from their card.
+
 ## [0.18.0]
 
 - **Workbench layout.** Settings → Appearance now has a layout too: **Classic** (as before) or **Workbench**, laid out

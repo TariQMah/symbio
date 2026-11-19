@@ -1,0 +1,19 @@
+// A VS Code color theme as extensions ship it: comments, trailing commas, colors with alpha.
+{
+  "name": "Night Harbor",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#10141c", // the main background
+    "editor.foreground": "#d8dee9",
+    "sideBar.background": "#0b0e14",
+    "activityBar.background": "#080a0f",
+    "button.background": "#e07a5f",
+    "button.foreground": "#10141c",
+    "textLink.foreground": "#f2a48c",
+    "focusBorder": "#e07a5f80",
+    "editorError.foreground": "#ff5c5c",
+    "panel.border": "#1f2633",
+    "list.hoverBackground": "url(javascript:alert(1))",
+  },
+  "tokenColors": [],
+}

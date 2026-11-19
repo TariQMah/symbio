@@ -84,7 +84,8 @@ docs/                  This documentation
   in `styles.css` and `ui.tsx` (Dialog, Drawer, EmptyState, Avatar) and lucide icons; avoid adding
   new UI libraries. Never write a color in a rule: use a token (or `color-mix()` of tokens), so
   every theme follows. To add a theme, give its token values in `web/src/themes.css` under
-  `html[data-theme="<id>"]` and list it in `THEMES` in `web/src/theme.ts`.
+  `html[data-theme="<id>"]` and list it in `THEMES` in `web/src/theme.ts`. Which VS Code colors
+  an imported theme's tokens come from is the `MAP` in `web/src/vscodeTheme.ts`.
 - **Tell the agents about changes.** When a change affects how agents work (tools, rules, messages
   they receive, what Symbio does on their behalf), add an entry to `src/server/updates.ts`. On the
   next start, each project's coordinator gets the entries it hasn't seen as a note (without being

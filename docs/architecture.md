@@ -123,7 +123,8 @@ into links, showing shared files as cards and the viewer page that opens them), 
 costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
 `Settings.tsx`/`Providers.tsx` the global settings. `styles.css` holds the design tokens (colors,
 radii, fonts) and every rule uses them; `themes.css` overrides them per theme under
-`html[data-theme="…"]`, and `theme.ts`/`Appearance.tsx` pick one and keep it in the browser, with the layout: `ProjectView.tsx`
+`html[data-theme="…"]`, and `theme.ts`/`Appearance.tsx` pick one and keep it in the browser (`vscodeTheme.ts` reads an imported VS
+Code color theme into token values), with the layout: `ProjectView.tsx`
 draws a project as *Classic* (team sidebar, tabs) or *Workbench* (activity bar, side bar with the team
 or the Explorer tree, the other tabs in the middle, the chat on the right, a status bar), from the
 same pieces.
