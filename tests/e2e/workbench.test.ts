@@ -37,8 +37,32 @@ test("the Workbench layout keeps the chat on the right while the middle shows th
   await page.locator(".wb-center h1", { hasText: "The brief" }).waitFor();
   assert.match(await page.locator(".wb-center .tab.active").innerText(), /brief\.md/);
   assert.equal(await chat.isVisible(), true);
-  await page.getByRole("button", { name: "Close the file" }).click();
-  assert.equal(await page.locator(".wb-file-tab").count(), 0);
+  await page.getByRole("button", { name: "Close brief.md" }).click();
+  assert.equal(await page.locator(".wb-center .tab", { hasText: "brief.md" }).count(), 0);
+
+  // The plan, messages, docs, files and settings open from the activity bar as tabs that close too.
+  await page.getByRole("button", { name: "Close Plan" }).click();
+  await page.locator(".wb-center", { hasText: "Nothing open" }).waitFor();
+  await page.locator(".wb-activity").getByRole("button", { name: "Messages" }).click();
+  await page.locator(".wb-activity").getByRole("button", { name: "Project settings" }).click();
+  assert.deepEqual(await page.locator(".wb-center .tab").allInnerTexts(), ["Messages", "Settings"]);
+  assert.equal(await page.locator(".wb-center .tab.active").innerText(), "Settings");
+  await page.getByRole("button", { name: "Close Settings" }).click();
+  assert.equal(await page.locator(".wb-center .tab.active").innerText(), "Messages", "closing the open tab shows the one before it");
+
+  // Dragging the chat's border makes it wider, and the width is kept.
+  const before = (await chat.boundingBox())!.width;
+  const handle = page.getByRole("separator", { name: "Resize the chat" });
+  const box = (await handle.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 100, box.y + 200, { steps: 5 });
+  await page.mouse.up();
+  const after = (await chat.boundingBox())!.width;
+  assert.ok(after > before + 80, `the chat got wider (${before} → ${after})`);
+  await page.reload();
+  await chat.waitFor();
+  assert.ok(Math.abs((await chat.boundingBox())!.width - after) < 2, "the width survives a reload");
 
   // A narrow window gets the classic layout back.
   await page.setViewportSize({ width: 800, height: 800 });

@@ -126,8 +126,8 @@ radii, fonts) and every rule uses them; `themes.css` overrides them per theme un
 `html[data-theme="…"]`, and `theme.ts`/`Appearance.tsx` pick one and keep it in the browser (`vscodeTheme.ts` reads an imported VS
 Code color theme into token values), with the layout: `ProjectView.tsx`
 draws a project as *Classic* (team sidebar, tabs) or *Workbench* (activity bar, side bar with the team
-or the Explorer tree, the other tabs in the middle, the chat on the right, a status bar), from the
-same pieces.
+or the Explorer tree, closable tabs in the middle, the chat on the right, resizable columns, a status
+bar), from the same pieces.
 
 ## Lifecycle of a project
 

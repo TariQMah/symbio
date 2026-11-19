@@ -143,6 +143,7 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.20.0** — Workbench: views in the activity bar, closable tabs, resizable side bar and chat.
 - **0.19.0** — Import a VS Code color theme (#2, step 4 of 4).
 - **0.18.0** — The Workbench layout (activity bar, side bar, the work in the middle, the chat on the right,
   a status bar) and the Developer look (Dark Modern + Workbench).

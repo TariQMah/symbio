@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.20.0]
+
+- **Workbench, more like an editor.** The plan, messages, docs, files and settings are icons in the activity bar
+  and open as tabs in the middle; every tab closes (×), like a file's, and several files can be open at once. The
+  side bar and the chat are resized by dragging their border (or with the arrow keys when it has focus;
+  double-click puts it back), and the widths are kept in the browser.
+
 ## [0.19.0]
 
 - **Import a VS Code color theme.** Settings → Appearance → **Import a VS Code theme…** takes a color theme's `.json`

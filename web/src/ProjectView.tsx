@@ -39,9 +39,18 @@ import { ProjectSettings } from "./ProjectSettings";
 import { Avatar, EmptyState, statusText, waitsForPinnedModel } from "./ui";
 
 type Tab = "chat" | "plan" | "explorer" | "messages" | "docs" | "files" | "settings";
-// The Workbench layout keeps the chat on the right and the Explorer in its side bar, so its middle
-// shows the other tabs, or a file picked in the Explorer.
-type CenterTab = Exclude<Tab, "chat" | "explorer"> | "file";
+// The Workbench layout keeps the chat on the right and the Explorer in its side bar; its middle has
+// tabs, opened from the activity bar or the Explorer and closed like an editor's.
+type CenterView = Exclude<Tab, "chat" | "explorer">;
+type OpenTab = { view: CenterView } | { file: ExplorerPick };
+const tabKey = (t: OpenTab) => ("view" in t ? t.view : `file:${t.file.agentId ?? ""}|${t.file.path}`);
+const CENTER_VIEWS: CenterView[] = ["plan", "messages", "docs", "files", "settings"];
+
+// Column widths the human dragged, kept in the browser.
+function useWidth(key: string, initial: number): [number, (w: number) => void] {
+  const [width, setWidth] = useState(() => Number(localStorage.getItem(key)) || initial);
+  return [width, (w) => (localStorage.setItem(key, String(Math.round(w))), setWidth(w))];
+}
 
 function useRemembered<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => {
@@ -76,9 +85,11 @@ export function ProjectView({ projectId }: { projectId: string }) {
   const wide = useWide(1100);
   const workbench = layout === "workbench" && wide;
   const [sideView, setSideView] = useRemembered<"team" | "explorer" | null>(`symbio:wb-side:${projectId}`, "team");
-  const [centerTab, setCenterTab] = useRemembered<CenterTab>(`symbio:wb-tab:${projectId}`, "plan");
+  const [openTabs, setOpenTabs] = useRemembered<OpenTab[]>(`symbio:wb-tabs:${projectId}`, [{ view: "plan" }]);
+  const [activeKey, setActiveKey] = useRemembered<string | null>(`symbio:wb-active:${projectId}`, "plan");
   const [explorerAgent, setExplorerAgent] = useState<string | null>(null);
-  const [picked, setPicked] = useState<ExplorerPick | null>(null);
+  const [sideWidth, setSideWidth] = useWidth("symbio:wb-side-width", 260);
+  const [chatWidth, setChatWidth] = useWidth("symbio:wb-chat-width", 420);
 
   useEffect(() => {
     const load = () =>
@@ -139,9 +150,22 @@ export function ProjectView({ projectId }: { projectId: string }) {
   const openTab = (t: Tab) => {
     if (!workbench) return setTab(t);
     if (t === "explorer") setSideView("explorer");
-    else if (t !== "chat") setCenterTab(t);
+    else if (t !== "chat") openInCenter({ view: t });
   };
-  const center: CenterTab = centerTab === "file" && !picked ? "plan" : centerTab;
+  // Opens a tab in the Workbench's middle (or goes to it, if it's open).
+  const openInCenter = (t: OpenTab) => {
+    const key = tabKey(t);
+    if (!openTabs.some((o) => tabKey(o) === key)) setOpenTabs([...openTabs, t]);
+    setActiveKey(key);
+  };
+  const closeTab = (key: string) => {
+    const i = openTabs.findIndex((o) => tabKey(o) === key);
+    const rest = openTabs.filter((o) => tabKey(o) !== key);
+    setOpenTabs(rest);
+    if (activeKey === key) setActiveKey(rest.length ? tabKey(rest[Math.max(0, i - 1)]) : null);
+  };
+  const activeTab = openTabs.find((o) => tabKey(o) === activeKey) ?? null;
+  const picked = activeTab && "file" in activeTab ? activeTab.file : null;
 
   async function start() {
     setStarting(true);
@@ -323,7 +347,7 @@ export function ProjectView({ projectId }: { projectId: string }) {
     </EmptyState>
   );
 
-  const view = (t: Tab | CenterTab) =>
+  const view = (t: Tab | "file", file?: ExplorerPick | null) =>
     t === "docs" ? (
       <Docs project={project} />
     ) : t === "files" ? (
@@ -338,7 +362,7 @@ export function ProjectView({ projectId }: { projectId: string }) {
       <ProjectSettings key={project.id} project={project} onChanged={setProject} />
     ) : t === "file" ? (
       <div className="docs-view explorer-view wb-file">
-        <ExplorerPreview projectId={project.id} picked={picked} />
+        <ExplorerPreview projectId={project.id} picked={file ?? null} />
       </div>
     ) : (
       chat
@@ -380,10 +404,32 @@ export function ProjectView({ projectId }: { projectId: string }) {
   if (workbench) {
     const working = activeAgents.filter((a) => a.status === "busy").length;
     const waiting = activeAgents.filter((a) => a.status === "waiting").length;
-    const centerTabs = tabs.filter((t): t is (typeof tabs)[number] & { id: CenterTab } => t.id !== "chat" && t.id !== "explorer");
     const side = (v: "team" | "explorer") => setSideView(sideView === v ? null : v);
+    const tabInfo = (v: CenterView) => tabs.find((t) => t.id === v)!;
+    const viewIcon: Record<CenterView, React.ReactNode> = {
+      plan: <KanbanSquare size={20} />,
+      messages: <MessagesSquare size={20} />,
+      docs: <BookOpen size={20} />,
+      files: <Paperclip size={20} />,
+      settings: <Settings2 size={20} />,
+    };
+    const viewButton = (v: CenterView) => (
+      <button
+        key={v}
+        className={`wb-activity-item ${activeKey === v ? "active" : ""}`}
+        onClick={() => openInCenter({ view: v })}
+        title={v === "settings" ? "Project settings" : tabInfo(v).label}
+        aria-label={v === "settings" ? "Project settings" : tabInfo(v).label}
+      >
+        {viewIcon[v]}
+        {v === "plan" && plan?.status === "proposed" && <span className="wb-activity-badge amber" />}
+      </button>
+    );
     return (
-      <div className={`workbench ${sideView ? "" : "no-side"}`}>
+      <div
+        className={`workbench ${sideView ? "" : "no-side"}`}
+        style={{ "--wb-side": `${sideWidth}px`, "--wb-chat": `${chatWidth}px` } as React.CSSProperties}
+      >
         <nav className="wb-activity" aria-label="Views">
           <button className={`wb-activity-item ${sideView === "team" ? "active" : ""}`} onClick={() => side("team")} title="Team" aria-label="Team" aria-pressed={sideView === "team"}>
             <Users size={20} />
@@ -392,10 +438,10 @@ export function ProjectView({ projectId }: { projectId: string }) {
           <button className={`wb-activity-item ${sideView === "explorer" ? "active" : ""}`} onClick={() => side("explorer")} title="Explorer" aria-label="Explorer" aria-pressed={sideView === "explorer"}>
             <FolderTree size={20} />
           </button>
+          <span className="wb-activity-sep" />
+          {CENTER_VIEWS.filter((v) => v !== "settings").map(viewButton)}
           <span className="grow" />
-          <button className={`wb-activity-item ${center === "settings" ? "active" : ""}`} onClick={() => setCenterTab("settings")} title="Project settings" aria-label="Project settings">
-            <Settings2 size={20} />
-          </button>
+          {viewButton("settings")}
         </nav>
         {sideView && (
           <aside className="wb-side" aria-label={sideView === "team" ? "Team" : "Explorer"}>
@@ -404,57 +450,50 @@ export function ProjectView({ projectId }: { projectId: string }) {
             ) : (
               <div className="wb-side-scroll explorer-tree">
                 <div className="wb-side-title">Explorer</div>
-                <ExplorerTree
-                  project={project}
-                  agentId={explorerAgent}
-                  onAgent={setExplorerAgent}
-                  picked={picked}
-                  onPick={(p) => {
-                    setPicked(p);
-                    setCenterTab("file");
-                  }}
-                />
+                <ExplorerTree project={project} agentId={explorerAgent} onAgent={setExplorerAgent} picked={picked} onPick={(p) => openInCenter({ file: p })} />
               </div>
             )}
+            <Resizer side="right" width={sideWidth} min={180} max={Math.min(600, innerWidth - 48 - chatWidth - 320)} initial={260} onResize={setSideWidth} label="Resize the side bar" />
           </aside>
         )}
         <section className="main wb-center">
           <div className="main-head">
             <div className="tabs">
-              {centerTabs.map((t) => (
-                <button key={t.id} className={`tab ${center === t.id ? "active" : ""}`} onClick={() => setCenterTab(t.id)}>
-                  {t.icon}
-                  {t.label}
-                  {t.extra}
-                  {center === t.id && <motion.span layoutId="tab-underline" className="tab-underline" transition={{ duration: 0.15 }} />}
-                </button>
-              ))}
-              {picked && (
-                <div className={`tab wb-file-tab ${center === "file" ? "active" : ""}`} title={picked.path}>
-                  <button className="wb-file-open" onClick={() => setCenterTab("file")}>
-                    <FileText size={14} />
-                    <span className="ellipsis">{picked.path.split("/").pop()}</span>
-                  </button>
-                  <button
-                    className="wb-tab-close"
-                    aria-label="Close the file"
-                    onClick={() => {
-                      setPicked(null);
-                      if (center === "file") setCenterTab("plan");
-                    }}
-                  >
-                    <X size={12} />
-                  </button>
-                  {center === "file" && <motion.span layoutId="tab-underline" className="tab-underline" transition={{ duration: 0.15 }} />}
-                </div>
-              )}
+              {openTabs.map((t) => {
+                const key = tabKey(t);
+                const active = key === activeKey;
+                const info = "view" in t ? tabInfo(t.view) : null;
+                const name = "view" in t ? info!.label : t.file.path.split("/").pop();
+                return (
+                  <div key={key} className={`tab wb-tab ${active ? "active" : ""}`} title={"file" in t ? t.file.path : undefined}>
+                    <button className="wb-tab-open" onClick={() => setActiveKey(key)}>
+                      {info ? info.icon : <FileText size={14} />}
+                      <span className="ellipsis">{name}</span>
+                      {info?.extra}
+                    </button>
+                    <button className="wb-tab-close" aria-label={`Close ${name}`} title="Close" onClick={() => closeTab(key)}>
+                      <X size={12} />
+                    </button>
+                    {active && <motion.span layoutId="tab-underline" className="tab-underline" transition={{ duration: 0.15 }} />}
+                  </div>
+                );
+              })}
             </div>
             {actions}
           </div>
           {banners}
-          <div className="main-body">{view(center)}</div>
+          <div className="main-body">
+            {activeTab ? (
+              view("view" in activeTab ? activeTab.view : "file", picked)
+            ) : (
+              <EmptyState icon={<FolderTree size={20} />} title="Nothing open">
+                Open the plan, messages, docs, files or settings from the bar on the left, or a file from the Explorer.
+              </EmptyState>
+            )}
+          </div>
         </section>
         <section className="wb-chat" aria-label="Chat">
+          <Resizer side="left" width={chatWidth} min={300} max={Math.min(1000, innerWidth - 48 - (sideView ? sideWidth : 0) - 320)} initial={420} onResize={setChatWidth} label="Resize the chat" />
           <div className="wb-chat-head">
             <span className="wb-side-title">Chat</span>
             <select value={agent?.id ?? ""} onChange={(e) => select(e.target.value)} aria-label="Talk to" title="Who you're talking to">
@@ -484,7 +523,7 @@ export function ProjectView({ projectId }: { projectId: string }) {
             </span>
           )}
           {plan && plan.tasks.length > 0 && (
-            <button className="wb-status-item" onClick={() => setCenterTab("plan")}>
+            <button className="wb-status-item" onClick={() => openInCenter({ view: "plan" })}>
               <KanbanSquare size={12} />
               {done}/{plan.tasks.length} tasks done
             </button>
@@ -563,5 +602,52 @@ function AgentRow({ agent: a, active, onClick }: { agent: Agent; active: boolean
         </span>
       </span>
     </motion.button>
+  );
+}
+
+/** A border to drag (or move with the arrow keys) to make a Workbench column wider; double-click resets it. */
+function Resizer({ side, width, min, max, initial, onResize, label }: { side: "left" | "right"; width: number; min: number; max: number; initial: number; onResize: (w: number) => void; label: string }) {
+  const clamp = (w: number) => Math.min(max, Math.max(min, w));
+  return (
+    <div
+      className={`wb-resizer ${side}`}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      aria-valuenow={Math.round(width)}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      tabIndex={0}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startWidth = width;
+        const el = e.currentTarget;
+        el.setPointerCapture(e.pointerId);
+        el.classList.add("dragging");
+        document.body.classList.add("resizing");
+        const move = (ev: PointerEvent) => onResize(clamp(startWidth + (side === "right" ? ev.clientX - startX : startX - ev.clientX)));
+        const up = () => {
+          el.classList.remove("dragging");
+          document.body.classList.remove("resizing");
+          el.removeEventListener("pointermove", move);
+          el.removeEventListener("pointerup", up);
+          el.removeEventListener("pointercancel", up);
+        };
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerup", up);
+        el.addEventListener("pointercancel", up);
+      }}
+      onDoubleClick={() => onResize(initial)}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 50 : 10;
+        const grow = side === "right" ? "ArrowRight" : "ArrowLeft";
+        const shrink = side === "right" ? "ArrowLeft" : "ArrowRight";
+        if (e.key === grow) onResize(clamp(width + step));
+        else if (e.key === shrink) onResize(clamp(width - step));
+        else return;
+        e.preventDefault();
+      }}
+    />
   );
 }
