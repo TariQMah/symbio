@@ -18,7 +18,7 @@ import { beginOauth, cancelOauth, completeOauth, connectWithKey, listProviders, 
 import { docsRoot, listDocs, rawDoc, readDoc, searchDocs, writeDoc } from "./docs.js";
 import { readRegister } from "./rules.js";
 import { addAttachment, attachmentNote, getAttachments, listAttachments, markSent, removeAttachment } from "./attachments.js";
-import { fileResponse, listShared, resolveFile, type ResolvedFile } from "./files.js";
+import { fileResponse, listDir, listShared, resolveFile, type ResolvedFile } from "./files.js";
 import type { Team } from "./team.js";
 import type { Connections } from "./connections.js";
 import { averageDailyUsage, PriceBook, projectUsage, resolvePrices, type Price } from "./costs.js";
@@ -1162,6 +1162,17 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
 
   // The file itself: shown in the browser when it can be (images, video, audio, PDF, text), else downloaded.
   api.get("/projects/:id/files/raw", async (c) => fileResponse(await fileFor(c), { download: c.req.query("download") === "1", range: c.req.header("range") }));
+
+  // One folder of the project or of a helper's copy, for the Explorer tab (read-only).
+  api.get("/projects/:id/files/tree", async (c) => {
+    const project = withProject(c.req.param("id"));
+    try {
+      return c.json(await listDir(project, c.req.query("path") ?? "", agentOf(project, c.req.query("agent"))));
+    } catch (err) {
+      const message = (err as Error).message;
+      throw new HttpError(/not found|ENOENT|ENOTDIR/.test(message) ? 404 : 403, message);
+    }
+  });
 
   // A text file's content, for the viewer page (Markdown formatted, code with line numbers).
   api.get("/projects/:id/files/text", async (c) => {

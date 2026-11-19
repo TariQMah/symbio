@@ -25,7 +25,7 @@ open to anyone (see their issues).
    steps, each released on its own: (1) themes in Settings → Appearance, kept in the browser, with
    the current look as the default plus Dark Modern and Light Modern (VS Code's default colors),
    *released in 0.16.0*; (2) an **Explorer** tab next to Plan, listing the project's files and folders
-   read-only (secrets hidden, as in the Files tab); (3) a **Workbench** layout like VS Code: an
+   read-only (secrets hidden, as in the Files tab), *released in 0.17.0*; (3) a **Workbench** layout like VS Code: an
    activity bar and side bar for the tools (team, Explorer, plan, messages, docs, files), the work
    in the middle, and the chat on the right with an agent switcher, plus a status bar; the
    *Developer* preset is Dark Modern + Workbench, phones keep the classic layout; (4) importing a

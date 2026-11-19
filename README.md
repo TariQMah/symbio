@@ -127,6 +127,8 @@ moment; the agent that asked carries on.
   (when you ask, after each finished task, or automatically when a conversation grows too large to
   send). A daily check backs up Symbio's state and tells you and core about work that exists only
   on this machine and build outputs filling the disk.
+- **Explorer.** The project's folders and files in a tab, read-only, to look at what the team wrote
+  without leaving the browser (secrets stay hidden).
 - **Themes.** The default look, or the colors of VS Code's Dark Modern and Light Modern themes
   (Settings → Appearance, kept per browser).
 - **Costs in view.** Tokens and estimated cost per agent and model, with prices you can set (and

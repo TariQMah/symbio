@@ -17,12 +17,14 @@ import {
   Users,
   Plus,
   Pin,
+  FolderTree,
 } from "lucide-react";
 import { UsageLine } from "./Usage";
 import { useCostsShown } from "./privacy";
 import { api, formatTokens, subscribe, usageTokens, type Agent, type Asset, type Plan, type Project } from "./api";
 import { Chat } from "./Chat";
 import { Docs } from "./Docs";
+import { Explorer } from "./Explorer";
 import { FilesView } from "./Attachments";
 import { InboxDrawer, useInbox } from "./Inbox";
 import { Kanban } from "./Kanban";
@@ -32,7 +34,7 @@ import { ProjectMenu } from "./ProjectMenu";
 import { ProjectSettings } from "./ProjectSettings";
 import { Avatar, EmptyState, statusText, waitsForPinnedModel } from "./ui";
 
-type Tab = "chat" | "plan" | "messages" | "docs" | "files" | "settings";
+type Tab = "chat" | "plan" | "explorer" | "messages" | "docs" | "files" | "settings";
 
 function useRemembered<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => {
@@ -154,6 +156,7 @@ export function ProjectView({ projectId }: { projectId: string }) {
           </span>
         ) : null,
     },
+    { id: "explorer", label: "Explorer", icon: <FolderTree size={14} /> },
     { id: "messages", label: "Messages", icon: <MessagesSquare size={14} /> },
     { id: "docs", label: "Docs", icon: <BookOpen size={14} /> },
     { id: "files", label: "Files", icon: <Paperclip size={14} /> },
@@ -306,6 +309,8 @@ export function ProjectView({ projectId }: { projectId: string }) {
             <Docs project={project} />
           ) : tab === "files" ? (
             <FilesView project={project} />
+          ) : tab === "explorer" ? (
+            <Explorer key={project.id} project={project} />
           ) : tab === "plan" ? (
             <Kanban project={project} plan={plan} />
           ) : tab === "messages" ? (

@@ -115,6 +115,57 @@ export async function resolveFile(project: Project, given: string, agent?: Agent
   return null;
 }
 
+export interface DirEntry {
+  name: string;
+  dir: boolean;
+  kind?: FileKind;
+  size?: number;
+}
+
+const MAX_ENTRIES = 2000;
+
+/** A folder with nothing in it that could be shown: .git, and .symbio except its attachments and docs. */
+const hiddenFolder = (rel: string) => ["x", "attachments", "docs"].every((child) => refused(`${rel}/${child}`));
+
+/**
+ * One folder of the project (or of a helper's copy), for the Explorer tab: its folders and files,
+ * folders first, without what `refused` hides (git's internals, Symbio's own files, secrets).
+ */
+export async function listDir(project: Project, given: string, agent?: Agent | null): Promise<{ path: string; where: string; entries: DirEntry[]; truncated: boolean }> {
+  const root = agent?.branch ? { dir: agent.directory, where: agent.name } : { dir: project.directory, where: "project" };
+  const cleaned = given.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  if (path.isAbsolute(cleaned) || cleaned.split("/").includes("..")) throw new Error("give a path inside the folder");
+  const realRoot = realpathSync(root.dir);
+  let real: string;
+  try {
+    real = realpathSync(path.resolve(root.dir, cleaned));
+  } catch {
+    throw new Error("not found");
+  }
+  // Real paths, so a link inside the folder can't lead outside it.
+  const rel = path.relative(realRoot, real);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("outside the folder");
+  const relSlash = rel.split(path.sep).join("/");
+  if (relSlash && hiddenFolder(relSlash)) throw new Error(`${relSlash}: ${refused(`${relSlash}/x`)}.`);
+  const dirents = await fs.readdir(real, { withFileTypes: true });
+  const entries: DirEntry[] = [];
+  for (const d of dirents) {
+    const childRel = relSlash ? `${relSlash}/${d.name}` : d.name;
+    let dir = d.isDirectory();
+    let size: number | undefined;
+    if (d.isSymbolicLink() || d.isFile()) {
+      const st = await fs.stat(path.join(real, d.name)).catch(() => null);
+      if (!st) continue;
+      dir = st.isDirectory();
+      if (!dir) size = st.size;
+    }
+    if (dir ? hiddenFolder(childRel) : refused(childRel)) continue;
+    entries.push(dir ? { name: d.name, dir } : { name: d.name, dir, kind: kindOf(d.name).kind, size });
+  }
+  entries.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }) : a.dir ? -1 : 1));
+  return { path: relSlash, where: root.where, entries: entries.slice(0, MAX_ENTRIES), truncated: entries.length > MAX_ENTRIES };
+}
+
 /** A file's bytes for the browser, with ranges so videos can seek. */
 export function fileResponse(file: ResolvedFile, opts: { download?: boolean; range?: string | null }): Response {
   const inline = !opts.download && file.kind !== "other";

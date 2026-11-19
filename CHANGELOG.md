@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0]
+
+- **Explorer tab.** Next to Plan, the project's folders and files as a tree (or a helper's own copy, where its branch's
+  work is before it's merged). Folders open on a click, Markdown and text show beside the tree, images preview, other
+  files open or download. Read-only, and under the same rules as files in the chat: no `.git`, none of Symbio's own
+  files, nothing that looks like a secret.
+
 ## [0.16.0]
 
 - **Themes.** Settings → **Appearance** has a choice of looks, kept in this browser: **Symbio** (the default, as

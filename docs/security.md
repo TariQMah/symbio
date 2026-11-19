@@ -19,13 +19,14 @@ working around the human's control, and web pages in your browser reaching the l
   is matched to a live agent session; core-only tools check the caller's role.
 - **New folders from the browser** (`POST /api/fs/mkdir`, the in-page folder browser used over remote access): one
   plain name inside an existing folder, no separators or characters Windows refuses, never recursive.
-- **Project files in the browser** (links to paths agents mention, files they share,
-  `src/server/files.ts`): only files inside the project folder or a helper's copy are served, checked
+- **Project files in the browser** (links to paths agents mention, files they share, the Explorer
+  tab, `src/server/files.ts`): only files inside the project folder or a helper's copy are served, checked
   on real paths so a symlink can't lead outside. Never git's internals (`.git/`), Symbio's own data
   in `.symbio/` (except attachments and docs), or files that look like secrets (`.env*`, private keys,
   `.pem`/`.pfx`/`.p12`, `.npmrc`, `.netrc`). Files are fetched with the UI key and shown from memory;
   the key never goes in a file URL. Only images, video, audio, PDFs and plain text are shown in the
-  browser; anything else downloads.
+  browser; anything else downloads. The Explorer lists folders under the same rules: hidden files and
+  folders aren't listed and can't be opened, and it's read-only (no writing, renaming or deleting).
 - Debug routes that pass OpenCode responses through (`/api/debug/opencode/*`, raw model data) are
   off unless Symbio is started with `SYMBIO_DEBUG=1`, because those responses can contain provider
   keys.

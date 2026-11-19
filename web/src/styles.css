@@ -981,3 +981,24 @@ tr.file-view-target > td, tr.file-view-target > th { background: color-mix(in sr
 .theme-preview-lines span { display: block; height: 5px; border-radius: 3px; width: 85%; opacity: 0.85; }
 .theme-card-text { display: flex; flex-direction: column; gap: 2px; }
 .theme-card-text .list-title { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Explorer tab (Explorer.tsx): the project's folders and files beside a read-only preview. */
+.explorer-tree { gap: 0; padding-top: 6px; }
+.explorer-head { display: flex; align-items: center; gap: 6px; padding: 0 2px 6px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.explorer-head select { flex: 1; min-width: 0; font-size: 12px; padding: 4px 6px; }
+.explorer-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); }
+.explorer-item { display: flex; align-items: center; gap: 5px; width: 100%; text-align: left; background: none; border: none; font: inherit; font-size: 13px; line-height: 1.3; color: var(--text-2); padding-top: 3px; padding-bottom: 3px; padding-right: 8px; border-radius: var(--r-sm); cursor: pointer; }
+.explorer-item svg { color: var(--text-3); flex: none; }
+.explorer-item .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.explorer-item:hover { background: var(--surface); color: var(--text); }
+.explorer-item.active { background: var(--surface-2); color: var(--text); }
+.explorer-spacer { width: 13px; flex: none; }
+.explorer-note { font-size: 12px; color: var(--text-3); padding: 3px 8px; }
+.explorer-error { color: var(--red); }
+.explorer-body { padding: 0; }
+.file-view.embedded { max-width: none; margin: 0; padding: 0 24px 48px; }
+.file-view.embedded .file-view-head { padding-top: 12px; }
+.explorer-file { padding: 16px 24px; display: flex; flex-direction: column; gap: 14px; }
+.explorer-file-head { display: flex; align-items: center; gap: 8px; }
+.explorer-file-head strong { font-family: var(--mono); font-size: 13px; }
+.explorer-image { max-width: 100%; max-height: 70vh; object-fit: contain; align-self: flex-start; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }

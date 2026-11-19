@@ -200,7 +200,7 @@ export function FileCard({ projectId, agentId, path, caption }: { projectId: str
 // ---------------------------------------------------------------- the viewer page (a new tab)
 
 /** A text file on its own page: Markdown formatted, code with line numbers, scrolled to the line. */
-export function FileViewer({ projectId, rel, agentId, line }: { projectId: string; rel: string; agentId?: string | null; line?: number }) {
+export function FileViewer({ projectId, rel, agentId, line, embedded }: { projectId: string; rel: string; agentId?: string | null; line?: number; embedded?: boolean }) {
   const [data, setData] = useState<{ content: string; where: string; kind: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState(false);
@@ -209,9 +209,9 @@ export function FileViewer({ projectId, rel, agentId, line }: { projectId: strin
   // render, then marked by the render itself, so re-renders keep it).
   const [mark, setMark] = useState<number | null>(null);
   useEffect(() => {
-    document.title = `${rel.split("/").pop()} · Symbio`;
+    if (!embedded) document.title = `${rel.split("/").pop()} · Symbio`;
     api.fileText(projectId, rel, agentId).then(setData, (e) => setError((e as Error).message));
-  }, [projectId, rel, agentId]);
+  }, [projectId, rel, agentId, embedded]);
   useLayoutEffect(() => {
     if (!data || !line || !body.current) return;
     const starts = [...body.current.querySelectorAll<HTMLElement>("[data-line]")].map((b) => Number(b.dataset.line));
@@ -245,7 +245,7 @@ export function FileViewer({ projectId, rel, agentId, line }: { projectId: strin
     } as Components;
   }, [mark]);
   return (
-    <div className="file-view">
+    <div className={`file-view ${embedded ? "embedded" : ""}`}>
       <div className="file-view-head">
         <FileText size={15} />
         <strong>{rel}</strong>

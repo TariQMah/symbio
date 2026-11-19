@@ -416,6 +416,14 @@ export interface ProjectFile {
   refused?: string;
 }
 
+/** One entry of a folder in the Explorer tab (files.ts listDir). */
+export interface DirEntry {
+  name: string;
+  dir: boolean;
+  kind?: NonNullable<ProjectFile["kind"]>;
+  size?: number;
+}
+
 export interface SharedFile {
   id: string;
   rel: string;
@@ -751,6 +759,8 @@ export const api = {
     call<ProjectFile[]>("POST", `/projects/${projectId}/files/resolve`, { paths, agentId: agentId ?? undefined }),
   fileText: (projectId: string, rel: string, agentId?: string | null) =>
     call<{ rel: string; where: string; agentId: string | null; kind: string; size: number; content: string }>("GET", `/projects/${projectId}/files/text?${fileQuery(rel, agentId)}`),
+  fileTree: (projectId: string, dir: string, agentId?: string | null) =>
+    call<{ path: string; where: string; entries: DirEntry[]; truncated: boolean }>("GET", `/projects/${projectId}/files/tree?${fileQuery(dir, agentId)}`),
   sharedFiles: (projectId: string) => call<SharedFile[]>("GET", `/projects/${projectId}/shared-files`),
   questions: (projectId: string) => call<Question[]>("GET", `/projects/${projectId}/questions`),
   answerQuestions: (projectId: string, answers: { id: string; answer: string; attachments?: string[] }[]) =>

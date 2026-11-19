@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { addShared, fileResponse, kindOf, listShared, refused, resolveFile } from "../src/server/files.js";
+import { addShared, fileResponse, kindOf, listDir, listShared, refused, resolveFile } from "../src/server/files.js";
 
 function setup() {
   const root = mkdtempSync(path.join(os.tmpdir(), "sym-files-"));
@@ -73,4 +73,32 @@ test("shared files are recorded where they were found", async () => {
   assert.equal(s.kind, "markdown");
   assert.deepEqual((await listShared(project)).map((x) => [x.rel, x.caption]), [["docs/regras/novo.md", "The new rule"]]);
   await assert.rejects(addShared(project, helper, "nope.png"), /Not found/);
+});
+
+test("the Explorer lists one folder at a time, folders first, without git's internals, Symbio's own files or secrets", async () => {
+  const { project, helper, core, projectDir } = setup();
+  mkdirSync(path.join(projectDir, ".git", "objects"), { recursive: true });
+  mkdirSync(path.join(projectDir, ".symbio", "attachments"), { recursive: true });
+  mkdirSync(path.join(projectDir, ".symbio", "sessions"), { recursive: true });
+  writeFileSync(path.join(projectDir, ".symbio", "state.json"), "{}");
+  writeFileSync(path.join(projectDir, "id_ed25519"), "key");
+  writeFileSync(path.join(projectDir, "notes10.txt"), "x");
+  writeFileSync(path.join(projectDir, "notes9.txt"), "x");
+
+  const top = await listDir(project, "", core);
+  assert.equal(top.where, "project");
+  assert.deepEqual(top.entries.map((e) => e.name), [".symbio", "docs", "notes9.txt", "notes10.txt", "video.mp4"]);
+  assert.deepEqual(top.entries.find((e) => e.name === "video.mp4"), { name: "video.mp4", dir: false, kind: "video", size: 1000 });
+  assert.deepEqual((await listDir(project, ".symbio", core)).entries.map((e) => e.name), ["attachments"]);
+  assert.deepEqual((await listDir(project, "docs\\regras/", core)).entries.map((e) => e.name), ["checagem-ia.md"]);
+
+  const branch = await listDir(project, "docs/regras", helper);
+  assert.equal(branch.where, "ia", "a helper's own copy");
+  assert.deepEqual(branch.entries.map((e) => e.name), ["checagem-ia.md", "novo.md"]);
+
+  await assert.rejects(listDir(project, ".git", core), /git's internal/);
+  await assert.rejects(listDir(project, ".symbio/sessions", core), /Symbio's own/);
+  await assert.rejects(listDir(project, "../", core), /inside the folder/);
+  await assert.rejects(listDir(project, path.join(projectDir, "docs"), core), /inside the folder/);
+  await assert.rejects(listDir(project, "missing", core), /not found/);
 });
