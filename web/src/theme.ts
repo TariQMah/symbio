@@ -57,3 +57,51 @@ export function useTheme(): [string, (id: string) => void] {
   }, []);
   return [theme, setTheme];
 }
+
+// ---------------------------------------------------------------- layout
+
+export type Layout = "classic" | "workbench";
+
+export const LAYOUTS: { id: Layout; label: string; description: string }[] = [
+  { id: "classic", label: "Classic", description: "The team on the left, the chat or a tab in the middle. The default." },
+  { id: "workbench", label: "Workbench", description: "Like an editor: tools on the left, the work in the middle, the chat on the right." },
+];
+
+const LAYOUT_KEY = "symbio:layout";
+
+export function currentLayout(): Layout {
+  return localStorage.getItem(LAYOUT_KEY) === "workbench" ? "workbench" : "classic";
+}
+
+export function setLayout(id: Layout) {
+  localStorage.setItem(LAYOUT_KEY, id);
+  dispatchEvent(new Event(EVENT));
+}
+
+export function useLayout(): [Layout, (id: Layout) => void] {
+  const [layout, set] = useState(currentLayout);
+  useEffect(() => {
+    const update = () => set(currentLayout());
+    const onStorage = (e: StorageEvent) => e.key === LAYOUT_KEY && update();
+    addEventListener(EVENT, update);
+    addEventListener("storage", onStorage);
+    return () => {
+      removeEventListener(EVENT, update);
+      removeEventListener("storage", onStorage);
+    };
+  }, []);
+  return [layout, setLayout];
+}
+
+/** Whether the window is at least this wide (the Workbench needs room for three columns). */
+export function useWide(minWidth: number): boolean {
+  const query = `(min-width: ${minWidth}px)`;
+  const [wide, setWide] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const m = matchMedia(query);
+    const update = () => setWide(m.matches);
+    m.addEventListener("change", update);
+    return () => m.removeEventListener("change", update);
+  }, [query]);
+  return wide;
+}

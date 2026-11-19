@@ -18,13 +18,17 @@ import {
   Plus,
   Pin,
   FolderTree,
+  FileText,
+  X,
+  Bot,
 } from "lucide-react";
 import { UsageLine } from "./Usage";
 import { useCostsShown } from "./privacy";
 import { api, formatTokens, subscribe, usageTokens, type Agent, type Asset, type Plan, type Project } from "./api";
 import { Chat } from "./Chat";
 import { Docs } from "./Docs";
-import { Explorer } from "./Explorer";
+import { Explorer, ExplorerPreview, ExplorerTree, type ExplorerPick } from "./Explorer";
+import { useLayout, useWide } from "./theme";
 import { FilesView } from "./Attachments";
 import { InboxDrawer, useInbox } from "./Inbox";
 import { Kanban } from "./Kanban";
@@ -35,6 +39,9 @@ import { ProjectSettings } from "./ProjectSettings";
 import { Avatar, EmptyState, statusText, waitsForPinnedModel } from "./ui";
 
 type Tab = "chat" | "plan" | "explorer" | "messages" | "docs" | "files" | "settings";
+// The Workbench layout keeps the chat on the right and the Explorer in its side bar, so its middle
+// shows the other tabs, or a file picked in the Explorer.
+type CenterTab = Exclude<Tab, "chat" | "explorer"> | "file";
 
 function useRemembered<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => {
@@ -64,6 +71,14 @@ export function ProjectView({ projectId }: { projectId: string }) {
   const [showStopped, setShowStopped] = useState(false);
   const log = useProjectLog(projectId);
   const inbox = useInbox(project, log, plan);
+  const [layout] = useLayout();
+  // Three columns need room: narrow windows and phones keep the classic layout.
+  const wide = useWide(1100);
+  const workbench = layout === "workbench" && wide;
+  const [sideView, setSideView] = useRemembered<"team" | "explorer" | null>(`symbio:wb-side:${projectId}`, "team");
+  const [centerTab, setCenterTab] = useRemembered<CenterTab>(`symbio:wb-tab:${projectId}`, "plan");
+  const [explorerAgent, setExplorerAgent] = useState<string | null>(null);
+  const [picked, setPicked] = useState<ExplorerPick | null>(null);
 
   useEffect(() => {
     const load = () =>
@@ -115,11 +130,18 @@ export function ProjectView({ projectId }: { projectId: string }) {
   const nameOf = (id: string | null) => (id === null ? "core" : (project.agents.find((a) => a.id === id)?.name ?? "?"));
   const done = plan?.tasks.filter((t) => t.status === "done").length ?? 0;
 
-  const select = (a: Agent) => {
-    setSelected(a.id);
-    setTab("chat");
+  const select = (a: Agent | string) => {
+    setSelected(typeof a === "string" ? a : a.id);
+    if (!workbench) setTab("chat");
     setTeamOpen(false);
   };
+  // Opens a tab in whichever layout is showing.
+  const openTab = (t: Tab) => {
+    if (!workbench) return setTab(t);
+    if (t === "explorer") setSideView("explorer");
+    else if (t !== "chat") setCenterTab(t);
+  };
+  const center: CenterTab = centerTab === "file" && !picked ? "plan" : centerTab;
 
   async function start() {
     setStarting(true);
@@ -163,87 +185,327 @@ export function ProjectView({ projectId }: { projectId: string }) {
     { id: "settings", label: "Settings", icon: <Settings2 size={14} /> },
   ];
 
+  const isActive = (a: Agent) => (workbench || tab === "chat") && agent?.id === a.id;
+  const teamPanel = (
+    <>
+      <div className="side-scroll">
+        <div>
+          <div className="side-group-title">
+            Team
+            <span className="tnum">{activeAgents.length}</span>
+            {project.agents.some((a) => a.role === "coordinator" && a.status !== "stopped") && (
+              <button className="btn ghost icon xs side-add" title="New helper: one you talk to directly, in its own chat" aria-label="New helper" onClick={() => setNewHelper(true)}>
+                <Plus size={13} />
+              </button>
+            )}
+          </div>
+          <AnimatePresence initial={false}>
+            {activeAgents.map((a) => (
+              <AgentRow key={a.id} agent={a} active={isActive(a)} onClick={() => select(a)} />
+            ))}
+          </AnimatePresence>
+          {project.agents.length === 0 && (
+            <div style={{ padding: "4px 8px" }}>
+              <button className="btn primary block" onClick={start} disabled={starting}>
+                {starting ? "Starting…" : "Start core"}
+              </button>
+            </div>
+          )}
+          {stopped.length > 0 && (
+            <>
+              <button className="stopped-toggle" onClick={() => setShowStopped((s) => !s)}>
+                {showStopped ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                {stopped.length} stopped
+              </button>
+              {showStopped && stopped.map((a) => <AgentRow key={a.id} agent={a} active={isActive(a)} onClick={() => select(a)} />)}
+            </>
+          )}
+        </div>
+
+        <div>
+          <div className="side-group-title">Shared assets</div>
+          {assets.length === 0 ? (
+            <div className="subtle small" style={{ padding: "0 8px" }}>
+              None declared yet.
+            </div>
+          ) : (
+            assets.map((a) => (
+              <div key={a.name} className={`asset-row ${a.holder ? "held" : ""}`} title={a.description}>
+                {a.holder ? <Lock size={13} /> : <LockOpen size={13} />}
+                <div className="grow">
+                  <div className="asset-name ellipsis">{a.name}</div>
+                  <div className="asset-sub">
+                    {a.holder ? `Held by ${nameOf(a.holder)}` : "Free"}
+                    {a.queue.length > 0 && ` · ${a.queue.length} waiting`}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="side-foot">
+        <UsageLine
+          project={project}
+          onOpen={() => {
+            openTab("settings");
+            setTimeout(() => document.getElementById("usage")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+          }}
+        />
+        {project.agents.length > 0 && (
+          <button
+            className="btn sm block"
+            onClick={() => (project.paused ? api.resumeTeam(project.id) : api.pauseTeam(project.id)).then(setProject).catch((e) => alert(e.message))}
+            title={project.paused ? "Deliver held messages and let agents continue" : "Interrupt working agents and hold their messages"}
+          >
+            {project.paused ? <Play size={13} /> : <Pause size={13} />}
+            {project.paused ? "Resume team" : "Pause team"}
+          </button>
+        )}
+      </div>
+    </>
+  );
+
+  const actions = (
+    <div className="main-actions">
+      {inbox.count > 0 && (
+        <motion.button className="needs-you" onClick={() => setInboxOpen(true)} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+          Needs you
+          <span className="count">{inbox.count}</span>
+        </motion.button>
+      )}
+      <ProjectMenu project={project} onRemoved={() => (location.hash = "#/")} />
+    </div>
+  );
+
+  const banners = (
+    <>
+      {project.paused && (
+        <div className="banner blue">
+          <Pause size={15} />
+          <div className="grow">
+            <strong>The team is paused.</strong>{" "}
+            <span className="muted">
+              {project.heldMessages?.length
+                ? `${project.heldMessages.length} message(s) between agents will be delivered when you resume.`
+                : "Agents won't start anything on their own; you can still talk to them."}
+            </span>
+          </div>
+          <button className="btn sm" onClick={() => api.resumeTeam(project.id).then(setProject).catch((e) => alert(e.message))}>
+            <Play size={13} />
+            Resume
+          </button>
+        </div>
+      )}
+      {stuck.length > 0 && (
+        <div className="banner red">
+          <CircleAlert size={15} />
+          <div className="grow ellipsis" title={stuck[0].problem ?? ""}>
+            <strong>{stuck.map((a) => a.name).join(", ")} can't continue</strong> <span className="muted">— every allowed model failed.</span>
+          </div>
+          <button className="btn sm" onClick={() => api.retryModels(project.id).catch((e) => alert(e.message))}>
+            Retry now
+          </button>
+          <button className="btn primary sm" onClick={() => openTab("settings")}>
+            Add a model
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  const chat = agent ? (
+    <Chat key={agent.id} project={project} agent={agent} />
+  ) : (
+    <EmptyState icon={<MessageSquare size={20} />} title="Start the conversation">
+      Start core to begin discussing the project.
+    </EmptyState>
+  );
+
+  const view = (t: Tab | CenterTab) =>
+    t === "docs" ? (
+      <Docs project={project} />
+    ) : t === "files" ? (
+      <FilesView project={project} />
+    ) : t === "explorer" ? (
+      <Explorer key={project.id} project={project} />
+    ) : t === "plan" ? (
+      <Kanban project={project} plan={plan} />
+    ) : t === "messages" ? (
+      <Messages project={project} log={log} onOpenAgent={(id) => select(id)} />
+    ) : t === "settings" ? (
+      <ProjectSettings key={project.id} project={project} onChanged={setProject} />
+    ) : t === "file" ? (
+      <div className="docs-view explorer-view wb-file">
+        <ExplorerPreview projectId={project.id} picked={picked} />
+      </div>
+    ) : (
+      chat
+    );
+
+  const overlays = (
+    <>
+      <AnimatePresence>
+        {inboxOpen && (
+          <InboxDrawer
+            project={project}
+            plan={plan}
+            data={inbox}
+            onClose={() => setInboxOpen(false)}
+            onOpenAgent={(id) => {
+              select(id);
+              setInboxOpen(false);
+            }}
+            onOpenTab={(t) => {
+              openTab(t);
+              setInboxOpen(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+      {newHelper && (
+        <NewHelperDialog
+          project={project}
+          onClose={() => setNewHelper(false)}
+          onCreated={(a) => {
+            setNewHelper(false);
+            select(a);
+          }}
+        />
+      )}
+    </>
+  );
+
+  if (workbench) {
+    const working = activeAgents.filter((a) => a.status === "busy").length;
+    const waiting = activeAgents.filter((a) => a.status === "waiting").length;
+    const centerTabs = tabs.filter((t): t is (typeof tabs)[number] & { id: CenterTab } => t.id !== "chat" && t.id !== "explorer");
+    const side = (v: "team" | "explorer") => setSideView(sideView === v ? null : v);
+    return (
+      <div className={`workbench ${sideView ? "" : "no-side"}`}>
+        <nav className="wb-activity" aria-label="Views">
+          <button className={`wb-activity-item ${sideView === "team" ? "active" : ""}`} onClick={() => side("team")} title="Team" aria-label="Team" aria-pressed={sideView === "team"}>
+            <Users size={20} />
+            {stuck.length > 0 && <span className="wb-activity-badge red" />}
+          </button>
+          <button className={`wb-activity-item ${sideView === "explorer" ? "active" : ""}`} onClick={() => side("explorer")} title="Explorer" aria-label="Explorer" aria-pressed={sideView === "explorer"}>
+            <FolderTree size={20} />
+          </button>
+          <span className="grow" />
+          <button className={`wb-activity-item ${center === "settings" ? "active" : ""}`} onClick={() => setCenterTab("settings")} title="Project settings" aria-label="Project settings">
+            <Settings2 size={20} />
+          </button>
+        </nav>
+        {sideView && (
+          <aside className="wb-side" aria-label={sideView === "team" ? "Team" : "Explorer"}>
+            {sideView === "team" ? (
+              teamPanel
+            ) : (
+              <div className="wb-side-scroll explorer-tree">
+                <div className="wb-side-title">Explorer</div>
+                <ExplorerTree
+                  project={project}
+                  agentId={explorerAgent}
+                  onAgent={setExplorerAgent}
+                  picked={picked}
+                  onPick={(p) => {
+                    setPicked(p);
+                    setCenterTab("file");
+                  }}
+                />
+              </div>
+            )}
+          </aside>
+        )}
+        <section className="main wb-center">
+          <div className="main-head">
+            <div className="tabs">
+              {centerTabs.map((t) => (
+                <button key={t.id} className={`tab ${center === t.id ? "active" : ""}`} onClick={() => setCenterTab(t.id)}>
+                  {t.icon}
+                  {t.label}
+                  {t.extra}
+                  {center === t.id && <motion.span layoutId="tab-underline" className="tab-underline" transition={{ duration: 0.15 }} />}
+                </button>
+              ))}
+              {picked && (
+                <div className={`tab wb-file-tab ${center === "file" ? "active" : ""}`} title={picked.path}>
+                  <button className="wb-file-open" onClick={() => setCenterTab("file")}>
+                    <FileText size={14} />
+                    <span className="ellipsis">{picked.path.split("/").pop()}</span>
+                  </button>
+                  <button
+                    className="wb-tab-close"
+                    aria-label="Close the file"
+                    onClick={() => {
+                      setPicked(null);
+                      if (center === "file") setCenterTab("plan");
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                  {center === "file" && <motion.span layoutId="tab-underline" className="tab-underline" transition={{ duration: 0.15 }} />}
+                </div>
+              )}
+            </div>
+            {actions}
+          </div>
+          {banners}
+          <div className="main-body">{view(center)}</div>
+        </section>
+        <section className="wb-chat" aria-label="Chat">
+          <div className="wb-chat-head">
+            <span className="wb-side-title">Chat</span>
+            <select value={agent?.id ?? ""} onChange={(e) => select(e.target.value)} aria-label="Talk to" title="Who you're talking to">
+              {[...activeAgents, ...stopped].map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                  {a.role === "coordinator" ? " (lead)" : a.status === "stopped" ? " (stopped)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="wb-chat-body">{chat}</div>
+        </section>
+        <footer className="wb-status">
+          <span className="wb-status-item" title="The agent runtime this project runs on">
+            <Bot size={12} />
+            {project.runtime === "copilot" ? "GitHub Copilot CLI" : "OpenCode"}
+          </span>
+          {project.paused ? (
+            <span className="wb-status-item">
+              <Pause size={12} />
+              Paused
+            </span>
+          ) : (
+            <span className="wb-status-item">
+              {working} working{waiting > 0 ? ` · ${waiting} waiting` : ""}
+            </span>
+          )}
+          {plan && plan.tasks.length > 0 && (
+            <button className="wb-status-item" onClick={() => setCenterTab("plan")}>
+              <KanbanSquare size={12} />
+              {done}/{plan.tasks.length} tasks done
+            </button>
+          )}
+          <span className="grow" />
+          {inbox.count > 0 && (
+            <button className="wb-status-item attention" onClick={() => setInboxOpen(true)}>
+              Needs you: {inbox.count}
+            </button>
+          )}
+          {agent && <span className="wb-status-item">{agent.name} · {agent.model.split("/").pop()}</span>}
+        </footer>
+        {overlays}
+      </div>
+    );
+  }
+
   return (
     <div className="project-view">
       {teamOpen && <div className="side-backdrop" onClick={() => setTeamOpen(false)} />}
-      <aside className={`side ${teamOpen ? "open" : ""}`}>
-        <div className="side-scroll">
-          <div>
-            <div className="side-group-title">
-              Team
-              <span className="tnum">{activeAgents.length}</span>
-              {project.agents.some((a) => a.role === "coordinator" && a.status !== "stopped") && (
-                <button className="btn ghost icon xs side-add" title="New helper: one you talk to directly, in its own chat" aria-label="New helper" onClick={() => setNewHelper(true)}>
-                  <Plus size={13} />
-                </button>
-              )}
-            </div>
-            <AnimatePresence initial={false}>
-              {activeAgents.map((a) => (
-                <AgentRow key={a.id} agent={a} active={tab === "chat" && agent?.id === a.id} onClick={() => select(a)} />
-              ))}
-            </AnimatePresence>
-            {project.agents.length === 0 && (
-              <div style={{ padding: "4px 8px" }}>
-                <button className="btn primary block" onClick={start} disabled={starting}>
-                  {starting ? "Starting…" : "Start core"}
-                </button>
-              </div>
-            )}
-            {stopped.length > 0 && (
-              <>
-                <button className="stopped-toggle" onClick={() => setShowStopped((s) => !s)}>
-                  {showStopped ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  {stopped.length} stopped
-                </button>
-                {showStopped && stopped.map((a) => <AgentRow key={a.id} agent={a} active={tab === "chat" && agent?.id === a.id} onClick={() => select(a)} />)}
-              </>
-            )}
-          </div>
-
-          <div>
-            <div className="side-group-title">Shared assets</div>
-            {assets.length === 0 ? (
-              <div className="subtle small" style={{ padding: "0 8px" }}>
-                None declared yet.
-              </div>
-            ) : (
-              assets.map((a) => (
-                <div key={a.name} className={`asset-row ${a.holder ? "held" : ""}`} title={a.description}>
-                  {a.holder ? <Lock size={13} /> : <LockOpen size={13} />}
-                  <div className="grow">
-                    <div className="asset-name ellipsis">{a.name}</div>
-                    <div className="asset-sub">
-                      {a.holder ? `Held by ${nameOf(a.holder)}` : "Free"}
-                      {a.queue.length > 0 && ` · ${a.queue.length} waiting`}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="side-foot">
-          <UsageLine
-            project={project}
-            onOpen={() => {
-              setTab("settings");
-              setTimeout(() => document.getElementById("usage")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
-            }}
-          />
-          {project.agents.length > 0 && (
-            <button
-              className="btn sm block"
-              onClick={() => (project.paused ? api.resumeTeam(project.id) : api.pauseTeam(project.id)).then(setProject).catch((e) => alert(e.message))}
-              title={project.paused ? "Deliver held messages and let agents continue" : "Interrupt working agents and hold their messages"}
-            >
-              {project.paused ? <Play size={13} /> : <Pause size={13} />}
-              {project.paused ? "Resume team" : "Pause team"}
-            </button>
-          )}
-        </div>
-      </aside>
+      <aside className={`side ${teamOpen ? "open" : ""}`}>{teamPanel}</aside>
 
       <section className="main">
         <div className="main-head">
@@ -261,102 +523,12 @@ export function ProjectView({ projectId }: { projectId: string }) {
               </button>
             ))}
           </div>
-          <div className="main-actions">
-            {inbox.count > 0 && (
-              <motion.button className="needs-you" onClick={() => setInboxOpen(true)} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                Needs you
-                <span className="count">{inbox.count}</span>
-              </motion.button>
-            )}
-            <ProjectMenu project={project} onRemoved={() => (location.hash = "#/")} />
-          </div>
+          {actions}
         </div>
-
-        {project.paused && (
-          <div className="banner blue">
-            <Pause size={15} />
-            <div className="grow">
-              <strong>The team is paused.</strong>{" "}
-              <span className="muted">
-                {project.heldMessages?.length
-                  ? `${project.heldMessages.length} message(s) between agents will be delivered when you resume.`
-                  : "Agents won't start anything on their own; you can still talk to them."}
-              </span>
-            </div>
-            <button className="btn sm" onClick={() => api.resumeTeam(project.id).then(setProject).catch((e) => alert(e.message))}>
-              <Play size={13} />
-              Resume
-            </button>
-          </div>
-        )}
-        {stuck.length > 0 && (
-          <div className="banner red">
-            <CircleAlert size={15} />
-            <div className="grow ellipsis" title={stuck[0].problem ?? ""}>
-              <strong>{stuck.map((a) => a.name).join(", ")} can't continue</strong> <span className="muted">— every allowed model failed.</span>
-            </div>
-            <button className="btn sm" onClick={() => api.retryModels(project.id).catch((e) => alert(e.message))}>
-              Retry now
-            </button>
-            <button className="btn primary sm" onClick={() => setTab("settings")}>
-              Add a model
-            </button>
-          </div>
-        )}
-
-        <div className="main-body">
-          {tab === "docs" ? (
-            <Docs project={project} />
-          ) : tab === "files" ? (
-            <FilesView project={project} />
-          ) : tab === "explorer" ? (
-            <Explorer key={project.id} project={project} />
-          ) : tab === "plan" ? (
-            <Kanban project={project} plan={plan} />
-          ) : tab === "messages" ? (
-            <Messages project={project} log={log} onOpenAgent={(id) => { setSelected(id); setTab("chat"); }} />
-          ) : tab === "settings" ? (
-            <ProjectSettings key={project.id} project={project} onChanged={setProject} />
-          ) : agent ? (
-            <Chat key={agent.id} project={project} agent={agent} />
-          ) : (
-            <EmptyState icon={<MessageSquare size={20} />} title="Start the conversation">
-              Start core to begin discussing the project.
-            </EmptyState>
-          )}
-        </div>
+        {banners}
+        <div className="main-body">{view(tab)}</div>
       </section>
-
-      <AnimatePresence>
-        {inboxOpen && (
-          <InboxDrawer
-            project={project}
-            plan={plan}
-            data={inbox}
-            onClose={() => setInboxOpen(false)}
-            onOpenAgent={(id) => {
-              setSelected(id);
-              setTab("chat");
-              setInboxOpen(false);
-            }}
-            onOpenTab={(t) => {
-              setTab(t);
-              setInboxOpen(false);
-            }}
-          />
-        )}
-      </AnimatePresence>
-      {newHelper && (
-        <NewHelperDialog
-          project={project}
-          onClose={() => setNewHelper(false)}
-          onCreated={(a) => {
-            setNewHelper(false);
-            setSelected(a.id);
-            setTab("chat");
-          }}
-        />
-      )}
+      {overlays}
     </div>
   );
 }

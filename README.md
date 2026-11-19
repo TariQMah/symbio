@@ -129,8 +129,9 @@ moment; the agent that asked carries on.
   on this machine and build outputs filling the disk.
 - **Explorer.** The project's folders and files in a tab, read-only, to look at what the team wrote
   without leaving the browser (secrets stay hidden).
-- **Themes.** The default look, or the colors of VS Code's Dark Modern and Light Modern themes
-  (Settings → Appearance, kept per browser).
+- **Themes and layouts.** The default look, or the colors of VS Code's Dark Modern and Light Modern
+  themes, and a *Workbench* layout like an editor's: tools on the left, the work in the middle, the
+  chat on the right (Settings → Appearance, kept per browser).
 - **Costs in view.** Tokens and estimated cost per agent and model, with prices you can set (and
   GitHub Copilot's own prices, in AI credits).
 - **Safety rails.** Agents can't kill processes by name (which would take down your terminals and

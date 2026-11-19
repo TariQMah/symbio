@@ -1002,3 +1002,48 @@ tr.file-view-target > td, tr.file-view-target > th { background: color-mix(in sr
 .explorer-file-head { display: flex; align-items: center; gap: 8px; }
 .explorer-file-head strong { font-family: var(--mono); font-size: 13px; }
 .explorer-image { max-width: 100%; max-height: 70vh; object-fit: contain; align-self: flex-start; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+
+/* Workbench layout (ProjectView.tsx): an activity bar, a side bar (team or Explorer), the work in the
+   middle, the chat on the right and a status bar, like an editor. Narrow windows keep the classic layout. */
+.workbench { display: grid; grid-template-columns: 48px 260px minmax(0, 1fr) minmax(360px, 32%); grid-template-rows: minmax(0, 1fr) 24px; height: 100%; }
+.workbench.no-side { grid-template-columns: 48px minmax(0, 1fr) minmax(360px, 32%); }
+.wb-activity { display: flex; flex-direction: column; align-items: center; padding: 4px 0; background: var(--bg-sunken); border-right: 1px solid var(--border); min-height: 0; }
+.wb-activity-item { position: relative; width: 48px; height: 46px; display: grid; place-items: center; background: none; border: none; border-left: 2px solid transparent; color: var(--text-3); cursor: pointer; }
+.wb-activity-item:hover { color: var(--text); }
+.wb-activity-item.active { color: var(--text); border-left-color: var(--accent); }
+.wb-activity-badge { position: absolute; top: 10px; right: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+.wb-side { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); border-right: 1px solid var(--border); }
+.wb-side-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); padding: 12px 16px 6px; flex: none; }
+.wb-side .side-scroll { padding-top: 12px; }
+.wb-side-scroll .wb-side-title { padding-left: 8px; }
+.wb-side-scroll { flex: 1; overflow: auto; padding: 0 8px 10px; display: flex; flex-direction: column; }
+.wb-center { border-right: 1px solid var(--border); }
+.wb-file { height: 100%; }
+.wb-file-tab .ellipsis { max-width: 160px; }
+.wb-file-open { display: inline-flex; align-items: center; gap: inherit; background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.wb-tab-close { display: inline-grid; background: none; border: none; padding: 0; cursor: pointer; place-items: center; width: 18px; height: 18px; margin-left: 2px; border-radius: var(--r-sm); color: var(--text-3); }
+.wb-tab-close:hover { background: var(--surface-2); color: var(--text); }
+.wb-chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
+.wb-chat-head { display: flex; align-items: center; gap: 8px; height: 46px; flex: none; padding-right: 12px; border-bottom: 1px solid var(--border); }
+.wb-chat-head .wb-side-title { padding: 0 0 0 16px; }
+.wb-chat-head select { margin-left: auto; max-width: 65%; font-size: 12px; padding: 4px 6px; }
+.wb-chat-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.wb-chat .chat-head { padding: 8px 14px; }
+.wb-chat .chat-scroll { padding: 16px 14px 10px; }
+.wb-chat .composer-wrap { padding: 6px 12px 12px; }
+.wb-chat .composer-hint { display: none; }
+.wb-chat .msg-user { max-width: 92%; }
+.wb-status { grid-column: 1 / -1; display: flex; align-items: center; min-width: 0; padding: 0 6px; background: var(--bg-sunken); border-top: 1px solid var(--border); color: var(--text-2); font-size: 12px; overflow: hidden; }
+.wb-status-item { display: inline-flex; align-items: center; gap: 5px; height: 100%; padding: 0 8px; background: none; border: none; color: inherit; font: inherit; font-size: 12px; white-space: nowrap; }
+button.wb-status-item { cursor: pointer; }
+button.wb-status-item:hover { background: var(--surface-hover); color: var(--text); }
+.wb-status-item.attention { background: var(--amber); color: var(--on-amber); font-weight: 500; }
+button.wb-status-item.attention:hover { background: var(--amber); color: var(--on-amber); filter: brightness(1.08); }
+
+/* Settings → Appearance: the layout choice, drawn as a tiny wireframe. */
+.layout-preview { display: grid; gap: 3px; height: 64px; padding: 4px; border-radius: var(--r); border: 1px solid var(--border); background: var(--bg-sunken); }
+.layout-preview span { border-radius: 2px; background: var(--surface-2); }
+.layout-preview span.accent { background: color-mix(in srgb, var(--accent) 45%, var(--surface-2)); }
+.layout-preview.classic { grid-template-columns: 1fr 3fr; }
+.layout-preview.workbench { grid-template-columns: 6px 1fr 2fr 1.3fr; }
+.appearance-preset { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }

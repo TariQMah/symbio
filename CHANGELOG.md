@@ -5,6 +5,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.0]
+
+- **Workbench layout.** Settings → Appearance now has a layout too: **Classic** (as before) or **Workbench**, laid out
+  like an editor: an activity bar with the team and the Explorer in a side bar, the plan, messages, docs, files,
+  settings or a file from the Explorer in the middle (as tabs), the chat always on the right with a switcher for who
+  you're talking to, and a status bar (runtime, who's working, plan progress, *Needs you*). **Developer look** sets
+  Dark Modern with the Workbench in one click. Windows narrower than 1100 pixels, and phones, keep the classic layout.
+
 ## [0.17.0]
 
 - **Explorer tab.** Next to Plan, the project's folders and files as a tree (or a helper's own copy, where its branch's

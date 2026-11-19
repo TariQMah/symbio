@@ -28,7 +28,7 @@ open to anyone (see their issues).
    read-only (secrets hidden, as in the Files tab), *released in 0.17.0*; (3) a **Workbench** layout like VS Code: an
    activity bar and side bar for the tools (team, Explorer, plan, messages, docs, files), the work
    in the middle, and the chat on the right with an agent switcher, plus a status bar; the
-   *Developer* preset is Dark Modern + Workbench, phones keep the classic layout; (4) importing a
+   *Developer* preset is Dark Modern + Workbench, phones keep the classic layout, *released in 0.18.0*; (4) importing a
    VS Code color theme file, so people can bring their own.
 3. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can

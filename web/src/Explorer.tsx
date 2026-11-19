@@ -12,13 +12,47 @@ type Listing = { entries: DirEntry[]; truncated: boolean } | { error: string } |
 
 const ICONS = { image: FileImage, video: FileVideo, audio: FileAudio, pdf: FileText, markdown: FileText, text: FileText, other: File };
 
+/** A file picked in the tree, and whose folder it's in (null: the project's). */
+export interface ExplorerPick {
+  path: string;
+  entry: DirEntry;
+  agentId: string | null;
+}
+
+/** The Explorer tab of the classic layout: the tree beside the preview. */
 export function Explorer({ project }: { project: Project }) {
+  const [agentId, setAgentId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<ExplorerPick | null>(null);
+  return (
+    <div className="docs explorer">
+      <nav className="docs-list explorer-tree" aria-label="Project files">
+        <ExplorerTree project={project} agentId={agentId} onAgent={(id) => (setAgentId(id), setPicked(null))} picked={picked} onPick={setPicked} />
+      </nav>
+      <section className="docs-view explorer-view">
+        <ExplorerPreview projectId={project.id} picked={picked} />
+      </section>
+    </div>
+  );
+}
+
+/** The folders and files, loaded a folder at a time (the Workbench layout shows it in its side bar). */
+export function ExplorerTree({
+  project,
+  agentId,
+  onAgent,
+  picked,
+  onPick,
+}: {
+  project: Project;
+  agentId: string | null;
+  onAgent: (id: string | null) => void;
+  picked: ExplorerPick | null;
+  onPick: (p: ExplorerPick) => void;
+}) {
   // Whose folder: the project's (null) or a helper's own copy.
   const copies = project.agents.filter((a) => a.branch && a.role !== "coordinator");
-  const [agentId, setAgentId] = useState<string | null>(null);
   const [listings, setListings] = useState<Record<string, Listing>>({});
   const [open, setOpen] = useState<Set<string>>(new Set([""]));
-  const [selected, setSelected] = useState<{ path: string; entry: DirEntry } | null>(null);
 
   const load = useCallback(
     (dir: string) => {
@@ -34,7 +68,6 @@ export function Explorer({ project }: { project: Project }) {
   useEffect(() => {
     setListings({});
     setOpen(new Set([""]));
-    setSelected(null);
     load("");
   }, [load]);
 
@@ -76,9 +109,9 @@ export function Explorer({ project }: { project: Project }) {
           return (
             <button
               key={p}
-              className={`explorer-item file ${selected?.path === p ? "active" : ""}`}
+              className={`explorer-item file ${picked?.path === p && picked.agentId === agentId ? "active" : ""}`}
               style={pad}
-              onClick={() => setSelected({ path: p, entry: e })}
+              onClick={() => onPick({ path: p, entry: e, agentId })}
               title={`${p} · ${formatSize(e.size)}`}
             >
               <span className="explorer-spacer" />
@@ -93,38 +126,39 @@ export function Explorer({ project }: { project: Project }) {
   };
 
   return (
-    <div className="docs explorer">
-      <nav className="docs-list explorer-tree" aria-label="Project files">
-        <div className="explorer-head">
-          {copies.length > 0 ? (
-            <select value={agentId ?? ""} onChange={(e) => setAgentId(e.target.value || null)} aria-label="Whose folder" title="The project folder, or a helper's own copy (its branch, before it's merged)">
-              <option value="">Project folder</option>
-              {copies.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}'s copy
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="explorer-title grow">Project folder</span>
-          )}
-          <button className="btn ghost icon xs" onClick={refresh} title="Refresh" aria-label="Refresh">
-            <RefreshCw size={13} />
-          </button>
-        </div>
-        {renderDir("", 0)}
-      </nav>
-      <section className="docs-view explorer-view">
-        {selected ? (
-          <Preview key={`${agentId}|${selected.path}`} projectId={project.id} agentId={agentId} path={selected.path} entry={selected.entry} />
+    <>
+      <div className="explorer-head">
+        {copies.length > 0 ? (
+          <select value={agentId ?? ""} onChange={(e) => onAgent(e.target.value || null)} aria-label="Whose folder" title="The project folder, or a helper's own copy (its branch, before it's merged)">
+            <option value="">Project folder</option>
+            {copies.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}'s copy
+              </option>
+            ))}
+          </select>
         ) : (
-          <EmptyState icon={<FolderTree size={20} />} title="The project's files">
-            Pick a file to see it. This view is read-only: the team does the editing.
-          </EmptyState>
+          <span className="explorer-title grow">Project folder</span>
         )}
-      </section>
-    </div>
+        <button className="btn ghost icon xs" onClick={refresh} title="Refresh" aria-label="Refresh">
+          <RefreshCw size={13} />
+        </button>
+      </div>
+      {renderDir("", 0)}
+    </>
   );
+}
+
+/** The picked file: text beside the tree, images previewed, anything else to open or download. */
+export function ExplorerPreview({ projectId, picked }: { projectId: string; picked: ExplorerPick | null }) {
+  if (!picked) {
+    return (
+      <EmptyState icon={<FolderTree size={20} />} title="The project's files">
+        Pick a file to see it. This view is read-only: the team does the editing.
+      </EmptyState>
+    );
+  }
+  return <Preview key={`${picked.agentId}|${picked.path}`} projectId={projectId} agentId={picked.agentId} path={picked.path} entry={picked.entry} />;
 }
 
 function Preview({ projectId, agentId, path, entry }: { projectId: string; agentId: string | null; path: string; entry: DirEntry }) {
