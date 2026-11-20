@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MachineBadge } from "./Machine";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, ChevronDown, ChevronRight, KeyRound, LayoutList, PauseCircle, Plus, Settings as SettingsIcon } from "lucide-react";
 import { api, LOCKED_EVENT, subscribe, type Project, type RuntimeInfo, type RuntimeKind, type RuntimeStatus } from "./api";
@@ -154,6 +155,7 @@ export function App() {
           </a>
           <ReportProblemLink />
           <UpdateBadge />
+          <MachineBadge />
           <RuntimeBadges runtime={runtime} only={projectRuntime} />
         </div>
       </header>

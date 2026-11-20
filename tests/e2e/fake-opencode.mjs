@@ -17,7 +17,7 @@
 // script. A message with no line for the agent gets a short default reply. A session on the model
 // "fake/unavailable" fails every turn at once, like a model that doesn't exist.
 
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -193,6 +193,10 @@ async function runStep(session, step, ctl) {
     // "@core effort": says the reasoning effort level its session is on.
     case "effort":
       return sayStep(session, `effort: ${session.model.variant ?? "default"}`);
+    // "@core spawn <command>": a program that keeps running, started in a shell under the runtime (not waited for).
+    case "spawn":
+      spawn(step.rest, { cwd: session.directory, shell: true, stdio: "ignore", windowsHide: true });
+      return sayStep(session, "started");
     // "@core coauthor": whether the agent was told to leave AI co-author lines out of commits.
     case "coauthor":
       return sayStep(session, `coauthor: ${Object.values(session.instructions).some((v) => String(v).includes("Co-authored-by")) ? "off" : "on"}`);

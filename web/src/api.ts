@@ -282,6 +282,28 @@ export interface ModelInfo {
   efforts: string[];
 }
 
+/** This computer's load and the load guard (server: machine.ts). */
+export interface MachineLoad {
+  cpu: number;
+  memory: { total: number; free: number };
+  cores: number;
+  overloaded: boolean;
+  since: number | null;
+  holding: boolean;
+  settings: { holdTurns: boolean };
+}
+
+/** A program an agent started (anything under a runtime's shells). */
+export interface AgentProgram {
+  pid: number;
+  name: string;
+  command: string;
+  memory: number;
+  cpu: number | null;
+  started: number;
+  runtime: string;
+}
+
 export interface RuntimeInfo {
   state: "stopped" | "starting" | "running" | "crashed";
   version: string | null;
@@ -357,7 +379,8 @@ export type UiEvent =
   | { type: "questions.updated"; projectId: string }
   | { type: "agent.status"; projectId: string; agentId: string; status: AgentStatus }
   | { type: "agent.stream"; projectId: string; agentId: string; event: { type: string; data: any } }
-  | { type: "message"; projectId: string; message: LoggedMessage };
+  | { type: "message"; projectId: string; message: LoggedMessage }
+  | { type: "machine.updated"; load: MachineLoad };
 
 export interface ProviderFormField {
   key: string;
@@ -745,6 +768,10 @@ export const api = {
     call<Project>("POST", `/projects/${projectId}/agents/${agentId}/rename`, { name }),
   setAgentModel: (projectId: string, agentId: string, model: string) =>
     call<Project>("POST", `/projects/${projectId}/agents/${agentId}/model`, { model }),
+  machine: () => call<MachineLoad>("GET", "/machine"),
+  machinePrograms: () => call<AgentProgram[]>("GET", "/machine/processes"),
+  stopProgram: (pid: number) => call<{ ok: true }>("POST", `/machine/processes/${pid}/stop`),
+  machineSettings: (settings: { holdTurns: boolean }) => call<MachineLoad>("PUT", "/machine/settings", settings),
   setAgentEffort: (projectId: string, agentId: string, level: string | null) =>
     call<Agent>("POST", `/projects/${projectId}/agents/${agentId}/effort`, { level }),
   pinAgentModel: (projectId: string, agentId: string, pinned: boolean) =>

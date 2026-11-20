@@ -97,6 +97,8 @@ export interface AgentRuntime extends EventEmitter<RuntimeEvents> {
   readonly lastError: string | null;
   readonly restarts: number;
   readonly lastMemory: number | null;
+  /** The runtime's process while it runs (the programs agents start run under it); null when unknown. */
+  readonly pid: number | null;
   /**
    * Whether agents working in a folder may add a `Co-authored-by` line naming the AI to their commits
    * (a project setting; off unless the project allows it). Set by the team; read when a session opens.

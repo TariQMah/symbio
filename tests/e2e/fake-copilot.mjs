@@ -16,7 +16,7 @@
 // Every tool call goes through the session's permission handler first, as Copilot's do. A session
 // on the model "unavailable" fails every turn at once, like a model that isn't available.
 
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -31,6 +31,8 @@ const MODELS = [
 
 /** Sessions outlive a client, like Copilot's stored sessions (a runtime restart resumes them). */
 const sessions = new Map();
+/** The fake runtime process (see FakeClient.start). */
+let runtimeProcess = null;
 /** Signed in to GitHub, unless SYMBIO_FAKE_COPILOT_SIGNED_OUT=1 (then a device-code sign-in signs in). */
 const logins = new Map();
 const auth = { login: process.env.SYMBIO_FAKE_COPILOT_SIGNED_OUT === "1" ? null : "e2e" };
@@ -40,8 +42,20 @@ export function createClient() {
 }
 
 class FakeClient {
-  async start() {}
-  async stop() {}
+  // Like the SDK, the runtime is a process of its own (cliProcess), and agents' commands run under it:
+  // here a small Node process that starts each line it's sent in a shell ("@core spawn <command>").
+  async start() {
+    this.cliProcess = spawn(
+      process.execPath,
+      ["-e", "require('readline').createInterface({ input: process.stdin }).on('line', (c) => require('child_process').spawn(c, { shell: true, stdio: 'ignore', windowsHide: true }))"],
+      { stdio: ["pipe", "ignore", "ignore"], windowsHide: true },
+    );
+    runtimeProcess = this.cliProcess;
+  }
+  async stop() {
+    this.cliProcess?.kill();
+    if (runtimeProcess === this.cliProcess) runtimeProcess = null;
+  }
   async getStatus() {
     return { version: "1.0.112-fake", protocolVersion: 3 };
   }
@@ -259,6 +273,10 @@ async function runStep(state, step, ctl) {
     // "@core effort": says the reasoning effort level its session is on; "@core coauthor": whether Copilot would add its line.
     case "effort":
       return say(state, `effort: ${state.effort ?? "default"}`);
+    // "@core spawn <command>": a program that keeps running, started under the runtime's shell (not waited for).
+    case "spawn":
+      runtimeProcess?.stdin.write(`${step.rest}\n`);
+      return say(state, "started");
     case "coauthor":
       return say(state, `coauthor: ${state.config.coauthorEnabled === false ? "off" : "on"}`);
     case "say":

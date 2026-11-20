@@ -88,6 +88,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `mcp.ts` | Minimal MCP server (Streamable HTTP, JSON responses) |
 | `prompts.ts` | The briefs given to core and helpers |
 | `updates.ts` | Agent-facing notes about what changed in Symbio, given once to each coordinator after an update |
+| `machine.ts` | This computer: agents' work at below-normal priority (the runtime's process, inherited by what it starts), the programs agents started (under a runtime's shells, tracked after their parent exits) to list and stop by pid, and the load guard (CPU and free memory sampled every 15 s; overloaded → the human and core are told, and messages between agents wait if the human chose so). Settings in `machine.json` |
 | `housekeeping.ts` | Daily: backups of Symbio's state (`~/.symbio/backups`), commits no remote has, build outputs piling up in helpers' folders |
 | `plan.ts` | The plan and its tasks (`plan.json`) |
 | `questions.ts` | The team's questions for the human and their answers (`questions.json`) |
@@ -118,7 +119,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 The UI (`web/src/`) is React + Vite with Motion for animation and lucide icons. `api.ts` is its
 client; `ProjectView.tsx` holds the project screen (team sidebar and tabs), `Chat.tsx` renders a
 live session (with `steps.ts` labelling the team's steps in plain words, and `files.tsx` and `paths.ts` turning paths
-into links, showing shared files as cards and the viewer page that opens them), `Effort.tsx` reasoning effort (in a chat header and project settings), `Kanban.tsx` the plan, `Explorer.tsx` the project's folders and files (read-only), `Messages.tsx` the message log, `Attachments.tsx` attachments in the chat and the Files tab, `Docs.tsx` the Docs tab and
+into links, showing shared files as cards and the viewer page that opens them), `Machine.tsx` the computer's load and agents' programs (top bar), `Effort.tsx` reasoning effort (in a chat header and project settings), `Kanban.tsx` the plan, `Explorer.tsx` the project's folders and files (read-only), `Messages.tsx` the message log, `Attachments.tsx` attachments in the chat and the Files tab, `Docs.tsx` the Docs tab and
 `Rules.tsx` the rules register in it, `Inbox.tsx` the *Needs you* drawer, `Usage.tsx` tokens and
 costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
 `Settings.tsx`/`Providers.tsx` the global settings. `styles.css` holds the design tokens (colors,
@@ -184,6 +185,12 @@ bar), from the same pieces.
 - **AI co-authors in commits.** Unless the project allows them (`Project.aiCoauthors`, off by
   default), the briefs tell agents to leave `Co-authored-by` lines naming an AI out of commits, and
   Copilot sessions are opened with `coauthorEnabled: false` (`AgentRuntime.commitCoauthors`).
+- **Machine load.** Runtimes run at below-normal priority, so everything agents start does too (`machine.ts`).
+  Briefs say how big the computer is (on a small one: one heavy job at a time). The load guard samples
+  CPU and free memory; when the machine stays overloaded it logs it for the human (with the heaviest
+  agents' programs) and notes it to core, and with *hold* on, messages between agents wait
+  (`Team.deliver`, like a pause) until it recovers, then go out. The top bar's machine view lists
+  agents' programs and stops one by pid; core has `list_programs` / `stop_program`.
 - **Memory recycling.** Each runtime's memory is measured (its process tree, without the shells it
   runs agents' commands in and what runs under them: builds and servers agents start aren't the
   runtime's, and restarting it would only cut them off). Above
@@ -237,7 +244,7 @@ Global data is in `~/.symbio/`: `config.json` (projects), `connections.json`, `s
 `ui-token`, `prices.json` (model prices), `approvals/<project>.json` (remote-action approvals),
 `worktrees/`, `backups/<date>/` (and `<date>-before-<version>/` before an update), `logs/symbio.log`
 and `logs/update.log`, `updates.json` and `update-result.json` (update setting and the last
-result), `bin/` (a downloaded `cloudflared`, for remote access) and `opencode.pid`.
+result), `machine.json` (what happens when the computer is overloaded), `bin/` (a downloaded `cloudflared`, for remote access) and `opencode.pid`.
 
 Conversations live in OpenCode's own database. A project opened on another machine keeps its docs
 and plan, but its agents' sessions would need to be re-created.

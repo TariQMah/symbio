@@ -2,6 +2,7 @@
 // protocol, merging work, and recovering from hangs (watchdog), opencode crashes
 // (runtime restarts) and failing providers (model fallback).
 
+import type { AgentProcess, MachineLoad, MachineMonitor } from "./machine.js";
 import { randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -104,6 +105,9 @@ export class Team implements TeamCore {
   /** The agent runtimes, by kind. The first one given is the default (OpenCode). */
   readonly runtimes = new Map<RuntimeKind, AgentRuntime>();
   private readonly levelCache = new Map<RuntimeKind, { at: number; levels: Map<string, string[]> }>();
+  /** The computer's load guard (set at startup). */
+  machine: MachineMonitor | null = null;
+  private readonly overloadNotified = new Set<string>();
   /** The default runtime: OpenCode. */
   readonly runtime: AgentRuntime;
 
@@ -1202,7 +1206,7 @@ export class Team implements TeamCore {
     this.quiet.track(from, to, kind);
     await this.prepare(project, to);
     const body = `[from: ${from.name} · ${kind}]\n${text}`;
-    if (project.paused) {
+    if (project.paused || this.machine?.holding) {
       await this.hold(project, to, body);
       return undefined;
     }
@@ -1334,15 +1338,7 @@ export class Team implements TeamCore {
     project.heldMessages = [];
     project.pausedAgents = [];
     await this.store.update(project);
-    const woken = new Set<string>();
-    for (const m of held) {
-      const agent = project.agents.find((a) => a.id === m.agentId && active(a));
-      if (!agent) continue;
-      await this.ensureTools(project, agent);
-      await this.rt(agent).prompt(agent.sessionId, m.text, "queue").catch((err) => console.error("[resume]", err.message));
-      this.setStatus(project, agent, "busy");
-      woken.add(agent.id);
-    }
+    const woken = await this.deliverHeld(project, held);
     for (const id of interrupted) {
       const agent = project.agents.find((a) => a.id === id && active(a));
       if (!agent || woken.has(id)) continue;
@@ -1354,6 +1350,85 @@ export class Team implements TeamCore {
     }
     await this.log(project, { from: "symbio", to: "human", kind: "system", text: `Team resumed — ${held.length} held message(s) delivered.` });
     bus.publish({ type: "project.updated", projectId: project.id });
+  }
+
+  /** Delivers held messages (after a pause, or once the machine recovered); returns the agents woken. */
+  private async deliverHeld(project: Project, held: { agentId: string; text: string }[]): Promise<Set<string>> {
+    const woken = new Set<string>();
+    for (const m of held) {
+      const agent = project.agents.find((a) => a.id === m.agentId && active(a));
+      if (!agent) continue;
+      await this.ensureTools(project, agent);
+      await this.rt(agent).prompt(agent.sessionId, m.text, "queue").catch((err) => console.error("[resume]", err.message));
+      this.setStatus(project, agent, "busy");
+      woken.add(agent.id);
+    }
+    return woken;
+  }
+
+  // ---------------------------------------------------------------- the machine (machine.ts)
+
+  /** The load guard: tells the human and core when the computer is overloaded, and holds new turns if asked. */
+  attachMachine(machine: MachineMonitor) {
+    this.machine = machine;
+    machine.on("changed", (load) => bus.publish({ type: "machine.updated", load }));
+    machine.on("overloaded", (load, heavy) => void this.onOverloaded(load, heavy).catch((err) => console.error("[machine]", err.message)));
+    machine.on("recovered", (load) => void this.onRecovered(load).catch((err) => console.error("[machine]", err.message)));
+  }
+
+  private async onOverloaded(load: MachineLoad, heavy: AgentProcess[]) {
+    const gb = (bytes: number) => (bytes / 1024 ** 3).toFixed(1);
+    const top = heavy
+      .slice(0, 5)
+      .map((p) => `${p.name} (pid ${p.pid}${p.cpu !== null ? `, ${p.cpu}% CPU` : ""}, ${Math.round(p.memory / 1024 ** 2)} MB)`)
+      .join(", ");
+    const state = `CPU ${load.cpu}%, ${gb(load.memory.free)} of ${gb(load.memory.total)} GB memory free`;
+    console.warn(`[machine] overloaded: ${state}${top ? `; agents' programs: ${top}` : ""}`);
+    for (const project of this.store.list()) {
+      if (!project.agents.some((a) => a.status === "busy" || a.status === "waiting" || a.status === "stuck")) continue;
+      this.overloadNotified.add(project.id);
+      await this.log(project, {
+        from: "symbio",
+        to: "human",
+        kind: "system",
+        text:
+          `This computer is overloaded (${state}).${top ? ` The heaviest programs agents started: ${top}.` : ""} ` +
+          `${load.holding ? "New agent turns wait until it recovers. " : ""}You can stop them from the machine indicator at the top.`,
+      });
+      const coordinator = this.coordinator(project);
+      if (coordinator && active(coordinator)) {
+        await this.note(
+          project,
+          coordinator,
+          `Symbio: this computer is overloaded (${state}).${top ? ` Programs agents started, heaviest first: ${top}.` : ""} ` +
+            "Don't start more heavy work now; have helpers finish or stop what isn't needed, and run heavy jobs one at a time." +
+            (load.holding ? " Messages between agents wait until the machine recovers." : ""),
+        );
+      }
+    }
+  }
+
+  private async onRecovered(load: MachineLoad) {
+    console.log(`[machine] recovered: CPU ${load.cpu}%`);
+    for (const project of this.store.list()) {
+      const told = this.overloadNotified.delete(project.id);
+      // Held because of the machine (not paused by the human): deliver them now.
+      const held = !project.paused ? (project.heldMessages ?? []) : [];
+      if (held.length) {
+        project.heldMessages = [];
+        await this.store.update(project);
+        await this.deliverHeld(project, held);
+      }
+      if (told || held.length) {
+        await this.log(project, {
+          from: "symbio",
+          to: "human",
+          kind: "system",
+          text: `This computer has recovered (CPU ${load.cpu}%).${held.length ? ` ${held.length} held message(s) delivered.` : ""}`,
+        });
+        bus.publish({ type: "project.updated", projectId: project.id });
+      }
+    }
   }
 
   private async hold(project: Project, agent: Agent, text: string) {
@@ -1759,7 +1834,7 @@ export class Team implements TeamCore {
   async system(project: Project, agent: Agent, text: string, wake = true) {
     await this.log(project, { from: "symbio", to: agent.id, kind: "system", text });
     await this.prepare(project, agent);
-    if (wake && project.paused) {
+    if (wake && (project.paused || this.machine?.holding)) {
       await this.hold(project, agent, text);
     } else if (wake) {
       await this.rt(agent).prompt(agent.sessionId, text, "queue");

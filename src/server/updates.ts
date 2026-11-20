@@ -258,6 +258,14 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "Commits: unless the human allows it in the project's settings, commit messages must not have Co-authored-by (or similar) " +
       "lines naming an AI tool or model. On GitHub Copilot CLI, Symbio also turns off the line Copilot adds by itself.",
   },
+  {
+    id: "2026-11-20-machine-load",
+    text:
+      "This computer: programs agents start now run at low priority, so the machine stays usable. Your brief says how big the " +
+      "machine is; on a small one, run heavy jobs (3D tools, builds, browsers, simulations) one at a time across the team. When " +
+      "the machine is overloaded, Symbio tells the human and core (with the heaviest programs) and may hold messages between " +
+      "agents until it recovers. core: list_programs shows the load and the programs agents started; stop_program stops one by pid.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

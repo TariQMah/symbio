@@ -5,6 +5,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.22.0]
+
+- **Small computers stay usable.** The agents' runtime runs at below-normal priority, and everything agents start
+  inherits it (builds, Blender, browsers…): they use whatever CPU is free, but the system, remote desktop tools and
+  you come first, even at 100% CPU.
+- **The machine view.** A CPU indicator in the top bar opens the computer's load and the programs agents started,
+  heaviest first, each with **Stop** (by process id, only agents' programs), from a phone too. Programs that detach
+  from the command that started them (browsers) are still recognized. core gets the same: `list_programs` and
+  `stop_program`.
+- **Load guard.** When the computer stays overloaded (CPU around 90% or more for 3 minutes, or memory nearly full),
+  you and core are told, with the heaviest programs; the indicator turns red. Optionally (in the machine view),
+  messages between agents wait until it recovers, so tokens aren't spent while it struggles.
+- Agents' briefs say how big the computer is; on a small one, heavy jobs run one at a time across the team.
+
 ## [0.21.0]
 
 - **Reasoning effort.** Models that can think less or more (low, medium, high…, as each lists them) get a level per

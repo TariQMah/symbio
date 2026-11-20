@@ -1,6 +1,7 @@
 // Owns a private `opencode serve` process: starts it, restarts it if it dies,
 // and keeps a single event subscription alive across restarts.
 
+import { lowerPriority } from "../machine.js";
 import { spawn, execFile, execFileSync, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -121,6 +122,8 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
     this.lastError = null;
     this.setState("running");
     this.subscribe(client);
+    // Agents' commands run under it: at low priority, the computer stays usable (machine.ts).
+    void lowerPriority(proc.pid);
   }
 
   async stop(): Promise<void> {
@@ -136,6 +139,10 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
     await this.start();
     this.restarts++;
     this.emit("restarted");
+  }
+
+  get pid(): number | null {
+    return this.proc?.pid ?? null;
   }
 
   /** Last measured memory of the opencode process tree, in bytes. */

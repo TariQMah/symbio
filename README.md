@@ -137,6 +137,9 @@ moment; the agent that asked carries on.
   chat (core can set it for its helpers).
 - **Costs in view.** Tokens and estimated cost per agent and model, with prices you can set (and
   GitHub Copilot's own prices, in AI credits).
+- **Kind to small computers.** Agents' programs run at low priority, so the computer stays usable and
+  reachable; the machine view in the top bar lists what they started (Stop works from a phone too),
+  and an overloaded machine is reported to you and core, optionally holding new turns until it recovers.
 - **Safety rails.** Agents can't kill processes by name (which would take down your terminals and
   editors), can't read your SSH keys or Symbio's secret store, and must ask before installing
   software. They look at images through scaled-down copies, so a few large pictures can't make a
@@ -275,6 +278,10 @@ All optional, set as environment variables:
 | `SYMBIO_RECYCLE_MB` | `1500` | Restart an agent runtime above this memory use once its agents are idle |
 | `SYMBIO_RECYCLE_HARD_MB` | `3000` | Restart an agent runtime above this memory use regardless (agents resume) |
 | `SYMBIO_MEMORY_CHECK_SECONDS` | `60` | How often the agent runtimes' memory use is checked |
+| `SYMBIO_AGENT_PRIORITY` | `low` | Set to `normal` to run the agents' work at normal priority instead of below normal |
+| `SYMBIO_OVERLOAD_CPU` | `90` | The computer counts as overloaded when CPU use averages this (%) or more… |
+| `SYMBIO_OVERLOAD_SECONDS` | `180` | …over this many seconds (or free memory stays under 10% of it, at least 600 MB) |
+| `SYMBIO_OVERLOAD_FREE_MB` | | A different free-memory floor, in MB |
 | `SYMBIO_BACKUP_DAYS` | `7` | How many daily backups of Symbio's state to keep |
 | `SYMBIO_BUILD_ALERT_GB` | `2` | Build outputs in a helper's folder above this size are reported by the daily check |
 

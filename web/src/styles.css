@@ -1072,3 +1072,20 @@ body.resizing iframe { pointer-events: none; }
 .effort-select { margin-left: 4px; }
 .effort-row { display: flex; align-items: center; gap: 12px; font-size: 13px; }
 .effort-row select { width: 150px; flex: none; }
+
+/* This computer (Machine.tsx): the top bar indicator and its drawer. */
+.machine-badge.overloaded { color: var(--red); background: var(--red-soft); }
+.machine { display: flex; flex-direction: column; gap: 14px; }
+.machine-load { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.machine-load > div { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); }
+.machine-load strong { font-size: 18px; }
+.machine-bar { display: block; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.machine-bar > span { display: block; height: 100%; background: var(--accent); }
+.machine-bar > span.high { background: var(--red); }
+.machine-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); }
+.machine-programs { display: flex; flex-direction: column; gap: 6px; }
+.machine-program { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); }
+.machine-program-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.machine-command { display: block; margin-top: 4px; font-size: 11px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.machine-hold { align-items: flex-start; gap: 8px; }
+.machine-hold .hint { display: block; margin-top: 2px; }

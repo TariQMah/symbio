@@ -15,7 +15,8 @@ export type UiEvent =
   | { type: "agent.status"; projectId: string; agentId: string; status: string }
   | { type: "agent.stream"; projectId: string; agentId: string; event: { type: string; data: any } }
   | { type: "message"; projectId: string; message: unknown }
-  | { type: "runtime.switch"; projectId: string; progress: unknown };
+  | { type: "runtime.switch"; projectId: string; progress: unknown }
+  | { type: "machine.updated"; load: unknown };
 
 // Recent events are also kept, numbered, for clients that can't hold a stream open (some
 // proxies, like Cloudflare quick tunnels, don't pass Server-Sent Events): they poll instead.

@@ -6,6 +6,7 @@
 // its own event vocabulary, translated here into the one the team and the chat use
 // (runtime/types.ts).
 
+import { lowerPriority } from "../machine.js";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -164,6 +165,8 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       this.client = client;
       await this.checkLogin();
       this.setState("running");
+      // Agents' commands run under it: at low priority, the computer stays usable (machine.ts).
+      void lowerPriority(this.pid);
     } catch (err) {
       this.lastError = (err as Error).message;
       this.setState(err instanceof NotInstalledError ? "stopped" : "crashed");
@@ -242,7 +245,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
   }
 
   /** The runtime process the SDK started (`cliProcess`: not public API, so it may go away; then null). */
-  private get pid(): number | null {
+  get pid(): number | null {
     const pid = (this.client as any)?.cliProcess?.pid;
     return typeof pid === "number" ? pid : null;
   }

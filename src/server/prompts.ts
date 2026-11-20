@@ -1,6 +1,7 @@
 // Briefings injected into agent sessions as instruction entries.
 // Keep these domain-neutral: projects can be software, writing, research, design, anything.
 
+import { machineNote } from "./machine.js";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { docsPaths } from "./docs.js";
@@ -121,6 +122,9 @@ ${rulesSection(project, "coordinator")}
   It also takes a reasoning \`effort\` level (e.g. low, medium, high; a level the
   model doesn't take is refused with the ones it does); leave it out to use the
   project's setting.
+- \`list_programs\`, \`stop_program\` — this computer's load and the programs the
+  team's agents started (builds, 3D tools, browsers…), heaviest first; stop one by
+  its pid when it's runaway or the machine is overloaded.
 - \`set_effort\` — change a helper's reasoning effort level (more thinking costs
   more tokens; save the higher levels for hard work). You can't change a level
   the human set.
@@ -140,6 +144,8 @@ ${helperFolders(project)}
   files you mention in replies become links to them, so write them out in full.
 
 ${findingTools(project.runtime ?? "opencode")}${commitRule(project, "\n\n")}
+
+${machineNote()}
 
 Team members are created with \`spawn_agent\` only. Your built-in sub-agent tool
 is fine for quick, read-only lookups, but never use it to do project work:
@@ -433,6 +439,7 @@ assets. ${agent.startedBy === "human" ? STARTED_BY_HUMAN : "Your tasks come from
       : ""
   }`
   }${commitRule(project, "\n  ")}
+- ${machineNote()}
 - When you finish a task, or are blocked, report it once: with \`update_task\`
   for plan tasks (see below), otherwise with \`send_message\` to the coordinator
   (what you did, where, anything they should know). Then end your turn; new

@@ -130,6 +130,9 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.22.0** — Small computers stay usable: agents' programs at low priority, the machine view (list and stop
+  what agents started, also from a phone), and a load guard that tells you and core when the computer is
+  overloaded and can hold new turns.
 - **0.21.0** — Reasoning effort per model and per agent (#1); AI co-author lines left out of commits unless
   the project allows them (#20).
 - **0.20.0** — Workbench: views in the activity bar, closable tabs, resizable side bar and chat.

@@ -255,6 +255,37 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     return c.json(runtimeInfo());
   });
 
+  // ---- This computer: its load, the programs agents started (to stop one), the load guard's setting (machine.ts)
+  const machineOf = () => {
+    if (!team.machine) throw new HttpError(503, "not available");
+    return team.machine;
+  };
+  api.get("/machine", (c) => c.json(machineOf().state()));
+  api.get("/machine/processes", async (c) => {
+    try {
+      return c.json(await machineOf().processes());
+    } catch (err) {
+      return c.json({ error: `Could not list processes: ${(err as Error).message}` }, 500);
+    }
+  });
+  api.post("/machine/processes/:pid/stop", async (c) => {
+    const pid = Number(c.req.param("pid"));
+    if (!Number.isInteger(pid) || pid <= 0) return c.json({ error: "pid is required" }, 400);
+    try {
+      const stopped = await machineOf().stopProcess(pid);
+      console.log(`[machine] the human stopped ${stopped.name} (pid ${pid})`);
+      return c.json({ ok: true, stopped });
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+  });
+  api.put("/machine/settings", async (c) => {
+    const body = await c.req.json<{ holdTurns?: boolean }>();
+    if (typeof body.holdTurns !== "boolean") return c.json({ error: "holdTurns (true/false) is required" }, 400);
+    await machineOf().setSettings({ holdTurns: body.holdTurns });
+    return c.json(machineOf().state());
+  });
+
   // A runtime's models (?runtime=copilot); the runtime is started if it isn't yet.
   api.get("/models", async (c) => {
     const kind = c.req.query("runtime") === "copilot" ? "copilot" : "opencode";

@@ -1,4 +1,5 @@
 import { serve } from "@hono/node-server";
+import { MachineMonitor } from "./machine.js";
 import { Hono } from "hono";
 import { promises as fs, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -77,6 +78,14 @@ async function main() {
   // GitHub Copilot CLI: its sessions in Symbio's own Copilot folder; started when a project uses it.
   const copilot = new CopilotRuntime(path.join(globalDir, "copilot"));
   const team = new Team(store, [runtime, copilot], `http://127.0.0.1:${PORT}`);
+  // The computer's load: agents' programs, the load guard (machine.ts).
+  const machine = new MachineMonitor(
+    globalDir,
+    () => [runtime, copilot].filter((r) => r.state === "running" && r.pid).map((r) => ({ pid: r.pid!, label: r.label })),
+    () => store.list().some((p) => p.agents.some((a) => a.status === "busy")),
+  );
+  await machine.load();
+  team.attachMachine(machine);
 const installer = new RuntimeInstaller();
   team.remote = new RemoteOps(connections, {
     log: (project, m) => team.log(project, m),
@@ -237,12 +246,14 @@ const installer = new RuntimeInstaller();
     } else if (active(r.kind)) void start();
   }
   team.startWatchdog();
+  machine.start();
   updates.start();
 
   shutdown = async () => {
     remote.stop("Symbio stopped");
     team.shuttingDown = true;
     team.stopWatchdog();
+    machine.stop();
     updates.stop();
     await Promise.all([runtime.stop(), copilot.stop()]);
     process.exit(0);

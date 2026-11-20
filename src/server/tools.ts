@@ -202,6 +202,45 @@ const spawnAgent: Tool = {
   },
 };
 
+const listPrograms: Tool = {
+  name: "list_programs",
+  description:
+    "This computer's load (CPU, memory) and the programs the team's agents started (any agent, any project: builds, 3D tools, " +
+    "browsers, servers), heaviest first, with their pid, CPU and memory. Use it when the machine is slow or overloaded.",
+  inputSchema: obj({}),
+  async run(_args, { team }) {
+    if (!team.machine) return "Not available.";
+    const load = team.machine.state();
+    const gb = (b: number) => (b / 1024 ** 3).toFixed(1);
+    const head = `CPU ${load.cpu}% (${load.cores} threads), ${gb(load.memory.free)} of ${gb(load.memory.total)} GB memory free${load.overloaded ? " — overloaded" : ""}.`;
+    const list = await team.machine.processes();
+    if (!list.length) return `${head}
+No programs started by agents are running.`;
+    return [
+      head,
+      ...list.map(
+        (p) =>
+          `- pid ${p.pid} ${p.name}: ${p.cpu === null ? "CPU measured on the next call" : `${p.cpu}% CPU`}, ${Math.round(p.memory / 1024 ** 2)} MB, ` +
+          `started ${p.started ? new Date(p.started).toLocaleTimeString() : "?"} — ${p.command}`,
+      ),
+    ].join("\n");
+  },
+};
+
+const stopProgram: Tool = {
+  name: "stop_program",
+  description:
+    "Stop a program the team's agents started (and what it started), by the pid list_programs shows. Only agents' programs can be " +
+    "stopped this way; check with the helper that runs it first unless it's runaway or the machine is overloaded.",
+  inputSchema: obj({ pid: { type: "number", description: "The process id from list_programs" } }, ["pid"]),
+  async run({ pid }, { team, project }) {
+    if (!team.machine) throw new Error("Not available.");
+    const stopped = await team.machine.stopProcess(Number(pid));
+    await team.log(project, { from: "symbio", to: "human", kind: "system", text: `core stopped ${stopped.name} (pid ${stopped.pid}), a program an agent started.` });
+    return `Stopped ${stopped.name} (pid ${stopped.pid}) and what it started.`;
+  },
+};
+
 const setEffort: Tool = {
   name: "set_effort",
   description:
@@ -773,6 +812,8 @@ const COORDINATOR_ONLY = [
   spawnAgent,
   pinModel,
   setEffort,
+  listPrograms,
+  stopProgram,
   stopAgent,
   mergeWork,
   cleanBuildOutputs,
