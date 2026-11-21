@@ -143,6 +143,13 @@ project the connections it needs.
 - **Approvals** for remote actions are stored in `~/.symbio/approvals/`, outside the project, so an
   agent can't edit what you're about to approve. A connection set to **Ask me** makes every action
   wait for your approval; read-only API calls (GET, GitHub or Azure DevOps) don't need approval.
+  When you approve you can also **allow the agent on that connection for a while** (30 minutes to
+  until you stop it): its actions there run without asking, each one still logged in Messages, and
+  Project settings → Connections lists who's allowed until when, with **Stop**; pausing the team
+  ends them all. Or **always allow server commands like it** (`systemctl status *`): only plain
+  commands match, so anything with `;`, `&&`, `|`, `$(…)`, backticks, redirects or line breaks still
+  asks, and an allowed prefix can't carry another command along. The patterns are listed (and
+  removable) in the same place; they're part of the project, which agents can't edit.
 - **Model provider keys** are passed straight to OpenCode, which stores them in its own data folder.
   Symbio doesn't keep them and only returns non-secret fields to the browser.
 - Agents can't read image files with OpenCode's read tool: those reads are refused (by Symbio,

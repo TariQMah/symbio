@@ -5,6 +5,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.0]
+
+- **Approve connection requests without being there for each one.** In Needs you, a request to use a connection
+  can be approved once, **for a while** (the agent acts on that connection without asking for 30 minutes, 1 hour,
+  4 hours or until you stop it; pausing the team ends it), or with **always allow** for plain server commands like it
+  (`systemctl status *`; chained commands still ask). **Approve all** approves every request waiting. Project
+  settings → Connections shows who's allowed until when (with **Stop**) and the always-allowed commands (removable).
+  Agents now group the commands they need into one request, so you approve once.
+
 ## [0.23.1]
 
 - **Report a problem** opens the new bug report form, with your Symbio version, agent runtimes and operating system

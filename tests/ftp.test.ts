@@ -65,7 +65,7 @@ test("remote_upload sends a folder over FTP (skipping .git) and replaces files t
   writeFileSync(path.join(work, "dist", ".git", "HEAD"), "ref");
 
   const logs: string[] = [];
-  const remote = new RemoteOps(conns, { log: async (_p, m) => void logs.push(m.text), notify: async () => {} });
+  const remote = new RemoteOps(conns, { log: async (_p, m) => void logs.push(m.text), notify: async () => {}, save: async () => {} });
   const project = { id: "p1", connections: [{ id: c.id, policy: "allow" }] } as any;
   const agent = { id: "a1", name: "helper", directory: work } as any;
 
@@ -101,7 +101,7 @@ test("FTP file operations through remote_exec: listing runs at once, changes fol
   writeFileSync(path.join(server.root, "www", "old", "page.html"), "old");
   writeFileSync(path.join(server.root, "www", "draft.html"), "draft");
   const notes: string[] = [];
-  const remote = new RemoteOps(conns, { log: async () => {}, notify: async (_p, _a, text) => void notes.push(text) });
+  const remote = new RemoteOps(conns, { log: async () => {}, notify: async (_p, _a, text) => void notes.push(text), save: async () => {} });
   const project = { id: "p2", connections: [{ id: c.id, policy: "ask" }] } as any;
   const agent = { id: "a1", name: "helper", directory: os.tmpdir() } as any;
   const exec = (command: string) => remote.request(project, agent, { kind: "remote_exec", connectionId: "Ops", command }, "Tidy the site");

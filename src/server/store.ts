@@ -109,6 +109,8 @@ export interface Project {
   kickedOff: boolean;
   /** Global connections this project may use, and whether each action needs the human's OK. */
   connections: ProjectConnection[];
+  /** Agents allowed to use a connection without asking for now (see ConnectionGrant). */
+  connectionGrants?: ConnectionGrant[];
   /** "Always allow" answers to agents' permission requests (e.g. shell "pip install *"). */
   allowedPatterns: { action: string; pattern: string }[];
   /** Paused by the human: working agents were interrupted and agent messages are held. */
@@ -170,6 +172,20 @@ export interface ProjectConnection {
   id: string;
   /** "ask": every remote action waits for the human's approval. "allow": runs directly. */
   policy: "ask" | "allow";
+  /**
+   * Server commands that run without asking even under "ask" ("systemctl status *"): plain commands
+   * only, no chaining or redirects (remote.ts commandAllowed). Added from an approval or in settings.
+   */
+  allowedCommands?: string[];
+}
+
+/** The human let an agent use a connection without asking, for a while (or until they stop it, or pause the team). */
+export interface ConnectionGrant {
+  connectionId: string;
+  agentId: string;
+  /** Until when (ms); null: until the human stops it. */
+  until: number | null;
+  at: number;
 }
 
 /** Fills fields added after a project was first saved. */

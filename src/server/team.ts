@@ -1311,6 +1311,8 @@ export class Team implements TeamCore {
     if (project.paused) return;
     project.paused = true;
     project.pausedAgents = [];
+    // Pausing also ends "use this connection without asking" for now: after resuming, agents ask again.
+    project.connectionGrants = undefined;
     for (const agent of project.agents) {
       if (agent.status !== "busy" && agent.status !== "stuck" && agent.status !== "waiting") continue;
       project.pausedAgents.push(agent.id);

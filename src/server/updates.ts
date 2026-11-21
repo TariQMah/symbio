@@ -273,6 +273,13 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "Symbio's tested copy. When that happens your runtime may be a different version: if an API behavior looks unfamiliar, " +
       "tell the human which OpenCode version is in use.",
   },
+  {
+    id: "2026-11-21-approvals-allow",
+    text:
+      "Connection approvals: the human can now approve a request and let you use that connection without asking for a while, " +
+      "or always allow plain server commands like it (list_connections shows them). On a connection that needs approval, " +
+      "group the commands you need into one remote_exec (one per line, or with &&) so the human approves once.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

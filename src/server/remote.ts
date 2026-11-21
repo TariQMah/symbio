@@ -13,7 +13,8 @@ import { bus } from "./bus.js";
 import type { AzureConnection, Connection, Connections, GithubConnection, ServerConnection } from "./connections.js";
 import { FTP_OPERATIONS, ftpReadOnly, ftpRun, ftpUpload, parseFtpOperations } from "./ftp.js";
 import { sshExec, sshUpload } from "./ssh.js";
-import { globalDir, newId, type Agent, type Project, type ProjectConnection } from "./store.js";
+import { globalDir, newId, type Agent, type ConnectionGrant, type Project, type ProjectConnection } from "./store.js";
+import { wildcardMatch } from "./guard.js";
 
 const run = promisify(execFile);
 
@@ -32,6 +33,8 @@ export interface Approval {
   agentId: string;
   agentName: string;
   connectionName: string;
+  /** "server", "ftp", "github", "azure": what "always allow commands like this" applies to. */
+  connectionType?: Connection["type"];
   action: RemoteAction;
   /** Human-readable "what will happen". */
   summary: string;
@@ -47,7 +50,55 @@ export interface RemoteHost {
   log(project: Project, m: { from: string; to: string; kind: "approval" | "remote"; text: string }): Promise<void>;
   /** Delivers a message from Symbio to the agent and wakes it. */
   notify(project: Project, agent: Agent, text: string): Promise<void>;
+  /** Saves the project (grants, allowed commands). */
+  save(project: Project): Promise<void>;
 }
+
+/** How the human approved: once, for a while (minutes; null = until stopped), or commands like it always. */
+export interface ApproveOptions {
+  allowFor?: number | null;
+  always?: string;
+}
+
+// Chaining, pipes, substitution, redirects, line breaks: a command with any of these is never
+// "like" an allowed one, so an allowed prefix can't carry something else along.
+const SHELL_SPECIAL = /[;&|`$<>\r\n(){}\\]/;
+
+/** A command with nothing but a program and its arguments. */
+export function plainCommand(command: string): boolean {
+  const c = command.trim();
+  return !!c && !SHELL_SPECIAL.test(c);
+}
+
+/** The pattern offered for "always allow commands like this": the program and its subcommand, any arguments. */
+export function suggestPattern(command: string): string | null {
+  if (!plainCommand(command)) return null;
+  const words = command.trim().split(/\s+/);
+  if (words.length === 1) return words[0];
+  return /^[a-z][\w.-]*$/i.test(words[1]) ? `${words[0]} ${words[1]} *` : `${words[0]} *`;
+}
+
+/** A pattern that can be saved: plain, starting with a program name, at most 200 characters. */
+export function validCommandPattern(pattern: string): string | null {
+  const p = pattern.trim().replace(/\s+/g, " ");
+  if (!p || p.length > 200 || !plainCommand(p.replace(/\*/g, "")) || !/^[\w./-]/.test(p) || /^\*/.test(p)) return null;
+  return p;
+}
+
+/** Whether a server command matches one of the connection's always-allowed patterns. */
+export function commandAllowed(link: Pick<ProjectConnection, "allowedCommands">, command: string): boolean {
+  if (!plainCommand(command)) return false;
+  const c = command.trim().replace(/\s+/g, " ");
+  return (link.allowedCommands ?? []).some((p) => wildcardMatch(p, c));
+}
+
+/** The grant letting an agent use a connection without asking right now, if any. */
+export function activeGrant(project: Project, agentId: string, connectionId: string, now = Date.now()): ConnectionGrant | null {
+  if (project.paused) return null;
+  return (project.connectionGrants ?? []).find((g) => g.agentId === agentId && g.connectionId === connectionId && (g.until === null || g.until > now)) ?? null;
+}
+
+const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 export class RemoteOps {
   private approvals = new Map<string, Approval[]>(); // projectId → approvals
@@ -83,7 +134,8 @@ export class RemoteOps {
               : conn.type === "ftp"
                 ? `FTP account ${conn.username}@${conn.host}${conn.security === "none" ? "" : " (FTPS)"} — remote_upload (replaces files that exist), and remote_exec with FTP file operations, one per line: ${FTP_OPERATIONS} (no shell commands; ls never needs approval)`
                 : `server ${conn.username}@${conn.host} — remote_exec, remote_upload`;
-        return `- "${conn.name}": ${what} (${link.policy === "ask" ? "each action needs the human's approval" : "allowed without approval"})`;
+        const allowed = link.policy === "ask" && conn.type === "server" && link.allowedCommands?.length ? `; these run without asking: ${link.allowedCommands.join(", ")}` : "";
+        return `- "${conn.name}": ${what} (${link.policy === "ask" ? `each action needs the human's approval${allowed}` : "allowed without approval"})`;
       })
       .join("\n");
   }
@@ -100,12 +152,21 @@ export class RemoteOps {
     if (link.policy === "allow" || readOnly) {
       return this.execute(project, agent, conn, action, summary, reason);
     }
+    // Allowed by the human for now, or a command like one they always allow: no question.
+    const grant = activeGrant(project, agent.id, conn.id);
+    if (grant) {
+      return this.execute(project, agent, conn, action, summary, reason, grant.until ? `allowed until ${clock(grant.until)}` : "allowed until the human stops it");
+    }
+    if (action.kind === "remote_exec" && conn.type === "server" && commandAllowed(link, action.command)) {
+      return this.execute(project, agent, conn, action, summary, reason, "a command the human always allows");
+    }
     const approval: Approval = {
       id: newId("apr"),
       projectId: project.id,
       agentId: agent.id,
       agentName: agent.name,
       connectionName: conn.name,
+      connectionType: conn.type,
       action,
       summary,
       reason,
@@ -126,6 +187,59 @@ export class RemoteOps {
 
   async list(project: Project): Promise<Approval[]> {
     return this.load(project);
+  }
+
+  /**
+   * Approves with more than "once": lets the agent use the connection for a while, or always allows
+   * server commands like this one. Returns the other pending approvals that this now covers (the
+   * caller approves them too).
+   */
+  async widen(project: Project, approvalId: string, opts: ApproveOptions): Promise<Approval[]> {
+    const approval = (await this.load(project)).find((a) => a.id === approvalId);
+    if (!approval) throw new Error("Approval not found");
+    const { conn, link } = this.resolve(project, approval.action.connectionId, approval.action.kind);
+    if (opts.always !== undefined) {
+      if (approval.action.kind !== "remote_exec" || conn.type !== "server") throw new Error("Only server commands can be always allowed.");
+      const pattern = validCommandPattern(opts.always);
+      if (!pattern) throw new Error("Give a plain command pattern (a program and its arguments, * for any): no ;, &&, |, $(…), redirects or line breaks.");
+      if (!wildcardMatch(pattern, approval.action.command.trim().replace(/\s+/g, " "))) throw new Error(`"${pattern}" doesn't match this command.`);
+      link.allowedCommands = [...new Set([...(link.allowedCommands ?? []), pattern])];
+      await this.host.save(project);
+      await this.host.log(project, { from: "symbio", to: "human", kind: "remote", text: `Commands like \`${pattern}\` on ${conn.name} now run without asking (Project settings → Connections to change it).` });
+    }
+    if (opts.allowFor !== undefined) {
+      const minutes = opts.allowFor;
+      if (minutes !== null && !(Number.isFinite(minutes) && minutes > 0 && minutes <= 24 * 60)) throw new Error("allowFor is minutes (up to a day), or null until stopped.");
+      const until = minutes === null ? null : Date.now() + minutes * 60_000;
+      const grants = (project.connectionGrants ?? []).filter((g) => !(g.agentId === approval.agentId && g.connectionId === conn.id));
+      project.connectionGrants = [...grants, { connectionId: conn.id, agentId: approval.agentId, until, at: Date.now() }];
+      await this.host.save(project);
+      await this.host.log(project, {
+        from: "symbio",
+        to: "human",
+        kind: "remote",
+        text: `${approval.agentName} may use ${conn.name} without asking ${until ? `until ${clock(until)}` : "until you stop it"} (Project settings → Connections, or pausing the team, ends it).`,
+      });
+      bus.publish({ type: "project.updated", projectId: project.id });
+    }
+    // Other requests waiting that this now covers.
+    return (await this.load(project)).filter((a) => {
+      if (a.status !== "pending" || a.id === approval.id || a.action.connectionId !== approval.action.connectionId) return false;
+      if (activeGrant(project, a.agentId, conn.id)) return true;
+      return a.action.kind === "remote_exec" && conn.type === "server" && commandAllowed(link, a.action.command);
+    });
+  }
+
+  /** Stops an agent's permission to use a connection without asking. */
+  async revokeGrant(project: Project, agentId: string, connectionId: string) {
+    const before = project.connectionGrants ?? [];
+    project.connectionGrants = before.filter((g) => !(g.agentId === agentId && g.connectionId === connectionId));
+    if (project.connectionGrants.length === before.length) return;
+    await this.host.save(project);
+    const name = project.agents.find((a) => a.id === agentId)?.name ?? "The agent";
+    const conn = this.connections.get(connectionId);
+    await this.host.log(project, { from: "symbio", to: "human", kind: "remote", text: `${name} asks again before using ${conn?.name ?? "the connection"}.` });
+    bus.publish({ type: "project.updated", projectId: project.id });
   }
 
   async decide(project: Project, agent: Agent | undefined, approvalId: string, approved: boolean, note: string | null) {
@@ -201,7 +315,7 @@ export class RemoteOps {
     }
   }
 
-  private async execute(project: Project, agent: Agent, conn: Connection, a: RemoteAction, summary: string, reason: string): Promise<string> {
+  private async execute(project: Project, agent: Agent, conn: Connection, a: RemoteAction, summary: string, reason: string, withoutAsking?: string): Promise<string> {
     let output: string;
     let ok = true;
     try {
@@ -214,7 +328,7 @@ export class RemoteOps {
       from: agent.id,
       to: "human",
       kind: "remote",
-      text: `${ok ? "✓" : "✕"} ${summary}\n\nWhy: ${reason}\n\n\`\`\`\n${output.slice(0, 4000)}\n\`\`\``,
+      text: `${ok ? "✓" : "✕"} ${summary}${withoutAsking ? ` (without asking: ${withoutAsking})` : ""}\n\nWhy: ${reason}\n\n\`\`\`\n${output.slice(0, 4000)}\n\`\`\``,
     });
     return output;
   }

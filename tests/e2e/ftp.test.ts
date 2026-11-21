@@ -61,6 +61,6 @@ test("add an FTP connection in Settings, test it, and publish a folder with remo
   await page.locator(".needs-you").click();
   const item = page.locator(".inbox-item", { hasText: "Use Site hosting" });
   await item.locator("pre.command", { hasText: "mv public_html/index.html public_html/old.html" }).waitFor();
-  await item.locator("button", { hasText: "Approve" }).click();
+  await item.getByRole("button", { name: "Approve", exact: true }).click();
   await until("the file to be renamed", () => existsSync(path.join(ftp.root, "public_html", "old.html")));
 });

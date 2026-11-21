@@ -191,3 +191,6 @@ Agents never see their credentials: they call `git_push`, `github_api`, `azure_d
 config files) or that the human gives are a different matter: agents may use them for the task, but
 never copy them into anything committed or shared (see [security.md](security.md#credentials)). A connection set to **Ask me** queues an
 approval in the human's inbox; once approved, the result is delivered to the agent as a message.
+The human may also let the agent use the connection without asking for a while, or always allow
+plain server commands like one (`list_connections` shows those); agents put the commands they need
+into one `remote_exec` (one per line, or joined with `&&`) so the human approves once.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CircleAlert, ClipboardList, KeyRound, MessageCircleQuestion, Plug, ShieldQuestion, ListChecks } from "lucide-react";
+import { CheckCheck, CircleAlert, ClipboardList, KeyRound, MessageCircleQuestion, Plug, ShieldQuestion, ListChecks, Timer } from "lucide-react";
 import { api, subscribe, type Approval, type LoggedMessage, type PermissionRequest, type Plan, type Project, type Question, type Task } from "./api";
 import { Md } from "./files";
 import { OpenQuestions, useQuestions } from "./Questions";
@@ -125,6 +125,22 @@ export function InboxDrawer({
           </Item>
         ))}
 
+        {data.approvals.length > 1 && (
+          <div key="approve-all" className="inbox-approve-all">
+            <span className="small subtle">{data.approvals.length} requests to use connections are waiting.</span>
+            <button
+              className="btn sm"
+              onClick={() => {
+                if (confirm(`Approve all ${data.approvals.length} requests? Each runs, and its result goes to the agent that asked.`)) {
+                  api.approveAll(project.id).catch((e) => alert(e.message));
+                }
+              }}
+            >
+              <CheckCheck size={13} />
+              Approve all
+            </button>
+          </div>
+        )}
         {data.approvals.map((a) => (
           <ApprovalItem key={a.id} project={project} approval={a} />
         ))}
@@ -189,18 +205,44 @@ function Item({
   );
 }
 
+// The same checks as the server's (remote.ts): a plain command, and the pattern offered for it.
+const SHELL_SPECIAL = /[;&|`$<>\r\n(){}\\]/;
+function suggestPattern(command: string): string | null {
+  const c = command.trim();
+  if (!c || SHELL_SPECIAL.test(c)) return null;
+  const words = c.split(/\s+/);
+  if (words.length === 1) return words[0];
+  return /^[a-z][\w.-]*$/i.test(words[1]) ? `${words[0]} ${words[1]} *` : `${words[0]} *`;
+}
+
+const ALLOW_FOR = [
+  { value: "30", label: "30 minutes" },
+  { value: "60", label: "1 hour" },
+  { value: "240", label: "4 hours" },
+  { value: "stop", label: "until I stop it" },
+];
+
 function ApprovalItem({ project, approval: a }: { project: Project; approval: Approval }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  async function decide(approved: boolean) {
+  const [allowFor, setAllowFor] = useState("60");
+  const command = typeof a.action.command === "string" ? a.action.command : null;
+  const suggestion = a.action.kind === "remote_exec" && a.connectionType === "server" && command ? suggestPattern(command) : null;
+  const [pattern, setPattern] = useState(suggestion ?? "");
+  async function decide(approved: boolean, widen?: { allowFor?: number | null; always?: string }) {
     setBusy(true);
-    await api.decideApproval(project.id, a.id, approved, note.trim() || undefined).catch((e) => alert(e.message));
+    try {
+      await api.decideApproval(project.id, a.id, approved, note.trim() || undefined, widen);
+    } catch (e) {
+      alert((e as Error).message);
+      setBusy(false);
+    }
   }
   const body = a.action.kind === "github_api" && a.action.body !== undefined ? JSON.stringify(a.action.body, null, 2) : null;
   return (
     <Item icon={<Plug size={14} />} kind={`Use ${a.connectionName}`} agent={a.agentName} time={a.createdAt}>
       <div className="small">Wants to {a.summary}</div>
-      {typeof a.action.command === "string" && <pre className="command">{a.action.command}</pre>}
+      {command && <pre className="command">{command}</pre>}
       {body && <pre className="command">{body}</pre>}
       <div className="inbox-reason">Why: {a.reason}</div>
       <input placeholder="Note for the agent (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -212,6 +254,38 @@ function ApprovalItem({ project, approval: a }: { project: Project; approval: Ap
           Deny
         </button>
       </div>
+      <div className="inbox-widen">
+        <button
+          className="btn sm"
+          disabled={busy}
+          onClick={() => decide(true, { allowFor: allowFor === "stop" ? null : Number(allowFor) })}
+          title={`Approve this, and let ${a.agentName} use ${a.connectionName} without asking for a while (pausing the team ends it)`}
+        >
+          <Timer size={13} />
+          Approve, and allow {a.agentName} on {a.connectionName} for
+        </button>
+        <select value={allowFor} onChange={(e) => setAllowFor(e.target.value)} disabled={busy} aria-label="For how long">
+          {ALLOW_FOR.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {suggestion && (
+        <div className="inbox-widen">
+          <button
+            className="btn sm"
+            disabled={busy || !pattern.trim()}
+            onClick={() => decide(true, { always: pattern })}
+            title={`Approve this, and run commands like it on ${a.connectionName} without asking, from now on (* stands for anything; chained commands still ask)`}
+          >
+            <KeyRound size={13} />
+            Approve, and always allow
+          </button>
+          <input className="inbox-pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} aria-label="Commands to always allow" disabled={busy} />
+        </div>
+      )}
     </Item>
   );
 }

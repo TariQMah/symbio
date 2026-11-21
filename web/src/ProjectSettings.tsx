@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { Trash2, X } from "lucide-react";
 import { api, RUNTIME_LABEL, type Project, type ProjectConnection } from "./api";
@@ -301,7 +301,15 @@ function Connections({ project, onChanged }: { project: Project; onChanged: (p: 
   const { t } = useI18n();
   const [value, setValue] = useState<ProjectConnection[]>(project.connections);
   const [saving, setSaving] = useState(false);
-  const dirty = JSON.stringify(value) !== JSON.stringify(project.connections);
+  const saved = JSON.stringify(project.connections);
+  const dirty = JSON.stringify(value) !== saved;
+  // Changed elsewhere (an "always allow" from Needs you): follow it, unless there are unsaved edits here.
+  const [base, setBase] = useState(saved);
+  useEffect(() => {
+    if (saved === base) return;
+    if (JSON.stringify(value) === base) setValue(project.connections);
+    setBase(saved);
+  }, [saved]);
   async function save() {
     setSaving(true);
     try {
@@ -321,7 +329,13 @@ function Connections({ project, onChanged }: { project: Project; onChanged: (p: 
         </div>
       </div>
       <div style={{ padding: 12 }}>
-        <ConnectionsPicker value={value} onChange={setValue} />
+        <ConnectionsPicker
+          value={value}
+          onChange={setValue}
+          grants={project.connectionGrants}
+          agentName={(id) => project.agents.find((a) => a.id === id)?.name ?? "An agent"}
+          onStopGrant={(g) => api.stopConnectionGrant(project.id, g.agentId, g.connectionId).then(onChanged, (e) => alert(e.message))}
+        />
       </div>
       <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={() => setValue(project.connections)} />
     </section>

@@ -45,7 +45,9 @@
   once.
 - **Connections without exposing secrets.** Give agents a GitHub account, an Azure DevOps
   organization, a server (SSH, SFTP) or an FTP account. They ask Symbio to push, open pull requests, call the API or deploy, and Symbio does it with credentials the agents never
-  see. Each connection can require your approval for every action.
+  see. Each connection can require your approval for every action; when it does, you can approve
+  several at once, let an agent act without asking for a while, or always allow plain server
+  commands like one (`systemctl status *`).
 - **Resilient.** A supervisor restarts the agent runtime if it crashes, a watchdog unsticks hung agents, and
   when a model fails (quota, outage) the agent switches to the next allowed model and carries on. Want
   an agent to stay on its model (say, to see how that model does)? Pin it in its chat: it then waits and

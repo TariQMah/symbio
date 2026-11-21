@@ -146,6 +146,16 @@ export type DocsLocation = "project" | "private";
 export interface ProjectConnection {
   id: string;
   policy: "ask" | "allow";
+  /** Server commands that run without asking even under "ask". */
+  allowedCommands?: string[];
+}
+
+/** An agent allowed to use a connection without asking, until a time (null: until stopped). */
+export interface ConnectionGrant {
+  connectionId: string;
+  agentId: string;
+  until: number | null;
+  at: number;
 }
 
 export interface PermissionRequest {
@@ -163,6 +173,7 @@ export interface Approval {
   agentId: string;
   agentName: string;
   connectionName: string;
+  connectionType?: "server" | "ftp" | "github" | "azure";
   action: { kind: string; [k: string]: unknown };
   summary: string;
   reason: string;
@@ -196,6 +207,8 @@ export interface Project {
   docsLocation: DocsLocation;
   origin: "new" | "existing";
   connections: ProjectConnection[];
+  /** Agents allowed to use a connection without asking for now. */
+  connectionGrants?: ConnectionGrant[];
   allowedPatterns: { action: string; pattern: string }[];
   paused?: boolean;
   /** Conversational messages two agents may exchange in 30 minutes; 0 = no limit; unset = default (20). */
@@ -718,8 +731,11 @@ export const api = {
   answerPermission: (projectId: string, requestId: string, decision: "once" | "always" | "reject", note?: string) =>
     call<{ ok: true }>("POST", `/projects/${projectId}/permissions/${requestId}`, { decision, note }),
   approvals: (projectId: string) => call<Approval[]>("GET", `/projects/${projectId}/approvals`),
-  decideApproval: (projectId: string, approvalId: string, approved: boolean, note?: string) =>
-    call<{ ok: true }>("POST", `/projects/${projectId}/approvals/${approvalId}`, { approved, note }),
+  approveAll: (projectId: string) => call<{ ok: true; approved: number }>("POST", `/projects/${projectId}/approvals-all`),
+  stopConnectionGrant: (projectId: string, agentId: string, connectionId: string) =>
+    call<Project>("DELETE", `/projects/${projectId}/connection-grants?agent=${encodeURIComponent(agentId)}&connection=${encodeURIComponent(connectionId)}`),
+  decideApproval: (projectId: string, approvalId: string, approved: boolean, note?: string, widen?: { allowFor?: number | null; always?: string }) =>
+    call<{ ok: true; alsoApproved?: number }>("POST", `/projects/${projectId}/approvals/${approvalId}`, { approved, note, ...(widen ?? {}) }),
   rules: (id: string) => call<RulesRegister>("GET", `/projects/${id}/rules`),
   searchDocs: (id: string, q: string) =>
     call<{ matches: DocMatch[]; truncated: boolean }>("GET", `/projects/${id}/docs/search?q=${encodeURIComponent(q)}`),

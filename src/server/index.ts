@@ -90,6 +90,7 @@ const installer = new RuntimeInstaller();
   team.remote = new RemoteOps(connections, {
     log: (project, m) => team.log(project, m),
     notify: (project, agent, text) => team.notify(project, agent, text),
+    save: (project) => store.update(project),
   });
   // Agents that were working when Symbio last went down (crash, killed, machine off)
   // are told to continue once OpenCode is up again.

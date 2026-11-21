@@ -529,6 +529,12 @@ push the branch with \`git_push\`, then create it with \`github_api\` or
 clear \`reason\`: when a connection needs approval, the human decides based on
 it, and the result arrives later as a message.
 
+**Ask for approval once, not once per command.** On a connection that needs
+approval, put the commands you need together in one \`remote_exec\` (one per line,
+or joined with \`&&\`), e.g. everything to inspect a service at once, instead of
+one request per command; the human approves it in one go. Plain single commands
+the human always allows (listed with the connection) run without asking.
+
 **The project's own tools come first.** If the project already has a way to do
 it (a deploy or publish script, a configured CLI, a task in its build files),
 run that like any other command; you don't need a connection for it, and don't

@@ -8,6 +8,7 @@ import { runtimeOf, type AgentRuntime, type RuntimeKind } from "./runtime/types.
 import { findOnPath, hasInstalledCopy, isInstalled, locate, NotInstalledError, RUNTIME_PACKAGES, RuntimeInstaller } from "./runtime/install.js";
 import { loadRuntimeSettings, saveRuntimeSettings } from "./runtime/settings.js";
 import { CopilotRuntime } from "./copilot/runtime.js";
+import { validCommandPattern, type Approval } from "./remote.js";
 import type { CoreMode, ReviewBy, Store, Project, DocsLocation, HelperWorkspace, ProjectConnection } from "./store.js";
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
@@ -120,7 +121,10 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   const cleanLinks = (links: ProjectConnection[] | undefined): ProjectConnection[] =>
     (links ?? [])
       .filter((l) => connections.get(l.id))
-      .map((l) => ({ id: l.id, policy: l.policy === "allow" ? "allow" : "ask" }));
+      .map((l) => {
+        const allowed = (Array.isArray(l.allowedCommands) ? l.allowedCommands : []).map((p) => validCommandPattern(String(p))).filter((p): p is string => !!p);
+        return { id: l.id, policy: l.policy === "allow" ? "allow" : "ask", ...(allowed.length ? { allowedCommands: [...new Set(allowed)] } : {}) };
+      });
 
   api.post("/connections/:id/test", async (c) => c.json(await connections.test(c.req.param("id"))));
 
@@ -903,20 +907,53 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     return c.json(await team.remote.list(project));
   });
 
+  // Runs approved actions in the background, one after another (a deploy can take minutes); each
+  // result reaches its agent as a message.
+  const runDecisions = (project: Project, list: Approval[], approved: boolean, note: string | null) =>
+    void (async () => {
+      for (const approval of list) {
+        const agent = project.agents.find((a) => a.id === approval.agentId && a.status !== "stopped");
+        await team.remote.decide(project, agent, approval.id, approved, note).catch((err) => console.error("[approvals]", err.message));
+      }
+    })();
+
+  // One approval: once, or (approve only) also for a while (allowFor: minutes, null until stopped) or
+  // for commands like it (always: a pattern); requests waiting that this covers are approved too.
   api.post("/projects/:id/approvals/:approvalId", async (c) => {
     const project = withProject(c.req.param("id"));
-    const body = await c.req.json<{ approved?: boolean; note?: string }>();
+    const body = await c.req.json<{ approved?: boolean; note?: string; allowFor?: number | null; always?: string }>();
     if (typeof body.approved !== "boolean") return c.json({ error: "approved (true/false) is required" }, 400);
     const approval = (await team.remote.list(project)).find((a) => a.id === c.req.param("approvalId"));
     if (!approval) return c.json({ error: "Approval not found" }, 404);
     if (approval.status !== "pending") return c.json({ error: `Already ${approval.status}` }, 409);
-    const agent = project.agents.find((a) => a.id === approval.agentId && a.status !== "stopped");
-    // Runs the action (if approved) in the background — a deploy can take minutes — and
-    // delivers the result to the agent as a message.
-    void team.remote
-      .decide(project, agent, approval.id, body.approved, body.note ?? null)
-      .catch((err) => console.error("[approvals]", err.message));
-    return c.json({ ok: true });
+    let covered: Approval[] = [];
+    if (body.approved && (body.allowFor !== undefined || body.always !== undefined)) {
+      try {
+        covered = await team.remote.widen(project, approval.id, { allowFor: body.allowFor, always: body.always });
+      } catch (err) {
+        return c.json({ error: (err as Error).message }, 400);
+      }
+    }
+    runDecisions(project, [approval, ...covered], body.approved, body.note ?? null);
+    return c.json({ ok: true, alsoApproved: covered.length });
+  });
+
+  // Approve every request waiting in the project.
+  api.post("/projects/:id/approvals-all", async (c) => {
+    const project = withProject(c.req.param("id"));
+    const pending = (await team.remote.list(project)).filter((a) => a.status === "pending");
+    runDecisions(project, pending, true, null);
+    return c.json({ ok: true, approved: pending.length });
+  });
+
+  // Stop letting an agent use a connection without asking.
+  api.delete("/projects/:id/connection-grants", async (c) => {
+    const project = withProject(c.req.param("id"));
+    const agentId = c.req.query("agent") ?? "";
+    const connectionId = c.req.query("connection") ?? "";
+    if (!agentId || !connectionId) return c.json({ error: "agent and connection are required" }, 400);
+    await team.remote.revokeGrant(project, agentId, connectionId);
+    return c.json(project);
   });
 
   api.post("/projects/:id/pause", async (c) => {
