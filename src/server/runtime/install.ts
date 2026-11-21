@@ -97,7 +97,8 @@ export function findOnPath(kind: RuntimeKind): Located | null {
   // Windows npm shims are .cmd; the extensionless file is a shell script Node can't spawn directly.
   const names = process.platform === "win32" ? ["opencode.exe", "opencode.cmd"] : ["opencode"];
   for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
-    if (!dir) continue;
+    // Only absolute folders: a relative one (".", "bin") would depend on where Symbio was started from.
+    if (!dir || !path.isAbsolute(dir)) continue;
     for (const name of names) {
       const entry = path.resolve(dir, name);
       if (!existsSync(entry)) continue;

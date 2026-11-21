@@ -86,6 +86,10 @@ docs/                  This documentation
   every theme follows. To add a theme, give its token values in `web/src/themes.css` under
   `html[data-theme="<id>"]` and list it in `THEMES` in `web/src/theme.ts`. Which VS Code colors
   an imported theme's tokens come from is the `MAP` in `web/src/vscodeTheme.ts`.
+- **Interface text goes through `t()`** (`web/src/i18n.ts`, or `useI18n()` in components) with a key
+  in the English dictionary; add the Portuguese (Brazil) text too if you can. A key missing in a
+  language shows the English text. Some screens are still plain English strings: translating them
+  is welcome (#13).
 - **Tell the agents about changes.** When a change affects how agents work (tools, rules, messages
   they receive, what Symbio does on their behalf), add an entry to `src/server/updates.ts`. On the
   next start, each project's coordinator gets the entries it hasn't seen as a note (without being

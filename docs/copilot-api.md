@@ -148,6 +148,12 @@ Copilot's; keys never leave the server.
   produced more output tokens). Copilot doesn't check the level for them (an unknown one was
   passed on as is), so Symbio offers `low` … `max` for them.
 
+## No "from the PATH" option
+
+Unlike OpenCode, Copilot isn't a command Symbio starts but the SDK's module, loaded from Symbio's own
+copy; so Settings → Agent runtimes' "use the one on the PATH" is OpenCode-only, and its end-to-end
+test is skipped on the Copilot run.
+
 ## Co-author lines in commits
 
 The runtime tells its agent to add a `Co-authored-by` trailer to commits it writes unless the

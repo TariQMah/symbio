@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Upload, X } from "lucide-react";
 import { addCustomTheme, allThemes, LAYOUTS, removeCustomTheme, useLayout, useTheme } from "./theme";
 import { parseVsCodeTheme } from "./vscodeTheme";

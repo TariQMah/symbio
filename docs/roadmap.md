@@ -56,7 +56,8 @@ for the maintainers is task priorities.
 9. **Rules register on import.** ([#12](https://github.com/linkzy/symbio/issues/12)) When importing an existing project, offer to build the register
    from the project and from sources the human points to (e-mails, meeting notes, manuals), marking
    rules found only in the work as unsourced.
-10. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages: first the structure and Portuguese (Brazil), then an issue per language.
+10. **Translations.** ([#13](https://github.com/linkzy/symbio/issues/13)) The UI in other languages. The structure
+   and Portuguese (Brazil) are in (0.23.0, the main screens); next, the remaining screens, then an issue per language.
 11. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
@@ -130,6 +131,8 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.23.0** — Use an OpenCode already on the PATH (opt-in) and the interface in Portuguese (Brazil), both by
+  [@wesleyhjpr](https://github.com/wesleyhjpr) (#36, #37); agents can't change Symbio's own settings and runtimes.
 - **0.22.0** — Small computers stay usable: agents' programs at low priority, the machine view (list and stop
   what agents started, also from a phone), and a load guard that tells you and core when the computer is
   overloaded and can hold new turns.

@@ -89,6 +89,7 @@ Every agent session gets permission rules from `src/server/guard.ts`:
 |---|---|
 | **Deny** killing processes by name or PID (`taskkill`, `Stop-Process`, `kill`, `pkill`, `killall`, `wmic … process`…) | Your terminals, editors and Symbio itself run the same executables. An agent once ran `taskkill /F /IM node.exe /T` and closed all of them. Agents stop what they started with `stop_process`; core can stop a program any agent started with `stop_program`, and you from the machine view in the top bar. Those stop by process id, and only processes Symbio recognizes as agents' programs (under a runtime's shells, or seen there before), never the rest of the machine. |
 | **Deny** reading or editing `~/.ssh`, Symbio's secret store, the UI key, the approvals store, Symbio's backups and OpenCode's provider logins (`auth.json`), and shell commands that mention them or private key files | Servers, GitHub and Azure DevOps are reached through Symbio's connection tools instead |
+| **Deny** editing what decides which programs Symbio runs: its settings and state (`runtime-settings.json`, `config.json`, `connections.json`, `machine.json`, `updates.json`, `opencode.pid`), the runtimes it installed (`runtimes/`), the downloaded `cloudflared` (`bin/`), its own Copilot folder, and OpenCode shims anywhere (`opencode.cmd`, `.ps1`, `.bat`, `.exe`); shell commands that mention them are refused too. Reading them is allowed | Otherwise an agent could turn on "OpenCode from the PATH", put its own `opencode.cmd` there, and Symbio would run it as the runtime, outside these rules, with the runtime's server password. Shell commands are matched on their text, so for shell writes this is best effort, as for the secrets |
 | **Ask** before installing software (`winget`, `choco`, `npm -g`, `pip install`…) and "download and run" commands (`… \| sh`, `… \| bash -s`, `… \| sudo bash`, `… \| iex`) | You approve installs from the *Needs you* inbox |
 | **Refuse** reading image files (png, jpg, gif, webp, bmp) and PDFs with the read tool; Symbio answers with a pointer to `view_image` or `read_document` | The read tool puts the whole file in the conversation, re-sent every turn; a few large ones made one too big to send |
 
@@ -165,7 +166,11 @@ project the connections it needs.
   Settings (or at startup, for one existing projects use). By default Symbio never runs one from the
   PATH, so another copy on the computer doesn't change what runs. In Settings → Agent runtimes the
   human can explicitly opt in to using an OpenCode already on PATH; that version may be unverified,
-  and the Copilot SDK can't be swapped this way.
+  and the Copilot SDK can't be swapped this way. Agents can't turn that option on (the guard above),
+  only absolute folders on the PATH are searched, and the first `opencode` found there is what runs,
+  so keep the PATH free of folders others can write to. An npm shim (`opencode.cmd`) is started
+  through `cmd.exe`, which keeps the server password in its own environment (OpenCode itself removes
+  it); programs running as you could read it from there.
 
 ## Things to know
 

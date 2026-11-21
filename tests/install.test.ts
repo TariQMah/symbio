@@ -117,6 +117,19 @@ test("the PATH opt-in wins over Symbio's copy but not over an explicit override"
   assert.deepEqual(locate("opencode"), { entry: "/override/opencode", source: "environment", version: null });
 });
 
+test("relative folders on the PATH are skipped (they'd depend on where Symbio was started)", () => {
+  const cwd = process.cwd();
+  process.chdir(path.dirname(pathDir));
+  try {
+    process.env.PATH = path.basename(pathDir);
+    assert.equal(findOnPath("opencode"), null);
+    process.env.PATH = pathDir;
+    assert.equal(findOnPath("opencode")?.entry, pathExe);
+  } finally {
+    process.chdir(cwd);
+  }
+});
+
 test("the PATH opt-in never applies to Copilot", async () => {
   process.env.SYMBIO_NO_DEV_RUNTIMES = "1";
   process.env.SYMBIO_COPILOT_SDK = "";

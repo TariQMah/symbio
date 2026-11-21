@@ -109,6 +109,27 @@ const SECRET_SHELL = [
   "*opencode*auth.json*",
 ];
 
+// What decides which programs Symbio runs and how (its settings, the runtimes it installed, the
+// downloaded cloudflared, its own Copilot folder, its state): agents may read them but never change
+// them. Otherwise an agent could, for example, turn on "OpenCode from the PATH" and put its own
+// opencode.cmd there, and Symbio would run it as the runtime, outside these rules. The OpenCode
+// executables are covered by name too, so none can be planted on the PATH. Shell commands are
+// matched on their text, so like the secrets above this is best effort for shell writes.
+const SYMBIO_FILES = ["runtime-settings.json", "config.json", "connections.json", "machine.json", "updates.json", "opencode.pid"];
+const SYMBIO_FOLDERS = ["runtimes", "bin", "copilot"];
+const RUNTIME_EXECUTABLES = ["opencode.cmd", "opencode.exe", "opencode.ps1", "opencode.bat"];
+const SYMBIO_CONTROL_PATHS = [
+  ...SYMBIO_FILES.flatMap((f) => [`*\\.symbio\\${f}`, `*/.symbio/${f}`]),
+  ...SYMBIO_FOLDERS.flatMap((d) => [`*\\.symbio\\${d}\\*`, `*/.symbio/${d}/*`]),
+  ...RUNTIME_EXECUTABLES.flatMap((f) => [`*\\${f}`, `*/${f}`]),
+];
+const SYMBIO_CONTROL_SHELL = [
+  ...SYMBIO_FILES.flatMap((f) => [`*.symbio\\${f}*`, `*.symbio/${f}*`]),
+  ...SYMBIO_FOLDERS.flatMap((d) => [`*.symbio\\${d}\\*`, `*.symbio/${d}/*`]),
+  // Running `opencode.exe --version` is harmless; the shims are only ever written.
+  ...RUNTIME_EXECUTABLES.filter((f) => f !== "opencode.exe").map((f) => `*${f}*`),
+];
+
 // Images read with the read tool go into the conversation at full size and are re-sent every
 // turn; a few large ones made a conversation too big to send at all. Agents look at images
 // through Symbio's view_image tool instead, which scales them down. These reads are "ask", not
@@ -206,8 +227,10 @@ export const AGENT_PERMISSIONS: PermissionRule[] = [
   ...rules("read", "ask", [...IMAGE_PATHS, ...PDF_PATHS]), // refused by Symbio with a message (readRefusal)
   ...rules("shell", "deny", KILL_PATTERNS),
   ...rules("shell", "deny", SECRET_SHELL),
+  ...rules("shell", "deny", SYMBIO_CONTROL_SHELL),
   ...rules("read", "deny", SECRET_PATHS),
   ...rules("edit", "deny", SECRET_PATHS),
+  ...rules("edit", "deny", SYMBIO_CONTROL_PATHS),
 ];
 
 /** Whether a path is one agents may never read (keys, Symbio's secrets…), for Symbio's own file tools. */

@@ -5,9 +5,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.23.0]
+
 - **Use an OpenCode already on your computer.** Settings → Agent runtimes has an opt-in to run the
   `opencode` found on PATH instead of Symbio's tested copy. It's off by default, the PATH version can
-  differ from the tested one, and Copilot is unaffected.
+  differ from the tested one, and Copilot is unaffected. By [@wesleyhjpr](https://github.com/wesleyhjpr) (#36).
+- **Interface in Portuguese (Brazil).** Settings → Appearance and the top bar choose the interface language, kept
+  in this browser: English (the default) or Português (Brasil), the first step of translations (#13). The main
+  screens are translated; the rest shows English for now. By [@wesleyhjpr](https://github.com/wesleyhjpr) (#37).
+- **Agents can't change what decides which programs Symbio runs**: its settings and state files, the runtimes it
+  installed, the downloaded `cloudflared`, its Copilot folder, and OpenCode shims anywhere (so none can be put on
+  the PATH). Reading them is still allowed. Only absolute folders on the PATH are searched for OpenCode.
 
 ## [0.22.0]
 

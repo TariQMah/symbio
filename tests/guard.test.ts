@@ -130,3 +130,25 @@ test("Symbio's own evaluation of the rules (runtimes that leave it to Symbio): d
   assert.equal(evaluate(rules, "edit", ["C:\\work\\notes.md"]).effect, "deny", "Plan mode");
   assert.equal(evaluate(rules, "shell", ["git log --oneline"]).effect, "allow", "Plan mode still reads");
 });
+
+test("agents can't change what decides which programs Symbio runs (its settings, runtimes, cloudflared, OpenCode shims)", () => {
+  const effect = (action: string, resource: string) => evaluate(AGENT_PERMISSIONS, action, [resource]).effect;
+  const home = String.raw`C:\Users\me\.symbio`;
+  // Turning on "OpenCode from the PATH" and planting a shim there would make Symbio run the agent's program.
+  assert.equal(effect("edit", `${home}\\runtime-settings.json`), "deny");
+  assert.equal(effect("shell", `Set-Content ${home}\\runtime-settings.json '{"usePathOpenCode":true}'`), "deny");
+  assert.equal(effect("edit", String.raw`C:\Users\me\AppData\Roaming\npm\opencode.cmd`), "deny");
+  assert.equal(effect("shell", String.raw`copy evil.cmd %APPDATA%\npm\opencode.cmd`), "deny");
+  // Symbio's own runtime copies, downloaded tools and state.
+  assert.equal(effect("edit", `${home}\\runtimes\\opencode\\node_modules\\opencode-ai\\bin\\opencode`), "deny");
+  assert.equal(effect("shell", "echo x > ~/.symbio/runtimes/opencode/bin/opencode"), "deny");
+  assert.equal(effect("edit", `${home}\\bin\\cloudflared.exe`), "deny");
+  assert.equal(effect("edit", `${home}\\config.json`), "deny");
+  assert.equal(effect("edit", "/home/me/.symbio/machine.json"), "deny");
+  // Reading is fine, and helpers' folders (under .symbio/worktrees) and projects' own files aren't affected.
+  assert.notEqual(effect("read", `${home}\\runtime-settings.json`), "deny");
+  assert.notEqual(effect("edit", `${home}\\worktrees\\p\\writer\\config.json`), "deny");
+  assert.notEqual(effect("edit", `${home}\\worktrees\\p\\writer\\bin\\run.js`), "deny");
+  assert.notEqual(effect("edit", String.raw`C:\proj\config.json`), "deny");
+  assert.notEqual(effect("shell", "opencode --version"), "deny");
+});
