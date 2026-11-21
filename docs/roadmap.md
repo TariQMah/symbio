@@ -137,6 +137,7 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.23.1** — Report a problem opens the new bug form with versions filled in; a shorter README with the details in `docs/`.
 - **0.23.0** — Use an OpenCode already on the PATH (opt-in) and the interface in Portuguese (Brazil), both by
   [@wesleyhjpr](https://github.com/wesleyhjpr) (#36, #37); agents can't change Symbio's own settings and runtimes.
 - **0.22.0** — Small computers stay usable: agents' programs at low priority, the machine view (list and stop

@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.23.1]
+
 - **Report a problem** opens the new bug report form, with your Symbio version, agent runtimes and operating system
   in their fields.
 - The README is shorter, with why Symbio exists, how it works (a diagram), engineering highlights, limitations and
