@@ -64,6 +64,6 @@ test("a finished task waits for the human with its guide; send back reaches the 
   await page.locator(".review-box .review-guide").waitFor();
   await page.locator(".review-box button", { hasText: "Approve" }).click();
   await until("the task to be done", async () => (await task()).status === "done");
-  await idle(symbio, project.id);
-  assert.match(await history(symbio, project.id, core.id), /the human approved T1/);
+  // core is told after the task is marked done: on a slow machine that note can come after the team looks idle.
+  await until("core to be told", async () => /the human approved T1/.test(await history(symbio, project.id, core.id)));
 });
