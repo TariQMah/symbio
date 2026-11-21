@@ -51,9 +51,10 @@ test("a finished task waits for the human with its guide; send back reaches the 
   const fix = ["Make it say hello world", "@writer write page.txt hello world", tool("writer", "update_task", { task_id: "T1", status: "review", summary: "Fixed", guide })].join("\n");
   await item.locator("textarea").fill(fix);
   await item.locator("button", { hasText: /^Send back$/ }).click();
+  // The click returns before the note is delivered (idle could be seen in between, on a slow machine).
+  await until("the note to reach the helper", async () => /sent back by the human[\s\S]*Make it say hello world/.test(await history(symbio, project.id, writer.id)));
+  await until("the helper to report again", async () => (await task()).status === "review");
   await idle(symbio, project.id);
-  assert.match(await history(symbio, project.id, writer.id), /sent back by the human[\s\S]*Make it say hello world/, "the note reached the helper");
-  assert.equal((await task()).status, "review", "the helper reported again");
 
   // Done again, and this time approved from the Plan tab.
   await say(tool("core", "update_task", { task_id: "T1", status: "done" }));
