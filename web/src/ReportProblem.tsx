@@ -11,29 +11,16 @@ function osName(): string {
 }
 
 /**
- * The link to a new bug report with the bug template and what helps to reproduce: Symbio's version, the agent runtimes
- * installed (with their versions) and the OS. Nothing about the person's projects (names, paths, logs, keys) is added;
- * they write what they choose.
+ * The link to a new bug report (the issue form, .github/ISSUE_TEMPLATE/bug_report.yml) with what helps to reproduce
+ * filled in: Symbio's version, the agent runtimes installed (with their versions) and the OS. Nothing about the
+ * person's projects (names, paths, logs, keys) is added; they write what they choose.
  */
 export function reportProblemUrl(env: { symbio: string | null; runtimes: string | null; os: string }): string {
-  const body = `**What happened**
-<!-- What you did, what you expected, and what happened instead. Screenshots help. -->
-
-**Steps to reproduce**
-1.
-2.
-3.
-
-**Environment**
-- OS: ${env.os}
-- Node.js (\`node --version\`):
-- Symbio version or commit: ${env.symbio ?? ""}
-- Agent runtime (OpenCode or GitHub Copilot CLI) and its version (\`sym doctor\` lists them): ${env.runtimes ?? ""}
-
-**Logs**
-<!-- Errors from the browser console or the terminal running Symbio. Remove API keys, tokens and private content. -->
-`;
-  return `${NEW_BUG}?template=bug_report.md&body=${encodeURIComponent(body)}`;
+  // GitHub fills an issue form's fields from query parameters named after their ids.
+  const params = new URLSearchParams({ template: "bug_report.yml", os: env.os });
+  if (env.symbio) params.set("version", env.symbio);
+  if (env.runtimes) params.set("runtime", env.runtimes);
+  return `${NEW_BUG}?${params}`;
 }
 
 /** The "Report a problem" link, with the versions filled in once Symbio has told us (it works without them). */

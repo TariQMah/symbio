@@ -1,0 +1,32 @@
+# Known issues and limitations
+
+What doesn't work yet, or works with a catch. Bugs go to the
+[issue tracker](https://github.com/linkzy/symbio/issues); this page keeps the ones worth knowing
+before you start, and the limits that come from how Symbio is built.
+
+## Known issues
+
+Problems people ran into, to fix.
+
+- **OpenCode restarts often on long projects.** Its memory grows with long sessions; on one project
+  it was restarted 15+ times in a day. Symbio recovers and agents continue, but turns are cut
+  short. Fresh sessions help; the cause is in OpenCode.
+- **Copilot costs don't match on OpenCode.** For GitHub Copilot models used through OpenCode, the cost Symbio shows differs a lot
+  from OpenCode's own figure.
+
+## Known limitations
+
+- Tested on Windows 11 only: macOS and Linux should work but haven't been tried
+  ([#9](https://github.com/linkzy/symbio/issues/9)).
+- One person per Symbio: no accounts or sharing; each person runs their own.
+- Two agent runtimes: OpenCode and GitHub Copilot CLI (preview); the roadmap's [Ideas](roadmap.md#ideas) has Claude Code and Codex.
+- Agent safety rules are pattern-based, not a sandbox (see [security.md](security.md)): agents run as
+  your user.
+- No hard CPU or memory limits for what agents start: they run at low priority, and the load guard
+  tells you and core when the computer is overloaded.
+- Conversations live in each runtime's storage on this computer. A project opened on another
+  machine keeps its docs and plan, but its agents' sessions don't come along.
+- The interface is in English, and in Portuguese (Brazil) for the main screens
+  ([#13](https://github.com/linkzy/symbio/issues/13)).
+- Relies on experimental OpenCode APIs (instructions, MCP registration), which may change between
+  OpenCode releases.

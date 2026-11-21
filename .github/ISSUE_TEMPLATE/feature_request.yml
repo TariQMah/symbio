@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest an idea or improvement for Symbio
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Not sure yet, or want to talk it through first? [Ideas in Discussions](https://github.com/linkzy/symbio/discussions/new?category=ideas) is a good place too.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How you'd like it to work. Alternatives you considered are welcome too.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - The team (core, helpers, plan, messages)
+        - The interface
+        - Agent runtimes and models
+        - Connections and remote access
+        - Documentation
+        - Something else
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to work on this myself (with or without an AI agent)

@@ -1,0 +1,76 @@
+# What Symbio does
+
+- **Your choice of agent runtime.** OpenCode or GitHub Copilot CLI, per project, each with its own
+  models; Symbio's rules, tools, plan and messages work the same on both. Install them from Symbio
+  (nothing else on your machine changes), and move a project from one to the other in its settings:
+  every agent writes a handoff and continues on the other runtime with its tasks and work.
+- **One conversation, a whole team.** You chat with core. It asks what you want, studies an
+  existing folder before touching it, and proposes a plan of tasks for you to approve.
+- **Helpers that work in parallel without collisions.** Each helper gets its own git worktree and
+  branch, and core reviews and merges their work. For step-by-step work (each step using the
+  previous one's files), helpers can share the project folder instead, with nothing to merge.
+  Helpers are only created when work can really run in parallel; one helper is the default.
+- **Agents talk to each other.** Messages go straight from agent to agent through Symbio, and
+  delivering a message wakes the recipient. No copy-pasting between terminals.
+- **Shared assets with a gatekeeper.** Anything several agents could change (a file pattern, a
+  database, a spreadsheet) can be declared a *shared asset*. Agents request it from core, wait for
+  the grant and release it when done. Changes to an asset an agent wasn't granted are flagged at
+  merge.
+- **Review the work your way.** Helpers report each finished task with a guide for checking it:
+  where to look, the steps and what you should see. Let core review (the default), or review every
+  task yourself from a "To review" list (approve it, or send it back with a note to the helper), or
+  only the tasks marked in the plan. Each task's changed files and diffs are a click away.
+- **Questions in one list, not lost in the chat.** When the team needs a decision from you, it goes
+  to your open questions (numbered, with context and suggested answers). Answer several at once
+  when you have a moment; each agent gets its answers, and the same question isn't asked twice.
+- **Choose how core takes your message.** A selector in the chat box: *Auto* (core decides),
+  *Plan* (discuss and plan only: Symbio blocks starting work and editing files until you switch)
+  or *Act* (get it done without a plan to approve).
+- **Attach files to a message.** Upload, drag in or paste images and documents into the chat, as in
+  other AI chats. Agents get them as files they can open (images as scaled-down copies, PDF, Word,
+  Excel and PowerPoint as text), and each project's **Files** tab keeps everything sent, to open,
+  resend or delete.
+- **Documentation you can find your way in.** core keeps the project's docs up to date, and the
+  Docs tab shows them as a folder tree with search across every doc, links between docs that open
+  in place, an outline of long docs, and plain-text sources (e-mails, transcripts) with line
+  numbers.
+- **A rules register (optional).** Agents record the project's rules (requirements, decisions,
+  constraints) with where each came from, a literal excerpt, who imposes it, how confirmed it is
+  and whether it's met. The Docs tab shows them as an index you can filter and search, with each
+  citation opening its source at the cited line.
+- **A live plan.** The Plan tab is an animated kanban that moves by itself as helpers pick up
+  tasks, ask for review and get merged.
+- **You stay in control.** Questions, plan approvals, permission requests (like installing
+  software) and deploy approvals collect in a **Needs you** inbox. Pause one team or everything at
+  once.
+- **Connections without exposing secrets.** Give agents a GitHub account, an Azure DevOps
+  organization, a server (SSH, SFTP) or an FTP account. They ask Symbio to push, open pull requests, call the API or deploy, and Symbio does it with credentials the agents never
+  see. Each connection can require your approval for every action.
+- **Resilient.** A supervisor restarts the agent runtime if it crashes, a watchdog unsticks hung agents, and
+  when a model fails (quota, outage) the agent switches to the next allowed model and carries on. Want
+  an agent to stay on its model (say, to see how that model does)? Pin it in its chat: it then waits and
+  retries that model instead.
+- **Long-running teams stay healthy.** Agents can continue in a fresh session with a handoff note
+  (when you ask, after each finished task, or automatically when a conversation grows too large to
+  send). A daily check backs up Symbio's state and tells you and core about work that exists only
+  on this machine and build outputs filling the disk.
+- **Explorer.** The project's folders and files in a tab, read-only, to look at what the team wrote
+  without leaving the browser (secrets stay hidden).
+- **Themes and layouts.** The default look, or the colors of VS Code's Dark Modern and Light Modern
+  themes, and a *Workbench* layout like an editor's: tools on the left, the work in the middle, the
+  chat on the right (Settings → Appearance, kept per browser). Bring your own by importing a VS Code
+  color theme file.
+- **Reasoning effort.** How hard each model thinks, per model in a project and per agent from its
+  chat (core can set it for its helpers).
+- **Costs in view.** Tokens and estimated cost per agent and model, with prices you can set (and
+  GitHub Copilot's own prices, in AI credits).
+- **Kind to small computers.** Agents' programs run at low priority, so the computer stays usable and
+  reachable; the machine view in the top bar lists what they started (Stop works from a phone too),
+  and an overloaded machine is reported to you and core, optionally holding new turns until it recovers.
+- **Safety rails.** Agents can't kill processes by name (which would take down your terminals and
+  editors), can't read your SSH keys or Symbio's secret store, and must ask before installing
+  software. They look at images through scaled-down copies, so a few large pictures can't make a
+  conversation too big to send.
+
+See also: [usage.md](usage.md) to get started, [configuration.md](configuration.md) for settings and where
+data lives, and [security.md](security.md) for the safety rules in detail.

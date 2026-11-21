@@ -1,7 +1,8 @@
 # Symbio documentation
 
-For people and AI agents working **on** Symbio. To *use* Symbio, the main [README](../README.md) is
-enough.
+For people and AI agents working **on** Symbio. To *use* Symbio, start with the main
+[README](../README.md), then [usage.md](usage.md), [features.md](features.md),
+[configuration.md](configuration.md) and [known-issues.md](known-issues.md).
 
 | Document | Read it when |
 |---|---|
@@ -11,7 +12,9 @@ enough.
 | [copilot-api.md](copilot-api.md) | You're working on GitHub Copilot CLI as a runtime: the Copilot SDK as Symbio uses it, verified live |
 | [development.md](development.md) | You're setting up, running, testing or debugging Symbio, or want the code conventions |
 | [security.md](security.md) | You're touching anything around agent permissions, credentials or the local API |
-| [roadmap.md](roadmap.md) | You want to know what's being worked on, what's next in priority order, collected ideas, what's done and the known limitations |
+| [roadmap.md](roadmap.md) | You want to know what's being worked on, what's next in priority order, collected ideas and what's done |
+| [known-issues.md](known-issues.md) | You want the known problems and limitations |
+| [releasing.md](releasing.md) | You're a maintainer cutting a release |
 
 Keep these documents true: when a change makes one of them wrong, update it in the same pull
 request.

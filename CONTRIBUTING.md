@@ -15,7 +15,8 @@ stand-ins for OpenCode and GitHub Copilot CLI, and so does CI on your pull reque
 ## Reporting bugs, asking and suggesting
 
 Questions and ideas go to [Discussions](https://github.com/linkzy/symbio/discussions) (Q&A, Ideas).
-For a bug, open an issue with the bug template, and include:
+For a bug, open an issue with the bug report form (Symbio's **Report a problem** button opens it with
+your versions filled in), and include:
 
 - what you did, what you expected, and what happened instead;
 - your OS, Node.js version and Symbio version, and the agent runtime the project uses with its

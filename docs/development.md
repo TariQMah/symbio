@@ -131,34 +131,8 @@ docs/                  This documentation
 
 ## Releasing
 
-1. Move the entries under `[Unreleased]` in `CHANGELOG.md` to a new version and set the same
-   version in `package.json`.
-2. If agents work differently, make sure `src/server/updates.ts` has entries for it.
-3. `npm pack` and try the package from a temporary prefix before publishing:
-   ```sh
-   npm pack --pack-destination /tmp/symbio-pkg
-   npm i -g --prefix /tmp/symbio-pkg/prefix /tmp/symbio-pkg/symbio-<version>.tgz
-   SYMBIO_HOME=/tmp/symbio-pkg/home SYMBIO_PORT=4330 /tmp/symbio-pkg/prefix/sym doctor
-   ```
-4. Commit, tag the commit with the version (`git tag v<version>`) and push the tag. The **Release**
-   workflow (`.github/workflows/release.yml`) checks that the tag matches `package.json`, runs the
-   type-check, tests and build, and publishes to npm through trusted publishing: no npm token is
-   stored anywhere, and the package gets provenance. It then creates the GitHub release, with the
-   version's section of `CHANGELOG.md` (`scripts/release-notes.mjs`; pre-releases marked as such). It's authorized on npmjs.com → symbio →
-   Settings → Trusted Publisher (GitHub Actions, user `linkzy`, repo `symbio`, workflow
-   `release.yml`).
-
-**Updates reach users by themselves.** Installed copies check npm and update automatically (see
-`self-update.ts`), so a release goes out to everyone within hours: keep `CHANGELOG.md` current (its
-section for the version is shown in Settings → Updates). A copy running from a clone (`npm link`)
-never updates itself. To test updates without npm, install a packed version into a temporary
-prefix and point it at a stand-in registry: `SYMBIO_UPDATE_REGISTRY` (serves `/symbio/latest`),
-`SYMBIO_UPDATE_SPEC` (what to install, e.g. a `.tgz`) and `SYMBIO_UPDATE_CHANGELOG`.
-
-The runtimes are pinned dev dependencies (`@opencode/cli`, patch updates only; `@github/copilot-sdk`,
-exact), and they're the versions users install. Moving to a newer one means re-verifying the APIs in
-[opencode-api.md](opencode-api.md) or [copilot-api.md](copilot-api.md) first; users get it with the
-Symbio update (Settings → Agent runtimes reinstalls; a missing one is reinstalled at startup).
+The maintainers' checklist is in [releasing.md](releasing.md): versions, the gated release workflow,
+recovering from a failed one, and how updates and runtime versions reach users.
 
 ## Debugging
 

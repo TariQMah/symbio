@@ -5,6 +5,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Report a problem** opens the new bug report form, with your Symbio version, agent runtimes and operating system
+  in their fields.
+- The README is shorter, with why Symbio exists, how it works (a diagram), engineering highlights, limitations and
+  an FAQ; the details moved to `docs/usage.md`, `docs/features.md`, `docs/configuration.md` and
+  `docs/known-issues.md`. Maintainers get `docs/releasing.md`.
+
 ## [0.23.0]
 
 - **Use an OpenCode already on your computer.** Settings → Agent runtimes has an opt-in to run the

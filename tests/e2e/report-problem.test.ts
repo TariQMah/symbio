@@ -23,17 +23,15 @@ test("Report a problem opens a new bug report with Symbio's version and the OS, 
   await top.waitFor();
   await inSettings.waitFor();
   for (const link of [top, inSettings]) {
-    await until("the version in the link", async () => ((await link.getAttribute("href")) ?? "").includes(encodeURIComponent(`Symbio version or commit: ${current}`)));
-    await until("the runtimes in the link", async () => ((await link.getAttribute("href")) ?? "").includes(encodeURIComponent("lists them): OpenCode")));
-    const url = new URL((await link.getAttribute("href"))!);
-    assert.equal(url.origin + url.pathname, "https://github.com/linkzy/symbio/issues/new");
-    assert.equal(url.searchParams.get("template"), "bug_report.md");
-    const body = url.searchParams.get("body")!;
-    assert.match(body, /- OS: \S/);
-    assert.ok(body.includes(`- Symbio version or commit: ${current}`));
-    // The installed runtimes with their versions (both stand-ins are installed in the tests).
-    assert.match(body, /lists them\): OpenCode.*, GitHub Copilot CLI/);
-    assert.ok(!body.includes("Secret project name"));
+    const url = async () => new URL((await link.getAttribute("href"))!);
+    await until("the version in the link", async () => (await url()).searchParams.get("version") === current);
+    await until("the runtimes in the link", async () => /^OpenCode.*, GitHub Copilot CLI/.test((await url()).searchParams.get("runtime") ?? ""));
+    const u = await url();
+    assert.equal(u.origin + u.pathname, "https://github.com/linkzy/symbio/issues/new");
+    // The issue form's fields, by id (.github/ISSUE_TEMPLATE/bug_report.yml).
+    assert.equal(u.searchParams.get("template"), "bug_report.yml");
+    assert.match(u.searchParams.get("os") ?? "", /\S/);
+    assert.ok(!u.href.includes(encodeURIComponent("Secret project name")) && !u.href.includes("Secret"));
     assert.equal(await link.getAttribute("target"), "_blank");
   }
 });

@@ -1,0 +1,29 @@
+# Dependency updates as pull requests, checked by CI like any other (both runtimes, end to end).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # The agent runtimes are pinned on purpose: they're the versions users install, and a new one
+      # means verifying its API first (docs/opencode-api.md, docs/copilot-api.md). CI's contract job
+      # already tests the newest OpenCode.
+      - dependency-name: "@opencode/cli"
+      - dependency-name: "@github/copilot-sdk"
+      # Major versions change APIs: done by hand.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # One pull request for the minor and patch updates of everything else.
+      dependencies:
+        patterns: ["*"]

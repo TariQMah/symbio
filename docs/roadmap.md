@@ -12,6 +12,9 @@ for the maintainers is task priorities.
 
 ## Next
 
+The issues are also grouped into [milestones](https://github.com/linkzy/symbio/milestones):
+*Smarter teams*, *Never miss a thing*, *Everyday comfort* and *Show it to the world*.
+
 1. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
    change it (its plan tools take it), the human can change it on the board, and core is told when
@@ -204,21 +207,6 @@ Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
   as gatekeeper, model fallback); the plan and its live kanban; the *Needs you* inbox; GitHub and
   SSH connections with an encrypted vault and approvals; model providers from Settings.
 
-## Known issues
+## Known issues and limitations
 
-Problems people ran into, to fix.
-
-- **OpenCode restarts often on long projects.** Its memory grows with long sessions; on one project
-  it was restarted 15+ times in a day. Symbio recovers and agents continue, but turns are cut
-  short. Fresh sessions help; the cause is in OpenCode.
-- **Copilot costs don't match.** For GitHub Copilot models, the cost Symbio shows differs a lot
-  from OpenCode's own figure.
-
-## Known limitations
-
-- Tested on Windows 11 only.
-- One person per Symbio: no accounts or sharing; each person runs their own.
-- Two agent runtimes: OpenCode and GitHub Copilot CLI (preview); see Ideas for Claude Code and Codex.
-- Agent safety rules are pattern-based, not a sandbox (see [security.md](security.md)).
-- Relies on experimental OpenCode APIs (instructions, MCP registration), which may change between
-  OpenCode releases.
+In [known-issues.md](known-issues.md).
