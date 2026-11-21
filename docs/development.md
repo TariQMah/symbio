@@ -131,7 +131,8 @@ docs/                  This documentation
 
 ## Releasing
 
-The maintainers' checklist is in [releasing.md](releasing.md): versions, the gated release workflow,
+The maintainers' checklist is in [releasing.md](releasing.md): who changes what (Symbio is also
+developed by a Symbio team, on branches and pull requests), versions, the gated release workflow,
 recovering from a failed one, and how updates and runtime versions reach users.
 
 ## Debugging

@@ -54,3 +54,23 @@ can't support something yet, skip it there explicitly in the test, with the reas
 - **Keep docs true.** If your change makes a doc wrong, fix the doc in the same change.
 - **Tell the agents.** If a change affects how agents work (tools, rules, what Symbio does for them),
   add an entry to `src/server/updates.ts`: running projects' coordinators get it after the update.
+
+## If you're an agent in a Symbio team
+
+Symbio is developed with Symbio too. If you're core or a helper in a Symbio project working on this
+repository:
+
+- **The Symbio running you is the installed version, not this code.** Its tools, rules and briefs
+  come from that version; this folder may be ahead of it. Don't assume a change here affects you.
+- **Never touch the running Symbio**: don't start this code on its port (4310) or with its data
+  (`~/.symbio`), and don't install or link this folder globally. Manual runs use a temporary
+  `SYMBIO_HOME` and `SYMBIO_PORT`; the tests already do.
+- **Work on branches, and open pull requests.** One branch per issue (`symbio/<issue>-<short-name>`),
+  never pushed to `main` or `next` directly. CI checks the pull request; the maintainers review and
+  merge it.
+- **Never create tags or releases**: a version tag publishes to npm. Releases are cut by the
+  maintainers.
+- **Claim an issue before working on it** with the `in progress: symbio` label, and leave issues
+  that have it (or are assigned to someone) to whoever has them.
+- Heavy work (the end-to-end suite, builds) runs one helper at a time: it starts browsers and several
+  Symbio instances.

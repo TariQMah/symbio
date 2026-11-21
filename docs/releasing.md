@@ -12,6 +12,22 @@ publishes only if it all passes, so a broken build never reaches users.
 - Versions follow [Semantic Versioning](https://semver.org/): a minor version for features, a patch
   for fixes.
 
+## Who changes what
+
+Symbio is also developed by a Symbio team on another machine, working on the same repository with
+the same GitHub account. To keep the two from colliding:
+
+- **The Symbio team works on branches and opens pull requests** (`symbio/<issue>-<short-name>`); it
+  never pushes to `main` or `next`, and never tags. Its GitHub connection is set to *Ask me*, so each
+  push waits for the maintainer, and it uses its own fine-grained token, limited to this repository
+  (contents and pull requests).
+- **Direct pushes to `main`, merges and releases happen in one place**, the maintainers' own
+  session, so two version tags never race.
+- **Issues are the shared list.** Work in progress is labelled `in progress: symbio` (or assigned);
+  the other side leaves those alone.
+- **`CHANGELOG.md` and the roadmap conflict often** (both sides add to `[Unreleased]`): keep both
+  sides' entries when merging; they're sorted out at release.
+
 ## Steps
 
 1. Move the entries under `[Unreleased]` in `CHANGELOG.md` to a new version and set the same
