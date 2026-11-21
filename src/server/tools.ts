@@ -9,6 +9,7 @@ import { CONFIRMATIONS, listRules, saveArea, saveRule, saveSource, STATUSES } fr
 import { DEFAULT_IMAGE_SIZE, viewImage } from "./images.js";
 import { readDocument } from "./documents.js";
 import { describeOuterRepository, gitRepoFor } from "./repos.js";
+import { startedBy } from "./machine.js";
 import type { Team } from "./team.js";
 
 export interface ToolContext {
@@ -221,7 +222,7 @@ No programs started by agents are running.`;
       ...list.map(
         (p) =>
           `- pid ${p.pid} ${p.name}: ${p.cpu === null ? "CPU measured on the next call" : `${p.cpu}% CPU`}, ${Math.round(p.memory / 1024 ** 2)} MB, ` +
-          `started ${p.started ? new Date(p.started).toLocaleTimeString() : "?"} — ${p.command}`,
+          `started ${p.started ? new Date(p.started).toLocaleTimeString() : "?"}${p.owners.length ? ` by ${startedBy(p)}` : ""} — ${p.command}`,
       ),
     ].join("\n");
   },

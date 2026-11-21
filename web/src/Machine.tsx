@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { AlertTriangle, Gauge, Square } from "lucide-react";
+import { AlertTriangle, Bot, Gauge, Square } from "lucide-react";
 import { api, subscribe, type AgentProgram, type MachineLoad } from "./api";
 import { Drawer } from "./ui";
 
@@ -9,6 +9,15 @@ import { Drawer } from "./ui";
 
 const gb = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 const mb = (bytes: number) => (bytes >= 1024 ** 3 ? gb(bytes) : `${Math.round(bytes / 1024 ** 2)} MB`);
+
+/** "overdrive · core", or the agents that were working when it started when Symbio can't tell which one. */
+function ownerText(p: AgentProgram): string {
+  if (!p.owners.length) return "Started by an agent Symbio can't tell";
+  if (p.owners.length === 1) return `${p.owners[0].project} · ${p.owners[0].agent}`;
+  const names = p.owners.map((o) => (new Set(p.owners.map((x) => x.projectId)).size > 1 ? `${o.project} · ${o.agent}` : o.agent));
+  const one = `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+  return new Set(p.owners.map((x) => x.projectId)).size > 1 ? `One of: ${one}` : `${p.owners[0].project} · ${one}`;
+}
 
 export function MachineBadge() {
   const [load, setLoad] = useState<MachineLoad | null>(null);
@@ -40,6 +49,7 @@ function MachineDrawer({ load, onLoad, onClose }: { load: MachineLoad; onLoad: (
   const [programs, setPrograms] = useState<AgentProgram[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stopping, setStopping] = useState<number | null>(null);
+  const [project, setProject] = useState("");
   useEffect(() => {
     let live = true;
     // CPU per program is measured between two listings: the second one, a few seconds later, has it.
@@ -70,6 +80,19 @@ function MachineDrawer({ load, onLoad, onClose }: { load: MachineLoad; onLoad: (
   }
 
   const used = load.memory.total - load.memory.free;
+  // Programs by the project whose agent started them ("?" for ones Symbio can't tell), for the filter.
+  const projectOf = (p: AgentProgram) => {
+    const ids = [...new Set(p.owners.map((o) => o.projectId))];
+    return ids.length === 1 ? ids[0] : "?";
+  };
+  const projects = new Map<string, { name: string; count: number }>();
+  for (const p of programs ?? []) {
+    const id = projectOf(p);
+    const entry = projects.get(id) ?? { name: id === "?" ? "Not known" : p.owners[0].project, count: 0 };
+    entry.count++;
+    projects.set(id, entry);
+  }
+  const shown = programs?.filter((p) => !project || projectOf(p) === project);
   return (
     <Drawer title="This computer" onClose={onClose}>
       <div className="machine">
@@ -104,12 +127,26 @@ function MachineDrawer({ load, onLoad, onClose }: { load: MachineLoad; onLoad: (
           </div>
         )}
 
-        <div className="machine-section-title">Programs agents started</div>
+        <div className="machine-section-title">
+          <span className="grow">Programs agents started</span>
+          {programs && projects.size > 1 && (
+            <select className="machine-filter" value={project} onChange={(e) => setProject(e.target.value)} aria-label="Project">
+              <option value="">All projects ({programs.length})</option>
+              {[...projects]
+                .sort((a, b) => (a[0] === "?" ? 1 : b[0] === "?" ? -1 : a[1].name.localeCompare(b[1].name)))
+                .map(([id, e]) => (
+                  <option key={id} value={id}>
+                    {e.name} ({e.count})
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
         {error && <div className="error">{error}</div>}
         {!programs && !error && <div className="subtle small">Looking…</div>}
         {programs?.length === 0 && <div className="subtle small">None running.</div>}
         <div className="machine-programs">
-          {programs?.map((p) => (
+          {shown?.map((p) => (
             <div key={p.pid} className="machine-program" data-pid={p.pid}>
               <div className="grow" style={{ minWidth: 0 }}>
                 <div className="machine-program-head">
@@ -119,6 +156,10 @@ function MachineDrawer({ load, onLoad, onClose }: { load: MachineLoad; onLoad: (
                     {p.runtime ? ` · ${p.runtime}` : ""}
                     {p.started ? ` · since ${new Date(p.started).toLocaleTimeString()}` : ""}
                   </span>
+                </div>
+                <div className="machine-owner small">
+                  <Bot size={12} />
+                  {ownerText(p)}
                 </div>
                 <code className="machine-command" title={p.command}>
                   {p.command}

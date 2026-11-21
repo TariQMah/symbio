@@ -5,6 +5,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **The machine view says who started each program**: the project and the agent (or the agents that were working when it
+  started, when Symbio can't tell which one), with a filter by project. `list_programs` says it to core too.
+- **Fixed: system programs listed as agents' programs** on Windows (Windows Defender, Task Manager, the search indexer…), which
+  made the list long and the counts wrong. Windows keeps a program's parent id after the parent exits and gives the id to new
+  programs; a program now only counts as another's child when it started after it. Stopping a program also stops only its
+  checked children (no more `taskkill /T`), and agents' work is lowered in priority on the same checked tree. The same
+  mistake could count those programs in a runtime's memory (restarting it to free memory for nothing) and stop them along
+  with the runtime; both use the checked tree now.
+
 ## [0.24.0]
 
 - **Approve connection requests without being there for each one.** In Needs you, a request to use a connection

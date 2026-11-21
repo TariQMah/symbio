@@ -90,7 +90,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `mcp.ts` | Minimal MCP server (Streamable HTTP, JSON responses) |
 | `prompts.ts` | The briefs given to core and helpers |
 | `updates.ts` | Agent-facing notes about what changed in Symbio, given once to each coordinator after an update |
-| `machine.ts` | This computer: agents' work at below-normal priority (the runtime's process, inherited by what it starts), the programs agents started (under a runtime's shells, tracked after their parent exits) to list and stop by pid, and the load guard (CPU and free memory sampled every 15 s; overloaded → the human and core are told, and messages between agents wait if the human chose so). Settings in `machine.json` |
+| `machine.ts` | This computer: agents' work at below-normal priority (the runtime's process, inherited by what it starts), the programs agents started (under a runtime's shells, tracked after their parent exits, with who started each) to list and stop by pid, and the load guard (CPU and free memory sampled every 15 s; overloaded → the human and core are told, and messages between agents wait if the human chose so). Settings in `machine.json` |
 | `housekeeping.ts` | Daily: backups of Symbio's state (`~/.symbio/backups`), commits no remote has, build outputs piling up in helpers' folders |
 | `plan.ts` | The plan and its tasks (`plan.json`) |
 | `questions.ts` | The team's questions for the human and their answers (`questions.json`) |
@@ -193,7 +193,13 @@ bar), from the same pieces.
   CPU and free memory; when the machine stays overloaded it logs it for the human (with the heaviest
   agents' programs) and notes it to core, and with *hold* on, messages between agents wait
   (`Team.deliver`, like a pause) until it recovers, then go out. The top bar's machine view lists
-  agents' programs and stops one by pid; core has `list_programs` / `stop_program`.
+  agents' programs and stops one by pid; core has `list_programs` / `stop_program`. Each program
+  says who started it: the agent whose background shell it runs under (the runtimes record the
+  session), otherwise the agents that were working on its runtime when its shell started (the team
+  keeps each agent's recent turns), narrowed to the one whose folder its command line names.
+  Windows keeps a process's parent id after the parent exits and reuses ids, so a process only
+  counts as another's child when it started after it (`childOf`); stopping a program stops that
+  checked tree pid by pid, never with `taskkill /T`.
 - **Memory recycling.** Each runtime's memory is measured (its process tree, without the shells it
   runs agents' commands in and what runs under them: builds and servers agents start aren't the
   runtime's, and restarting it would only cut them off). Above

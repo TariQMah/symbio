@@ -315,6 +315,8 @@ export interface AgentProgram {
   cpu: number | null;
   started: number;
   runtime: string;
+  /** Who started it: one agent, or the agents that were working when it started; empty when unknown. */
+  owners: { projectId: string; project: string; agentId: string; agent: string }[];
 }
 
 export interface RuntimeInfo {

@@ -1088,6 +1088,9 @@ body.resizing iframe { pointer-events: none; }
 .machine-programs { display: flex; flex-direction: column; gap: 6px; }
 .machine-program { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); }
 .machine-program-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.machine-owner { display: flex; align-items: center; gap: 5px; color: var(--muted); margin: 2px 0; }
+.machine-section-title:has(.machine-filter) { display: flex; align-items: center; gap: 8px; }
+.machine-filter { width: auto; max-width: 220px; padding: 3px 6px; font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .machine-command { display: block; margin-top: 4px; font-size: 11px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .machine-hold { align-items: flex-start; gap: 8px; }
 .machine-hold .hint { display: block; margin-top: 2px; }

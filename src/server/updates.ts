@@ -280,6 +280,13 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "or always allow plain server commands like it (list_connections shows them). On a connection that needs approval, " +
       "group the commands you need into one remote_exec (one per line, or with &&) so the human approves once.",
   },
+  {
+    id: "2026-11-21-program-owners",
+    text:
+      "list_programs now says which project and agent started each program (and it no longer lists system programs by mistake). " +
+      "The human sees the same in the machine view: when you leave a server or a tunnel running on purpose, say so in your report, " +
+      "and stop what you no longer need.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

@@ -67,7 +67,8 @@
 - **Costs in view.** Tokens and estimated cost per agent and model, with prices you can set (and
   GitHub Copilot's own prices, in AI credits).
 - **Kind to small computers.** Agents' programs run at low priority, so the computer stays usable and
-  reachable; the machine view in the top bar lists what they started (Stop works from a phone too),
+  reachable; the machine view in the top bar lists what they started and which project and agent
+  started each (filter by project; Stop works from a phone too),
   and an overloaded machine is reported to you and core, optionally holding new turns until it recovers.
 - **Safety rails.** Agents can't kill processes by name (which would take down your terminals and
   editors), can't read your SSH keys or Symbio's secret store, and must ask before installing

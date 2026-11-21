@@ -20,6 +20,7 @@ import { execSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { createInterface } from "node:readline";
 
 const MODELS = [
   { id: "auto", name: "Auto" },
@@ -33,6 +34,8 @@ const MODELS = [
 const sessions = new Map();
 /** The fake runtime process (see FakeClient.start). */
 let runtimeProcess = null;
+/** Commands sent to the runtime's shell that haven't started yet. */
+let spawned = [];
 /** Signed in to GitHub, unless SYMBIO_FAKE_COPILOT_SIGNED_OUT=1 (then a device-code sign-in signs in). */
 const logins = new Map();
 const auth = { login: process.env.SYMBIO_FAKE_COPILOT_SIGNED_OUT === "1" ? null : "e2e" };
@@ -47,9 +50,16 @@ class FakeClient {
   async start() {
     this.cliProcess = spawn(
       process.execPath,
-      ["-e", "require('readline').createInterface({ input: process.stdin }).on('line', (c) => require('child_process').spawn(c, { shell: true, stdio: 'ignore', windowsHide: true }))"],
-      { stdio: ["pipe", "ignore", "ignore"], windowsHide: true },
+      [
+        "-e",
+        "require('readline').createInterface({ input: process.stdin }).on('line', (c) => " +
+          "require('child_process').spawn(c, { shell: true, stdio: 'ignore', windowsHide: true }).on('spawn', () => console.log('spawned')))",
+      ],
+      { stdio: ["pipe", "pipe", "ignore"], windowsHide: true },
     );
+    // Each "spawned" line answers the oldest command sent: a real shell tool returns once its command started.
+    spawned = [];
+    createInterface({ input: this.cliProcess.stdout }).on("line", () => spawned.shift()?.());
     runtimeProcess = this.cliProcess;
   }
   async stop() {
@@ -275,7 +285,11 @@ async function runStep(state, step, ctl) {
       return say(state, `effort: ${state.effort ?? "default"}`);
     // "@core spawn <command>": a program that keeps running, started under the runtime's shell (not waited for).
     case "spawn":
-      runtimeProcess?.stdin.write(`${step.rest}\n`);
+      if (runtimeProcess) {
+        const started = new Promise((resolve) => spawned.push(resolve));
+        runtimeProcess.stdin.write(`${step.rest}\n`);
+        await started;
+      }
       return say(state, "started");
     case "coauthor":
       return say(state, `coauthor: ${state.config.coauthorEnabled === false ? "off" : "on"}`);

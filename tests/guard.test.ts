@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AGENT_PERMISSIONS, evaluate, PLAN_MODE_PERMISSIONS, readRefusal, wildcardMatch } from "../src/server/guard.js";
-import { sumProcessTree } from "../src/server/opencode/runtime.js";
+import { treeMemory } from "../src/server/machine.js";
 
 test("wildcard matching (OpenCode semantics)", () => {
   assert.ok(wildcardMatch("pip install *", "pip install flask"));
@@ -39,21 +39,29 @@ test("the guard denies kills and secrets, asks for installs", () => {
 });
 
 test("process tree memory", () => {
-  const listing = ["10 1 100", "11 10 20", "12 11 3", "13 99 1000", "14 10 7", "1 0 5"].join("\r\n");
-  assert.equal(sumProcessTree(listing, 10), 130);
-  assert.equal(sumProcessTree(listing, 12), 3, "a leaf (no children) terminates");
-  assert.equal(sumProcessTree("5 6 1\n6 5 2", 5), 3, "cycles from pid reuse terminate");
+  const ps = (lines: string[]) =>
+    lines.map((line) => {
+      const [pid, parent, memory, ...name] = line.split(" ");
+      return { pid: Number(pid), parent: Number(parent), memory: Number(memory), name: name.join(" "), command: "", cpuTime: 0, started: 1 };
+    });
+  const listing = ps(["10 1 100", "11 10 20", "12 11 3", "13 99 1000", "14 10 7", "1 0 5"]);
+  assert.equal(treeMemory(listing, 10), 130);
+  assert.equal(treeMemory(listing, 12), 3, "a leaf (no children) terminates");
+  assert.equal(treeMemory(ps(["5 6 1", "6 5 2"]), 5), 3, "cycles from pid reuse terminate");
   // Agents' commands run under shells: a build or a dev server isn't the runtime's memory.
-  const withCommands = [
+  const withCommands = ps([
     "10 1 800 copilot-runtime.exe",
     "11 10 15 conhost.exe",
     "12 10 90 pwsh.exe",
     "13 12 300 dotnet.exe",
     "14 13 2000 MSBuild.exe",
     "15 10 50 typescript language server.exe",
-  ].join("\r\n");
-  assert.equal(sumProcessTree(withCommands, 10), 865, "the runtime and its own helpers, not the shells' commands");
-  assert.equal(sumProcessTree("10 1 800 pwsh.exe\n11 10 5 conhost.exe", 10), 805, "a runtime that is itself a shell still counts");
+  ]);
+  assert.equal(treeMemory(withCommands, 10), 865, "the runtime and its own helpers, not the shells' commands");
+  assert.equal(treeMemory(ps(["10 1 800 pwsh.exe", "11 10 5 conhost.exe"]), 10), 805, "a runtime that is itself a shell still counts");
+  // A program from before the runtime started that names the runtime's (reused) pid as its parent isn't the runtime's.
+  const reused = [...ps(["10 1 800 opencode.exe"]).map((p) => ({ ...p, started: 100 })), ...ps(["20 10 3000 MsMpEng.exe"])];
+  assert.equal(treeMemory(reused, 10), 800);
 });
 
 test("agents can't read Symbio's backups", () => {

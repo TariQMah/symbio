@@ -39,6 +39,9 @@ test("the programs agents start are listed in the machine view and can be stoppe
   const row = page.locator(".machine-program", { hasText: MARKER });
   await row.waitFor();
   assert.match(await row.innerText(), /node/);
+  // Who started it: the project and the agent.
+  await until("who started it to be known", async () => /Machine · core/.test(await row.innerText()));
+  assert.ok((await symbio.call("GET", "/machine/processes")).some((p: any) => p.command.includes(MARKER) && p.owners.length === 1 && p.owners[0].agent === "core"));
   await row.getByRole("button", { name: /^Stop / }).click();
   await row.waitFor({ state: "detached" });
   await until("the program to be gone", async () => !(await symbio.call("GET", "/machine/processes")).some((p: any) => p.command.includes(MARKER)), 30_000);

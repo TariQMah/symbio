@@ -1,7 +1,7 @@
 // Owns a private `opencode serve` process: starts it, restarts it if it dies,
 // and keeps a single event subscription alive across restarts.
 
-import { lowerPriority } from "../machine.js";
+import { killTreeSync, listProcesses, lowerPriority, treeMemory } from "../machine.js";
 import { spawn, execFile, execFileSync, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -354,7 +354,7 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
     this.proc = null;
     this.client = null;
     if (!proc?.pid) return;
-    killTree(proc.pid);
+    killTreeSync(proc.pid);
     rmSync(this.pidFile, { force: true });
   }
 
@@ -380,17 +380,6 @@ export function resolveOpencode(): { command: string; args: string[]; shell: boo
   return { command: found.shell ? `"${found.entry}"` : found.entry, args: [], shell: found.shell ?? false };
 }
 
-function killTree(pid: number) {
-  try {
-    if (process.platform === "win32") {
-      execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-    } else {
-      process.kill(pid, "SIGTERM");
-    }
-  } catch {
-    // already gone
-  }
-}
 
 /** Kills the server left behind by a previous run, but only if that pid is still an opencode process. */
 function killOrphan(pidFile: string) {
@@ -410,7 +399,7 @@ function killOrphan(pidFile: string) {
         : execFileSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf8" });
     if (/opencode/i.test(cmdline) && /serve --hostname 127\.0\.0\.1 --port/.test(cmdline)) {
       console.warn(`[runtime] killing orphaned opencode server from a previous run (pid ${pid})`);
-      killTree(pid);
+      killTreeSync(pid);
     }
   } catch {
     // not running
@@ -448,54 +437,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 export async function processTreeMemory(pid: number): Promise<number | null> {
   try {
-    if (process.platform === "win32") {
-      // List every process once ("pid parent bytes" per line) and sum the tree here.
-      const { stdout } = await execFileAsync(
-        "powershell.exe",
-        ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.WorkingSetSize) $($_.Name)\" }"],
-        { encoding: "utf8", windowsHide: true, timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
-      );
-      return sumProcessTree(stdout, pid) || null;
-    }
+    if (process.platform === "win32") return treeMemory(await listProcesses(), pid) || null;
     const { stdout } = await execFileAsync("ps", ["-o", "rss=", "-p", String(pid)], { encoding: "utf8" });
     return Number(stdout.trim()) * 1024 || null;
   } catch {
     return null;
   }
-}
-
-/** Shells a runtime runs agents' commands in (see processTreeMemory). */
-const SHELL = /^(pwsh|powershell|cmd|bash|sh|zsh|dash|fish)(\.exe)?$/i;
-
-/**
- * Sums the memory of a process and its descendants from "pid parent bytes [name]" lines, leaving
- * out shells (other than the root) and everything under them.
- */
-export function sumProcessTree(listing: string, root: number): number {
-  const children = new Map<number, number[]>();
-  const memory = new Map<number, number>();
-  const shells = new Set<number>();
-  for (const line of listing.split(/\r?\n/)) {
-    const [pidText, parentText, bytesText, ...name] = line.trim().split(/\s+/);
-    const [pid, parent, bytes] = [pidText, parentText, bytesText].map(Number);
-    if (!pid) continue;
-    memory.set(pid, bytes || 0);
-    if (SHELL.test(name.join(" "))) shells.add(pid);
-    if (!children.has(parent)) children.set(parent, []);
-    children.get(parent)!.push(pid);
-  }
-  let total = 0;
-  const seen = new Set<number>();
-  const stack = [root];
-  while (stack.length) {
-    const pid = stack.pop()!;
-    if (seen.has(pid)) continue; // pid reuse can create cycles
-    seen.add(pid);
-    if (pid !== root && shells.has(pid)) continue;
-    total += memory.get(pid) ?? 0;
-    stack.push(...(children.get(pid) ?? []));
-  }
-  return total;
 }
 
 /** A model's variants (its reasoning effort levels): `[{id, settings}]` in OpenCode 2.x (verified), an object in some builds. */
