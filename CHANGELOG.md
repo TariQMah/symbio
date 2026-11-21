@@ -16,6 +16,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 - **Agents can't change what decides which programs Symbio runs**: its settings and state files, the runtimes it
   installed, the downloaded `cloudflared`, its Copilot folder, and OpenCode shims anywhere (so none can be put on
   the PATH). Reading them is still allowed. Only absolute folders on the PATH are searched for OpenCode.
+- A new reasoning effort level applies to the agent's session before the setting shows as saved, so a message sent
+  right after already runs at it.
 
 ## [0.22.0]
 

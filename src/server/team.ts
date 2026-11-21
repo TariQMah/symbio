@@ -1531,9 +1531,11 @@ export class Team implements TeamCore {
       const levels = await this.levelsOf(runtime, agent.model);
       if (!levels.includes(level)) throw new Error(levelError(agent.model, level, levels));
     }
-    agent.effort = level ? { level, by } : null;
-    const effective = await this.effortFor(project, agent, agent.model, runtime);
+    // The session moves first: once the setting shows, the agent's next turn runs at it.
+    const next = level ? { level, by } : null;
+    const effective = await this.effortFor(project, { effort: next }, agent.model, runtime);
     await runtime.switchModel(agent.sessionId, agent.model, effective ?? null);
+    agent.effort = next;
     await this.store.update(project);
     bus.publish({ type: "project.updated", projectId: project.id });
     const text = `${agent.name}'s reasoning effort: ${effective ?? "the model's default"}${level ? "" : " (as set for its model in the project)"}.`;
@@ -1553,14 +1555,16 @@ export class Team implements TeamCore {
       else delete next[model];
     }
     const changed = Object.keys(efforts);
-    project.modelEfforts = Object.keys(next).length ? next : undefined;
-    await this.store.update(project);
+    const modelEfforts = Object.keys(next).length ? next : undefined;
+    // Sessions move first: once the setting shows, agents' next turns run at it.
     for (const agent of project.agents.filter((a) => active(a) && !a.effort && changed.includes(a.model))) {
       const runtime = this.runtimes.get(runtimeOf(agent));
       if (runtime?.state !== "running") continue; // applied when its session next changes
-      const effort = await this.effortFor(project, agent, agent.model, runtime);
+      const effort = await this.effortFor({ ...project, modelEfforts }, agent, agent.model, runtime);
       await runtime.switchModel(agent.sessionId, agent.model, effort ?? null).catch((err) => console.error(`[team] effort for ${agent.name}:`, err.message));
     }
+    project.modelEfforts = modelEfforts;
+    await this.store.update(project);
     bus.publish({ type: "project.updated", projectId: project.id });
   }
 
