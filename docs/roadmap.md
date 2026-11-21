@@ -69,7 +69,7 @@ chat (#23), the browser tab showing what needs you (#24), unread markers on agen
 folder in VS Code (#26), day separators (#27), find in a chat (#28), keyboard shortcuts (#29),
 filtering the plan board (#30), exporting a chat (#31) or usage (#32), an accessibility pass
 (#33), the projects list showing what needs you in each project (#34), and links into Settings
-opening the right section, like the update badge opening Updates (#35). All [good first issues](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+opening the right section, like the update badge opening Updates (#35). The Explorer keeping its open folders when you leave it and come back (#41). All [good first issues](https://github.com/linkzy/symbio/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 12. **Model fallback that fits the conversation.** ([#38](https://github.com/linkzy/symbio/issues/38)) Retry the same model on network errors
    before switching; prefer models whose context holds the conversation; when none does, ask the human
    (continue in a fresh session from a handoff note, go back to the original model, or pick another).
