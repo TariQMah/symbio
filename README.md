@@ -320,7 +320,7 @@ Thanks to everyone who has contributed to Symbio:
   computer (#36) and the interface in Portuguese (Brazil) (#37).
 
 <a href="https://github.com/linkzy/symbio/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=linkzy/symbio" alt="Contributors" />
+  <img src="https://contrib.rocks/image?repo=linkzy/symbio&max=100" alt="Contributors" />
 </a>
 
 ## License
