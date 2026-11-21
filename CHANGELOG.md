@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.25.0]
+
 - **The machine view says who started each program**: the project and the agent (or the agents that were working when it
   started, when Symbio can't tell which one), with a filter by project. `list_programs` says it to core too.
 - **Fixed: system programs listed as agents' programs** on Windows (Windows Defender, Task Manager, the search indexer…), which
@@ -13,6 +15,7 @@ versions follow [Semantic Versioning](https://semver.org/).
   checked children (no more `taskkill /T`), and agents' work is lowered in priority on the same checked tree. The same
   mistake could count those programs in a runtime's memory (restarting it to free memory for nothing) and stop them along
   with the runtime; both use the checked tree now.
+- Dependencies updated (Hono, Vite, React plugin, Lucide, Motion, Playwright) (#40).
 
 ## [0.24.0]
 

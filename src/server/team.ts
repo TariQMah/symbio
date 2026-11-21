@@ -1379,15 +1379,19 @@ export class Team implements TeamCore {
     machine.attribution = {
       shells: () => this.backgroundShells(),
       workingAt: (at, runtime) => {
-        const out: ProgramOwner[] = [];
+        // A turn is marked when its prompt has been sent, which a fast runtime may answer by starting a shell already:
+        // agents whose turn covers the moment come first, then ones whose turn began just after it.
+        const covering: ProgramOwner[] = [];
+        const justAfter: ProgramOwner[] = [];
         for (const project of this.store.list()) {
           for (const agent of project.agents) {
             if (this.runtimes.get(runtimeOf(agent))?.label !== runtime) continue;
-            // The turn starts (Symbio sends the prompt) before the runtime starts a shell for it, and its end is noticed after.
-            if ((this.turns.get(agent.id) ?? []).some((t) => t.start - 100 <= at && at <= (t.end ?? Date.now()))) out.push(ownerOf(project, agent));
+            const turns = this.turns.get(agent.id) ?? [];
+            if (turns.some((t) => t.start - 100 <= at && at <= (t.end ?? Date.now()))) covering.push(ownerOf(project, agent));
+            else if (turns.some((t) => t.start - 5000 <= at && at <= (t.end ?? Date.now()))) justAfter.push(ownerOf(project, agent));
           }
         }
-        return out;
+        return covering.length ? covering : justAfter;
       },
     };
     machine.on("changed", (load) => bus.publish({ type: "machine.updated", load }));
