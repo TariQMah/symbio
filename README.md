@@ -316,6 +316,9 @@ say there that you're taking it.
 
 Thanks to everyone who has contributed to Symbio:
 
+- [Wesley Pereira (@wesleyhjpr)](https://github.com/wesleyhjpr): using an OpenCode already on your
+  computer (#36) and the interface in Portuguese (Brazil) (#37).
+
 <a href="https://github.com/linkzy/symbio/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=linkzy/symbio" alt="Contributors" />
 </a>
