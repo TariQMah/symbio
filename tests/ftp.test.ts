@@ -133,7 +133,9 @@ test("FTP file operations through remote_exec: listing runs at once, changes fol
 test("a server that allows SFTP but no commands tests as SFTP only", async () => {
   const { Server, utils } = (await import("ssh2")).default;
   const { STATUS_CODE } = utils.sftp;
-  const hostKey = utils.generateKeyPairSync("ed25519").private;
+  // ssh2 sometimes generates an ed25519 key it can't parse back (about 1 in 200): try again.
+  let hostKey = utils.generateKeyPairSync("ed25519").private;
+  while (utils.parseKey(hostKey) instanceof Error) hostKey = utils.generateKeyPairSync("ed25519").private;
   const sshd = new Server({ hostKeys: [hostKey] }, (client) => {
     client.on("error", () => {});
     client.on("authentication", (ctx) => (ctx.method === "password" && ctx.password === PASSWORD ? ctx.accept() : ctx.reject(["password"])));

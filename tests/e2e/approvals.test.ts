@@ -8,12 +8,19 @@ import ssh2 from "ssh2";
 import { closeBrowser, history, idle, openPage, projectWithCore, startSymbio, until, type Symbio } from "./harness.js";
 
 let symbio: Symbio;
+// ssh2 sometimes generates an ed25519 key it can't parse back (about 1 in 200): try again.
+function hostKey(): string {
+  for (;;) {
+    const key = ssh2.utils.generateKeyPairSync("ed25519").private;
+    if (!(ssh2.utils.parseKey(key) instanceof Error)) return key;
+  }
+}
 let sshd: InstanceType<typeof ssh2.Server>;
 let port = 0;
 const ran: string[] = [];
 before(async () => {
   symbio = await startSymbio();
-  sshd = new ssh2.Server({ hostKeys: [ssh2.utils.generateKeyPairSync("ed25519").private] }, (client) => {
+  sshd = new ssh2.Server({ hostKeys: [hostKey()] }, (client) => {
     client.on("error", () => {});
     client.on("authentication", (ctx) => (ctx.method === "password" && ctx.password === "vps-pass" ? ctx.accept() : ctx.reject(["password"])));
     client.on("ready", () =>

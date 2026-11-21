@@ -9,7 +9,9 @@ import path from "node:path";
 const { Server, utils } = ssh2;
 const { STATUS_CODE } = utils.sftp;
 const root = process.argv[2];
-const hostKey = utils.generateKeyPairSync("ed25519").private;
+// ssh2 sometimes generates an ed25519 key it can't parse back (about 1 in 200): try again.
+let hostKey = utils.generateKeyPairSync("ed25519").private;
+while (utils.parseKey(hostKey) instanceof Error) hostKey = utils.generateKeyPairSync("ed25519").private;
 
 new Server({ hostKeys: [hostKey] }, (client) => {
   client.on("authentication", (ctx) => (ctx.method === "password" && ctx.username === "deploy" && ctx.password === "s3cret" ? ctx.accept() : ctx.reject(["password"])));
