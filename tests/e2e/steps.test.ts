@@ -37,7 +37,7 @@ test("a run of steps folds into one line in plain words, the raw command a click
   const { page } = await openPage(symbio);
   await page.goto(`${symbio.base}/#/p/${project.id}`);
   // A single step stands alone, in words.
-  await page.locator(".msg-assistant > .tool .step-text", { hasText: "Created helper setor" }).waitFor();
+  await page.locator(".msg-assistant .msg-blocks > .tool .step-text", { hasText: "Created helper setor" }).waitFor();
   // Three steps between two texts: one line, the most telling step first.
   const run = page.locator(".step-run").last();
   assert.equal(await run.locator(".step-run-title").innerText(), "Message to setor · Checked git status and 1 more");

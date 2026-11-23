@@ -237,6 +237,7 @@ Thanks to everyone who has contributed to Symbio:
 - Ismail Duran: usage by provider and model (#15), Give feedback (#17) and Report a problem (#16).
 - [Wesley Pereira (@wesleyhjpr)](https://github.com/wesleyhjpr): using an OpenCode already on your
   computer (#36) and the interface in Portuguese (Brazil) (#37).
+- [Veeramanikandan R (@Veeramanikandanr48)](https://github.com/Veeramanikandanr48): copy buttons in the chat (#42).
 
 <a href="https://github.com/linkzy/symbio/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=linkzy/symbio&max=100" alt="Contributors" />

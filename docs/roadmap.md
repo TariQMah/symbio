@@ -64,8 +64,7 @@ The issues are also grouped into [milestones](https://github.com/linkzy/symbio/m
 11. **A public demo.** ([#14](https://github.com/linkzy/symbio/issues/14)) A container on a VPS with a light model, connections and other sensitive
     options disabled, and visitors' data reset every few minutes (needs Linux headless support).
 
-**Small improvements**, each with an issue and where to start, open to anyone: copy buttons in the
-chat (#23), the browser tab showing what needs you (#24), unread markers on agents (#25), opening a
+**Small improvements**, each with an issue and where to start, open to anyone: the browser tab showing what needs you (#24), unread markers on agents (#25), opening a
 folder in VS Code (#26), day separators (#27), find in a chat (#28), keyboard shortcuts (#29),
 filtering the plan board (#30), exporting a chat (#31) or usage (#32), an accessibility pass
 (#33), the projects list showing what needs you in each project (#34), and links into Settings

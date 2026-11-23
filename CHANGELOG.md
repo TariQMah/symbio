@@ -5,6 +5,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Copy buttons in the chat**: on each code block, and on each message (its text as written, Markdown included). They show
+  on hover, and stay faintly visible on touch screens. By [@Veeramanikandanr48](https://github.com/Veeramanikandanr48) (#42).
+
 ## [0.25.0]
 
 - **The machine view says who started each program**: the project and the agent (or the agents that were working when it

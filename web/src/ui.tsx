@@ -188,6 +188,7 @@ export function RetryIn({ until }: { until: number }) {
 /** A pinned agent waiting for its model (not one stuck because every model failed). */
 export const waitsForPinnedModel = (a: { modelPinned?: unknown; modelWait?: unknown; problem?: string | null }) => !!(a.modelPinned && a.modelWait && a.problem);
 
+/** Copies text; the fallback covers pages not opened over https (Symbio from a phone on the network has no Clipboard API there). */
 export async function copyToClipboard(text: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -199,31 +200,33 @@ export async function copyToClipboard(text: string) {
   el.style.opacity = "0";
   document.body.appendChild(el);
   el.select();
-  document.execCommand("copy");
+  const ok = document.execCommand("copy");
   document.body.removeChild(el);
+  if (!ok) throw new Error("copy refused");
 }
 
-export function CopyButton({ text, className = "", label = "Copy", copiedLabel = "Copied" }: { text: string; className?: string; label?: string; copiedLabel?: string }) {
-  const [copied, setCopied] = useState(false);
+export function CopyButton({ text, className = "", label, copiedLabel }: { text: string; className?: string; label?: string; copiedLabel?: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const title = state === "copied" ? (copiedLabel ?? t("common.copied")) : state === "failed" ? t("common.copyFailed") : (label ?? t("common.copy"));
   return (
     <button
       type="button"
-      className={`btn ghost icon xs copy-btn ${copied ? "copied" : ""} ${className}`.trim()}
-      title={copied ? copiedLabel : label}
-      aria-label={copied ? copiedLabel : label}
+      className={`btn ghost icon xs copy-btn ${state === "idle" ? "" : state} ${className}`.trim()}
+      title={title}
+      aria-label={title}
       onClick={async (e) => {
         e.preventDefault();
         e.stopPropagation();
         try {
           await copyToClipboard(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
+          setState("copied");
         } catch {
-          /* ignore */
+          setState("failed");
         }
+        setTimeout(() => setState("idle"), 1500);
       }}
     >
-      {copied ? <Check size={13} /> : <Copy size={13} />}
+      {state === "copied" ? <Check size={13} /> : state === "failed" ? <X size={13} /> : <Copy size={13} />}
     </button>
   );
 }

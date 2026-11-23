@@ -389,6 +389,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .code-block { position: relative; margin: 0 0 10px; }
 .code-block pre { margin: 0; padding-right: 40px; }
 .code-copy { position: absolute; top: 6px; right: 6px; opacity: 0; z-index: 2; }
+.copy-btn.failed { color: var(--red); }
+/* Touch screens have no hover: the buttons stay visible, faintly. */
+@media (hover: none) { .msg-copy, .code-copy { opacity: 0.6; } }
 .msg-note { display: flex; justify-content: center; color: var(--text-3); font-size: 12px; text-align: center; line-height: 1.5; }
 .msg-note > span { max-width: 88%; padding: 4px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); }
 .msg-agent { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }
@@ -864,7 +867,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .step-raw > .small { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px 0; }
 .step-raw .tool-io { border-top: 0; }
 /* Long unbroken lines in a raw command or script must wrap, not widen the chat column. */
-.step-run, .step-run-body > *, .msg-assistant > .tool { min-width: 0; max-width: 100%; }
+.step-run, .step-run-body > *, .msg-blocks > .tool { min-width: 0; max-width: 100%; }
 .tool-io { overflow-wrap: anywhere; }
 
 /* Long messages from helpers folded to a few lines; reports with their task in the header */

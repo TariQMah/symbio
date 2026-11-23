@@ -1,6 +1,6 @@
-﻿import assert from "node:assert/strict";
+// The chat's copy buttons: a whole answer (its text as written), a code block, and the human's own message.
 import { after, before, test } from "node:test";
-import { closeBrowser, openPage, projectWithCore, startSymbio, type Symbio } from "./harness.js";
+import { closeBrowser, idle, openPage, projectWithCore, startSymbio, until, type Symbio } from "./harness.js";
 
 let symbio: Symbio;
 before(async () => { symbio = await startSymbio(); });
@@ -19,21 +19,22 @@ test("chat: copy buttons copy a code block and a whole message", async () => {
   await box.fill([`Show code`, step("core", "say", message)].join("\n"));
   await page.locator(".composer button[title=Send]").click();
 
-  const assistant = page.locator(".msg-assistant", { hasText: "Here is code:" }).first();
+  // Copied once the answer is complete (it streams in).
+  await idle(symbio, project.id);
+  const assistant = page.locator(".msg-assistant", { hasText: "After." }).first();
   await assistant.waitFor();
+  // The buttons show on hover; clicked directly here. waitForFunction doesn't wait for a promise, so the clipboard is polled.
+  const clipboard = () => page.evaluate(() => navigator.clipboard.readText().then((t) => t.replace(/\r\n/g, "\n")));
   await assistant.locator(".msg-copy").first().evaluate((el) => (el as HTMLButtonElement).click());
-  await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.includes("Here is code:") && t.includes("const n: number = 1")));
-  const copiedMessage = await page.evaluate(() => navigator.clipboard.readText());
-  assert.match(copiedMessage, /Here is code:/);
-  assert.match(copiedMessage, /const n: number = 1/);
+  await until("the answer to be copied", async () => (await clipboard()) === ["Here is code:", "```ts", "const n: number = 1", "```", "After."].join("\n"));
+  await assistant.locator(".msg-copy[title=Copied]").waitFor();
 
   const code = assistant.locator(".code-block").first();
   await code.locator(".code-copy").evaluate((el) => (el as HTMLButtonElement).click());
-  await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.trim() === "const n: number = 1"));
-  const copiedCode = await page.evaluate(() => navigator.clipboard.readText());
-  assert.equal(copiedCode.trim(), "const n: number = 1");
+  await until("the code to be copied", async () => (await clipboard()) === "const n: number = 1");
 
+  // The human's message is copied as it was sent.
   const user = page.locator(".msg-user", { hasText: "Show code" }).first();
   await user.locator(".msg-copy").evaluate((el) => (el as HTMLButtonElement).click());
-  await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.trim() === "Show code"));
+  await until("the message to be copied", async () => (await clipboard()).startsWith("Show code\n@core say Here is code:"));
 });

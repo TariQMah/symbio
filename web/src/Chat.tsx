@@ -680,14 +680,14 @@ function HistoryItem({ message: m, project }: { message: any; project: Project }
             )}
           </div>
           <MessageCopy text={report ? report.summary || t("chat.noSummary") : body} />
-      <Folded>
-        <Md
-          className="msg-agent-body md"
-          text={report ? report.summary || t("chat.noSummary") : body}
-          projectId={projectId}
-          agentId={project.agents.find((a) => a.name === fromAgent[1])?.id}
-        />
-      </Folded>
+          <Folded>
+            <Md
+              className="msg-agent-body md"
+              text={report ? report.summary || t("chat.noSummary") : body}
+              projectId={projectId}
+              agentId={project.agents.find((a) => a.name === fromAgent[1])?.id}
+            />
+          </Folded>
         </motion.div>
       );
     }
@@ -696,8 +696,8 @@ function HistoryItem({ message: m, project }: { message: any; project: Project }
       return (
         <motion.div className="msg-user" {...anim}>
           <MessageCopy text={body} />
-      {body}
-      <MessageAttachments projectId={projectId} files={files} />
+          {body}
+          <MessageAttachments projectId={projectId} files={files} />
         </motion.div>
       );
     }
@@ -766,9 +766,10 @@ function MessageCopy({ text }: { text: string }) {
   return <CopyButton text={copy} label={t("common.copy")} copiedLabel={t("common.copied")} className="msg-copy" />;
 }
 
+/** What an answer's copy button copies: its text as written (Markdown included), not its steps' output. */
 function messageText(blocks: Block[]): string {
   return blocks
-    .flatMap((b) => (b.kind === "text" ? [b.text] : b.kind === "tool" && b.output ? [`${b.name}\n${b.output}`] : []))
+    .flatMap((b) => (b.kind === "text" ? [b.text] : []))
     .join("\n\n")
     .trim();
 }

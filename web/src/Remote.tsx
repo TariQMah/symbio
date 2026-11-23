@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Copy, Globe, Power } from "lucide-react";
+import { Globe, Power } from "lucide-react";
+import { CopyButton } from "./ui";
 import { api, subscribe, type RemoteStatus } from "./api";
 
 /** Remote access status, kept current. */
@@ -110,9 +111,7 @@ export function RemoteSection() {
                 <a href={status.url!} target="_blank" rel="noreferrer" className="mono small">
                   {status.url}
                 </a>
-                <button className="btn ghost icon xs" title="Copy" onClick={() => navigator.clipboard.writeText(status.url!)}>
-                  <Copy size={12} />
-                </button>
+                <CopyButton text={status.url!} />
               </div>
             </div>
             {status.code && (
