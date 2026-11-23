@@ -136,6 +136,7 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.26.0** — Copy buttons in the chat, by @Veeramanikandanr48 (#42).
 - **0.25.0** — The machine view says which project and agent started each program; system programs no longer listed as agents' (Windows pid reuse).
 - **0.24.0** — Connection requests: Approve all, allow an agent for a while, always allow plain server commands; agents group commands into one request.
 - **0.23.1** — Report a problem opens the new bug form with versions filled in; a shorter README with the details in `docs/`.

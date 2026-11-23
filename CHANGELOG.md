@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.26.0]
+
 - **Copy buttons in the chat**: on each code block, and on each message (its text as written, Markdown included). They show
   on hover, and stay faintly visible on touch screens. By [@Veeramanikandanr48](https://github.com/Veeramanikandanr48) (#42).
 
