@@ -1,0 +1,77 @@
+# Glossary
+
+Symbio's words, one per thing. Use these in the interface (en and pt-BR), the docs, the agents'
+briefs and commit messages. Where the code uses another name (older, or more technical), it's in the
+last column: the code can keep it, but nothing a person or an agent reads should.
+
+When you add a concept, add it here first. When you notice two words for one thing, pick one here
+and align the rest.
+
+## People and agents
+
+| Term | Means | pt-BR | In the code |
+|---|---|---|---|
+| **the human** | The person using Symbio. The interface says "you"; briefs say "the human" | você / o humano | `"human"` |
+| **agent** | Any AI member of a team: core or a helper | agente | `Agent` |
+| **core** | The agent that leads a project's team: talks with the human, plans, delegates, reviews and merges. Shown with a *lead* badge. Not "the coordinator" in anything a person reads | core (badge: *líder*) | role `"coordinator"`, `coordinatorBrief` |
+| **helper** | An agent core (or the human) creates to do work: one purpose, tasks from the plan | auxiliar | role `"worker"`, `workerBrief` |
+| **team** | A project's agents | equipe | |
+| **project** | A folder Symbio runs a team on, with its plan, messages and settings | projeto | `Project`, data in `<folder>/.symbio/` |
+
+## Conversations
+
+| Term | Means | pt-BR | In the code |
+|---|---|---|---|
+| **runtime** | The program that runs the agents' conversations: OpenCode or GitHub Copilot CLI | runtime | `AgentRuntime`, `RuntimeKind` |
+| **model** | The AI model an agent runs on (`provider/model`) | modelo | |
+| **reasoning effort** | How much a model thinks before answering (low, medium, high…) | esforço de raciocínio | `effort`, `modelEfforts` |
+| **session** | One conversation of an agent with its runtime. Earlier ones stay readable | sessão | `sessionId`, `previousSessions` |
+| **fresh session** | Continuing an agent in a new session, from a handoff note. Not "renew", "refresh" or "new session" in anything a person reads | sessão nova | `renewSession`, `renewSessions` (`"manual"` / `"after-task"`) |
+| **handoff note** | What a fresh session starts from: the agent's own note (when it wrote one) plus the facts Symbio has (plan, assets, recent messages) | nota de handoff | `handoffNote`, `lastWords` |
+| **brief** | The instructions Symbio gives an agent: its role, the project's rules, its tools | instruções | `prompts.ts` |
+| **mode** | How core takes the human's message: *Auto*, *Plan* or *Act* | modo | `coreMode` |
+| **Symbio update** | A note to running projects' core when an update changes how agents work | atualização do Symbio | `updates.ts` |
+
+## The work
+
+| Term | Means | pt-BR | In the code |
+|---|---|---|---|
+| **plan** | The project's goal and tasks, proposed by core and approved by the human; shown as a board in the Plan tab | plano | `PlanStore`, `Kanban.tsx` |
+| **task** | One piece of the plan (`T3`): what to do, who does it, what it depends on | tarefa | `Task` |
+| **report** | A helper telling core a task is finished (its task moves to *review*), with a summary and a guide | relatório | `update_task(…, "review")` |
+| **guide** | With a report: where to look and how to check the work | guia | `guide` |
+| **review** | Checking finished work: by core, or also by the human (*To review*), per the project's setting | revisão | `reviewBy` (`"core"`, `"every"`, `"marked"`) |
+| **send back** | The human returning reviewed work to its helper, with a note | devolver | |
+| **merge** | Bringing a helper's committed work from its own copy into the project | mesclar | `merge_work`, `mergeWorkspace` |
+| **own copy** | A helper's separate copy of a git project, on its own branch | a própria cópia | workspace `"own"`, git worktree |
+| **project folder** | The project itself, where core (and helpers that share it) work | pasta do projeto | workspace `"shared"` |
+| **shared asset** | Anything more than one agent could change (files, data, a spreadsheet, a database). One holder at a time; core decides | recurso compartilhado | asset register, `asset-protocol.ts` |
+| **rules register** | The project's rules (requirements, decisions, constraints), each with its source and whether the work meets it | registro de regras | `rules*` |
+| **project documentation** | What agents (and people) need to work on the project: `AGENTS.md` and `docs/`, or private docs | documentação do projeto | `docs.ts` |
+| **shared file** | A file an agent showed the human (in the chat and the Files tab) | arquivo compartilhado | `share_file` |
+| **program** | Something an agent started that keeps running (a server, a tunnel, a build) | programa | `AgentProcess`, `list_programs` |
+
+## The human's side
+
+| Term | Means | pt-BR | In the code |
+|---|---|---|---|
+| **Needs you** | Everything waiting for the human: questions, approvals, work to review, the plan | Precisa de você | `Inbox.tsx` |
+| **question** | Something only the human can answer, asked by an agent; in Needs you | pergunta | `ask_human`, `questions.ts` |
+| **approval** | The human allowing an action: a remote action on a connection that asks, or a permission request | aprovação | `remote.ts`, `permissions.ts` |
+| **connection** | A GitHub account, Azure DevOps organization, server or FTP account agents use through Symbio, never seeing its credentials. *Ask me* or *Allowed* | conexão | `Connections`, `policy` (`"ask"` / `"allow"`) |
+| **pause** | Stopping a team (or every team) from starting new turns until resumed | pausar | `paused` |
+| **This computer** | The machine view in the top bar: load, and the programs agents started | Este computador | `machine.ts`, `Machine.tsx` |
+
+## Coming with *Core as lead*
+
+Names fixed now, before the features ([roadmap](roadmap.md)):
+
+| Term | Means | pt-BR |
+|---|---|---|
+| **glossary** | A project's terms, kept by core and followed by every agent (this file, for a project) | glossário |
+| **Done when** | A task's acceptance criteria: what the helper reports against and the reviewer checks | Pronto quando |
+| **skill** | A packaged method (`SKILL.md`) an agent can use, from Symbio's library | skill |
+| **check** | A command Symbio runs itself on a helper's work (build, tests, spellcheck…) | verificação |
+| **reviewer** | A one-off helper that checks a task's work against *Done when*, the rules and the glossary | revisor |
+| **briefing** | The questions about one feature, asked together before work starts; the answers become its spec | briefing |
+| **evidence** | Files that show a task's work was done (screenshots, outputs), tagged with the task | evidência |

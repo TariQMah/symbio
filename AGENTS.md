@@ -8,6 +8,7 @@ each other through Symbio, and the human steers from the browser.
 
 - [docs/architecture.md](docs/architecture.md): how it fits together and what each module does.
 - [docs/development.md](docs/development.md): setup, scripts, testing, conventions.
+- [docs/glossary.md](docs/glossary.md): Symbio's words, one per thing; use them in the UI, docs and briefs.
 - Read the doc for the area you touch: [agent-protocol](docs/agent-protocol.md) (briefs, tools,
   shared assets), [opencode-api](docs/opencode-api.md) (anything calling OpenCode),
   [security](docs/security.md) (permissions, credentials, the local API).

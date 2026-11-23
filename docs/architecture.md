@@ -210,7 +210,7 @@ bar), from the same pieces.
   assignments, shared-asset requests and grants, review reports) doesn't count. Past the limit,
   further messages are refused, the agents are told to bring the human in, and the human gets a
   notice.
-- **Fresh sessions.** A long-running agent can continue in a new OpenCode session (New session in
+- **Fresh sessions.** A long-running agent can continue in a fresh session (Fresh session in
   its chat, or automatically after each merged task if the project says so). It keeps its identity,
   folder, tasks and assets, and starts from a handoff note Symbio builds from the plan, the asset
   register and the message log. Old sessions stay readable. This keeps each step cheaper (every

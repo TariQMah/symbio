@@ -32,7 +32,7 @@ export function RuntimeSection({ project }: { project: Project }) {
           <h2>Agent runtime</h2>
           <p>
             This project's agents run on <strong>{RUNTIME_LABEL[current]}</strong>. Moving them to another runtime keeps the team, plan, tasks,
-            folders and branches; each agent continues in a new session there, from a handoff note.
+            folders and branches; each agent continues in a fresh session there, from a handoff note.
           </p>
         </div>
         {!running && others.length > 0 && (
@@ -181,7 +181,7 @@ function SwitchDialog({
     >
       <div className="notice switch-warning">
         <strong>Best done when the team is idle,</strong> with nothing waiting on you and the work that's ready merged. The team is paused while it
-        moves{working.length ? `: ${working.join(", ")} will be interrupted` : ""}. Each agent continues in a new session from a handoff note: its
+        moves{working.length ? `: ${working.join(", ")} will be interrupted` : ""}. Each agent continues in a fresh session from a handoff note: its
         earlier conversation stays readable in its chat but doesn't carry over, and agents will behave differently on another runtime. Expect to
         steer them for a while. Stopped helpers move when you restart them.
       </div>

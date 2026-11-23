@@ -5,6 +5,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **A glossary for Symbio itself** ([docs/glossary.md](docs/glossary.md)): one word per thing across the interface, docs and
+  briefs. The agent's *New session* button is now *Fresh session*, like the setting; the Portuguese interface says
+  *auxiliar* everywhere (#43).
 - Fixed: Settings' Back button read "Back to Back to the project" for a moment, until the project's name loaded.
 - The end-to-end tests run both runtimes at once, several files in parallel: about 1 min 45 s instead of 8 min on a
   28-thread machine, and about 5 min on a small one (#45).
