@@ -15,6 +15,8 @@ import { writeFileAtomic } from "./fsutil.js";
 // Overridable so tests never touch the real credential entry.
 const SERVICE = process.env.SYMBIO_KEYRING_SERVICE ?? "symbio";
 const MASTER_KEY_ACCOUNT = "vault-master-key";
+/** The vault key, once read or created (by service). */
+const keys = new Map<string, Buffer>();
 
 export class SecretVault {
   private cache: Record<string, string> | null = null;
@@ -48,6 +50,10 @@ export class SecretVault {
   }
 
   private masterKey(): Buffer {
+    // Read once per process: on Windows, reading the credential again has come back empty while
+    // other processes wrote and deleted theirs (seen in the tests), which looked like a lost key.
+    const known = keys.get(SERVICE);
+    if (known) return known;
     const entry = new Entry(SERVICE, MASTER_KEY_ACCOUNT);
     let encoded: string | null = null;
     try {
@@ -67,7 +73,9 @@ export class SecretVault {
       encoded = randomBytes(32).toString("base64");
       entry.setPassword(encoded);
     }
-    return Buffer.from(encoded, "base64");
+    const key = Buffer.from(encoded, "base64");
+    keys.set(SERVICE, key);
+    return key;
   }
 
   private async load(): Promise<Record<string, string>> {

@@ -12,6 +12,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
+import { Entry } from "@napi-rs/keyring";
 
 const repo = path.resolve(import.meta.dirname, "../..");
 
@@ -110,6 +111,12 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
       await call("POST", "/shutdown").catch(() => {});
       await new Promise((r) => setTimeout(r, 500));
       if (proc.exitCode === null) proc.kill();
+      // The vault's test key, so the OS credential store doesn't collect one per run.
+      try {
+        new Entry(fullEnv.SYMBIO_KEYRING_SERVICE!, "vault-master-key").deletePassword();
+      } catch {
+        // never created
+      }
     },
   };
 }

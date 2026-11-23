@@ -8,6 +8,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Fixed: Settings' Back button read "Back to Back to the project" for a moment, until the project's name loaded.
 - The end-to-end tests run both runtimes at once, several files in parallel: about 1 min 45 s instead of 8 min on a
   28-thread machine, and about 5 min on a small one (#45).
+- The secret vault reads its key from the OS credential store once per run instead of on every read and write: on
+  Windows a repeated read could come back empty under load, which looked like a lost key. The end-to-end tests also
+  remove the test keys they create (they were piling up in Windows Credential Manager).
 
 ## [0.26.0]
 

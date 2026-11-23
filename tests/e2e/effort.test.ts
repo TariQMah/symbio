@@ -89,7 +89,10 @@ test("AI co-author lines in commits are left out unless the project allows them"
   const { page } = await openPage(symbio);
   await page.goto(`${symbio.base}/#/p/${project.id}`);
   await page.locator(".tab", { hasText: "Settings" }).click();
+  // Done when the save answers: the project shows the setting at once, the agents' instructions a moment later.
+  const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().endsWith(`/api/projects/${project.id}`));
   await page.locator(".field", { hasText: "AI co-authors in commits" }).getByRole("button", { name: "Allow them" }).click();
-  await until("saved", async () => (await symbio.call("GET", `/projects/${project.id}`)).aiCoauthors === true);
+  await saved;
+  assert.equal((await symbio.call("GET", `/projects/${project.id}`)).aiCoauthors, true);
   assert.equal(await ask(), "coauthor: on");
 });
