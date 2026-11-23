@@ -941,13 +941,12 @@ export class Team implements TeamCore {
       await this.hold(project, to, body);
       return undefined;
     }
-    const inboxId = await this.rt(to).prompt(to.sessionId, body, kind === "urgent" ? "steer" : "queue");
+    const inboxId = await this.wake(project, to, body, kind === "urgent" ? "steer" : "queue");
     // Track it until the runtime delivers it, so it can be handed over mid-turn (see takeInbox).
     if (inboxId && kind !== "urgent") {
       if (!this.inbox.has(to.id)) this.inbox.set(to.id, new Map());
       this.inbox.get(to.id)!.set(inboxId, body);
     }
-    this.setStatus(project, to, "busy");
     // The queued item's id is also the id of the user message it becomes.
     return inboxId;
   }
@@ -984,8 +983,7 @@ export class Team implements TeamCore {
     await this.prepare(project, agent);
     // The coordinator talks with the human directly (in the chat mode they chose); for helpers, say who is speaking.
     const body = agent.role === "coordinator" ? text + modeNote(project.coreMode) : `[from: human · ${urgent ? "urgent" : "chat"}]\n${text}`;
-    await this.rt(agent).prompt(agent.sessionId, body, urgent ? "steer" : "queue");
-    this.setStatus(project, agent, "busy");
+    await this.wake(project, agent, body, urgent ? "steer" : "queue");
   }
 
   async askHuman(project: Project, from: Agent, input: QuestionInput): Promise<string> {
@@ -1093,8 +1091,7 @@ export class Team implements TeamCore {
       const agent = project.agents.find((a) => a.id === m.agentId && active(a));
       if (!agent) continue;
       await this.ensureTools(project, agent);
-      await this.rt(agent).prompt(agent.sessionId, m.text, "queue").catch((err) => console.error("[resume]", err.message));
-      this.setStatus(project, agent, "busy");
+      await this.wake(project, agent, m.text, "queue").catch((err) => console.error("[resume]", err.message));
       woken.add(agent.id);
     }
     return woken;
@@ -1510,6 +1507,7 @@ export class Team implements TeamCore {
     } else if (e.type === "session.execution.started") {
       if (agent.status !== "stopped") this.setStatus(project, agent, "busy");
     } else if (e.type.startsWith("session.execution.")) {
+      this.turnEnds.set(agent.id, (this.turnEnds.get(agent.id) ?? 0) + 1);
       this.pendingQuestion.delete(agent.id);
       if (e.type === "session.execution.succeeded" && agent.problem) {
         agent.problem = null;
@@ -1547,6 +1545,21 @@ export class Team implements TeamCore {
     bus.publish({ type: "agent.context", projectId: project.id, agentId: agent.id, context: agent.context });
   }
 
+  /** Turns seen ending, per agent (see wake). */
+  private turnEnds = new Map<string, number>();
+
+  /**
+   * Prompts an agent's session and marks it working. A quick turn can end before the prompt's reply
+   * arrives (the runtime's events come on another connection); then the agent isn't working anymore,
+   * and marking it so would leave it "working" until its next turn.
+   */
+  async wake(project: Project, agent: Agent, text: string, delivery: "queue" | "steer"): Promise<string | undefined> {
+    const ends = this.turnEnds.get(agent.id) ?? 0;
+    const id = await this.rt(agent).prompt(agent.sessionId, text, delivery);
+    if ((this.turnEnds.get(agent.id) ?? 0) === ends) this.setStatus(project, agent, "busy");
+    return id;
+  }
+
   setStatus(project: Project, agent: Agent, status: Agent["status"]) {
     if (agent.status === status) return;
     // A message arriving while the agent waits on the human (a question, a permission request) is
@@ -1579,8 +1592,7 @@ export class Team implements TeamCore {
     if (wake && (project.paused || this.machine?.holding)) {
       await this.hold(project, agent, text);
     } else if (wake) {
-      await this.rt(agent).prompt(agent.sessionId, text, "queue");
-      this.setStatus(project, agent, "busy");
+      await this.wake(project, agent, text, "queue");
     } else {
       await this.rt(agent).note(agent.sessionId, text);
     }

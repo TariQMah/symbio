@@ -5,6 +5,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- An agent whose turn ended very quickly could stay shown as working until its next turn (the turn's end arrived
+  before Symbio heard back from the message it sent).
+
 ## [0.28.0]
 
 - **Skills** (#52). Packaged methods agents load when a task calls for one (the `SKILL.md` format the agent runtimes share).

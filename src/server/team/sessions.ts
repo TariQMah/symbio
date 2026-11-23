@@ -23,6 +23,8 @@ export interface SessionsHost extends TeamCore {
   refreshInstructions(project: Project, agent: Agent): Promise<void>;
   /** Before starting an agent's turn: its runtime, folder, tools and private docs in place. */
   prepare(project: Project, agent: Agent): Promise<void>;
+  /** Prompts an agent's session and marks it working (unless its turn already ended). */
+  wake(project: Project, agent: Agent, text: string, delivery: "queue" | "steer"): Promise<string | undefined>;
   /** Counts what an agent's session has used so far. */
   refreshUsage(project: Project, agent: Agent): Promise<void>;
   /** Forgets what was tied to an agent's old session: queued messages, an open question. */
@@ -134,8 +136,7 @@ export class Sessions {
     await team.prepare(project, agent);
     const runtime = team.rt(agent);
     await team.log(project, { from: "symbio", to: agent.id, kind: "system", text: request });
-    await runtime.prompt(agent.sessionId, request, "queue");
-    team.setStatus(project, agent, "busy");
+    await team.wake(project, agent, request, "queue");
     const end = Date.now() + 5 * 60_000;
     // The status follows the session's events (busy → idle); a question to the human ends it too.
     await new Promise((r) => setTimeout(r, 1000));

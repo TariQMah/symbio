@@ -428,3 +428,22 @@ test("review by the human: a guide is required, done waits for the human, approv
   assert.equal(plan.openDependencies(plan.task(t2.id)).length, 0, "chapter 2 can start");
   assert.match(prompts(calls, core.sessionId).at(-1)!.body, /the human approved .*Chapter 1.*\(Great\)/);
 });
+
+test("a turn that ends before its prompt's reply arrives leaves the agent idle, not working", async () => {
+  const { project, team, writer } = await setup();
+  const runtime: any = (team as any).rt(writer);
+  const prompt = runtime.prompt;
+  // The runtime's events come on another connection: a quick turn can be over before the prompt call returns.
+  runtime.prompt = async (sessionId: string, text: string) => {
+    const id = await prompt(sessionId, text);
+    runtime.emit("event", { type: "session.execution.started", data: { sessionID: sessionId } });
+    runtime.emit("event", { type: "session.execution.succeeded", data: { sessionID: sessionId } });
+    await new Promise((r) => setTimeout(r, 20));
+    return id;
+  };
+  await team.sendFromHuman(project, writer, "hello");
+  assert.equal(writer.status, "idle");
+  runtime.prompt = prompt;
+  await team.sendFromHuman(project, writer, "again");
+  assert.equal(writer.status, "busy");
+});
