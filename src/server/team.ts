@@ -2,7 +2,7 @@
 // protocol, merging work, and recovering from hangs (watchdog), opencode crashes
 // (runtime restarts) and failing providers (model fallback).
 
-import { startedBy, type AgentProcess, type MachineLoad, type MachineMonitor, type ProgramOwner } from "./machine.js";
+import type { MachineMonitor } from "./machine.js";
 import { randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -16,10 +16,9 @@ import { PlanStore, type TaskInput, type TaskStatus } from "./plan.js";
 import type { RemoteOps } from "./remote.js";
 import { coordinatorBrief, kickoffMessage, modeNote, workerBrief } from "./prompts.js";
 import { git } from "./git.js";
-import { DEFAULT_MESSAGE_LIMIT, defaultModel, globalDir, modelsFor, newId, type Agent, type CoreMode, type HelperWorkspace, type ReviewBy, type LoggedMessage, type MessageKind, type Project, type Store } from "./store.js";
-import { accountChildUsage, accountUsage, emptyUsage, sessionUsage } from "./costs.js";
+import { defaultModel, globalDir, modelsFor, newId, type Agent, type CoreMode, type HelperWorkspace, type ReviewBy, type LoggedMessage, type MessageKind, type Project, type Store } from "./store.js";
+import { accountUsage, emptyUsage } from "./costs.js";
 import { AGENT_UPDATES, unseenUpdates, updatesNote } from "./updates.js";
-import { cleanBuildOutputs, dailyBackup, gb, helperFolders, lastBackup, unpushedWork, type FolderUsage, type UnpushedBranch } from "./housekeeping.js";
 import { coordinatorTools, workerTools, type ToolContext } from "./tools.js";
 import { SharedAssets } from "./team/asset-protocol.js";
 import { Reviews } from "./team/review.js";
@@ -36,9 +35,13 @@ import { QuietHelpers } from "./team/quiet-helpers.js";
 import { Usage } from "./team/usage.js";
 import { Watchdog } from "./team/watchdog.js";
 import { handoffRequest, Switches, type SwitchOptions } from "./team/switch.js";
+import { Sessions } from "./team/sessions.js";
+import { TaskFlow } from "./team/tasks.js";
+import { Efforts, levelError } from "./team/effort.js";
+import { MachineWatch } from "./team/machine-watch.js";
 import { NotInstalledError } from "./runtime/install.js";
-import { describeOuterRepository, listRepositories, projectRepositories, repoRoot, resolveRepository, swallowedRepositories } from "./repos.js";
-import { changedFiles, createWorkspace, inProjectFolder, isGitRepo, leaveWorkspace, mergeWorkspace, reattachWorkspace, removeWorkspace, restoreWorkspace, syncWorkspace } from "./workspaces.js";
+import { listRepositories, projectRepositories, repoRoot, resolveRepository } from "./repos.js";
+import { changedFiles, createWorkspace, inProjectFolder, isGitRepo, leaveWorkspace, reattachWorkspace, removeWorkspace, restoreWorkspace } from "./workspaces.js";
 
 const PROTOCOL_KINDS = new Set<MessageKind>([
   "asset-request",
@@ -98,19 +101,18 @@ export class Team implements TeamCore {
   readonly quiet = new QuietHelpers(this);
   readonly sharedAssets = new SharedAssets(this);
   readonly reviews = new Reviews(this);
+  readonly sessions = new Sessions(this);
+  readonly tasks = new TaskFlow(this);
+  readonly efforts = new Efforts(this);
+  readonly machineWatch = new MachineWatch(this);
   readonly questions = new Questions(this);
   readonly watchdog = new Watchdog(this, () => this.permissions.size);
   private loopGuard = new LoopGuard(this);
 
   /** The agent runtimes, by kind. The first one given is the default (OpenCode). */
   readonly runtimes = new Map<RuntimeKind, AgentRuntime>();
-  private readonly levelCache = new Map<RuntimeKind, { at: number; levels: Map<string, string[]> }>();
   /** The computer's load guard (set at startup). */
   machine: MachineMonitor | null = null;
-  private readonly overloadNotified = new Set<string>();
-  /** When each agent was working (agent id → its recent turns), to tell who started a program. */
-  private readonly turns = new Map<string, { start: number; end: number | null }[]>();
-  private shellsCache: { at: number; shells: Map<number, ProgramOwner> } | null = null;
   /** The default runtime: OpenCode. */
   readonly runtime: AgentRuntime;
 
@@ -369,136 +371,29 @@ export class Team implements TeamCore {
 
   // ---------------------------------------------------------------- plan
 
-  async submitPlan(project: Project, coordinator: Agent, goal: string, tasks: TaskInput[]): Promise<string> {
-    const store = await this.plan(project);
-    const plan = await store.propose(goal, tasks);
-    this.planChanged(project);
-    await this.log(project, {
-      from: coordinator.id,
-      to: "human",
-      kind: "plan",
-      text: `Proposed a plan (revision ${plan.revision}, ${plan.tasks.length} tasks) — review it in the Plan tab.\n\n**Goal:** ${plan.goal}`,
-    });
-    return (
-      `Plan submitted (revision ${plan.revision}): ${plan.tasks.map((t) => t.id).join(", ")}. ` +
-      `The human reviews it in Symbio's Plan tab; their decision arrives as a message. ` +
-      `Don't start assigning work until it is approved. Tell the human briefly that the plan is ready for review.`
-    );
+  // The plan's task flow lives in team/tasks.ts.
+  submitPlan(project: Project, coordinator: Agent, goal: string, tasks: TaskInput[]): Promise<string> {
+    return this.tasks.submitPlan(project, coordinator, goal, tasks);
   }
 
-  async decidePlan(project: Project, approved: boolean, feedback: string | null) {
-    const store = await this.plan(project);
-    const plan = await store.decide(approved, feedback);
-    this.planChanged(project);
-    const coordinator = this.coordinator(project);
-    if (!coordinator) return;
-    const text = approved
-      ? `✅ I approved the plan (revision ${plan.revision}).${feedback ? ` Note: ${feedback}` : ""} Assign the tasks to helpers.`
-      : `✏️ I'd like changes to the plan (revision ${plan.revision}): ${feedback ?? "(no details)"}\nRevise it and submit it again.`;
-    await this.sendFromHuman(project, coordinator, text);
+  decidePlan(project: Project, approved: boolean, feedback: string | null): Promise<void> {
+    return this.tasks.decidePlan(project, approved, feedback);
   }
 
-  async addTask(project: Project, input: TaskInput): Promise<string> {
-    const store = await this.plan(project);
-    const task = await store.addTask(input);
-    this.planChanged(project);
-    return `Added ${task.id}: ${task.title}.`;
+  addTask(project: Project, input: TaskInput): Promise<string> {
+    return this.tasks.addTask(project, input);
   }
 
-  /** Gives a task to a helper: marks it in progress and sends the helper the task. */
-  async assignTask(project: Project, coordinator: Agent, taskId: string, helper: Agent, extra?: string): Promise<string> {
-    if (helper.role === "coordinator") {
-      throw new Error("Tasks are done by helpers, not the coordinator. Assign it to a helper (spawn one if needed).");
-    }
-    const store = await this.plan(project);
-    if (store.plan.status === "proposed" || store.plan.status === "changes-requested") {
-      throw new Error("The plan isn't approved yet. Wait for the human's approval before assigning work.");
-    }
-    const task = store.task(taskId);
-    const open = store.openDependencies(task);
-    if (open.length) {
-      throw new Error(`${task.id} depends on unfinished task(s): ${open.map((t) => `${t.id} (${t.status})`).join(", ")}.`);
-    }
-    await store.update(task.id, { assignee: helper.id, status: "in-progress", note: { by: coordinator.name, text: `assigned to ${helper.name}` } });
-    this.planChanged(project);
-    const assets = task.assets.length ? `\nShared assets involved: ${task.assets.join(", ")} — request them before changing them.` : "";
-    const assignment = await this.deliver(
-      project,
-      coordinator,
-      helper,
-      "request",
-      `Task ${task.id}: ${task.title}\n\n${task.description}${assets}${extra ? `\n\n${extra}` : ""}\n\n` +
-        `When it's done, ${helper.branch ? "commit your work and " : ""}call update_task("${task.id}", "review", <summary>) — that is your report. ` +
-        `If you get stuck, update_task("${task.id}", "blocked", <why>).`,
-      { protocol: true },
-    );
-    // Where the work starts in the helper's session: the task's changes are diffed from here.
-    if (assignment) await store.update(task.id, { work: [...(task.work ?? []).filter((w) => w.sessionId !== helper.sessionId), { sessionId: helper.sessionId, from: assignment }] });
-    return `Assigned ${task.id} to ${helper.name}.`;
+  assignTask(project: Project, coordinator: Agent, taskId: string, helper: Agent, extra?: string): Promise<string> {
+    return this.tasks.assignTask(project, coordinator, taskId, helper, extra);
   }
 
-  async updateTask(
-    project: Project,
-    agent: Agent,
-    taskId: string,
-    status: TaskStatus | undefined,
-    note: string | undefined,
-    guide?: string,
-  ): Promise<string> {
-    const store = await this.plan(project);
-    const task = store.task(taskId);
-    if (agent.role !== "coordinator" && task.assignee !== agent.id) {
-      throw new Error(`${task.id} isn't assigned to you. Ask the coordinator.`);
-    }
-    const reviewed = this.reviews.gated(project, task);
-    if (agent.role === "worker" && status === "review" && reviewed && !guide?.trim()) {
-      throw new Error(
-        "The human reviews this task, so report it with a guide: where to look (URLs, files or folders), the steps to check it and " +
-          "what they should see, and whether you already ran those steps yourself. Call update_task again with guide.",
-      );
-    }
-    if (agent.role === "worker") this.quiet.reported(agent); // any update on its task is news for core
-    // Finished work the human reviews isn't done until they approve it.
-    if (status === "done" && reviewed && task.humanReview?.state !== "approved") {
-      if (note || guide) await store.update(task.id, { note: note ? { by: agent.name, text: note } : undefined, guide });
-      await this.reviews.complete(project, task.id, agent.name);
-      return `${task.id} now waits for the human's review (they check it with its guide); it's done when they approve, and tasks that depend on it wait meanwhile. You don't need to remind them.`;
-    }
-    if (agent.role === "worker" && status === "review") await this.reviews.recordReport(project, agent, task.id).catch(() => {});
-    await store.update(task.id, {
-      status,
-      note: note ? { by: agent.name, text: note } : undefined,
-      guide,
-      // Reported again after being sent back: the next review starts fresh.
-      ...(agent.role === "worker" && status === "review" ? { humanReview: null } : {}),
-    });
-    this.planChanged(project);
+  updateTask(project: Project, agent: Agent, taskId: string, status: TaskStatus | undefined, note: string | undefined, guide?: string): Promise<string> {
+    return this.tasks.updateTask(project, agent, taskId, status, note, guide);
+  }
 
-    // A helper's review/blocked update is its report to the coordinator.
-    const coordinator = this.coordinator(project);
-    if (coordinator && agent.role !== "coordinator" && (status === "review" || status === "blocked")) {
-      await this.deliver(
-        project,
-        agent,
-        coordinator,
-        status === "review" ? "task-review" : "task-blocked",
-        `${task.id} "${task.title}" → ${status}${note ? `: ${note}` : ""}` +
-          (status === "review"
-            ? (agent.branch
-                ? `\nMerge with merge_work("${agent.name}") when it looks right.`
-                : `\nIts work is already in the project folder; check it there, then mark the task done (update_task) or send it back.`) +
-              (reviewed ? "\nThen it waits for the human's review, with the helper's guide." : "")
-            : ""),
-      );
-      return `${task.id} is now ${status}. The coordinator has been notified — no separate report needed.`;
-    }
-    // Helpers without a branch have nothing to merge: the coordinator marking their task done
-    // is the moment a fresh session fits (what merging is for the others).
-    const helper = task.assignee ? project.agents.find((a) => a.id === task.assignee) : undefined;
-    if (agent.role === "coordinator" && status === "done" && helper && !helper.branch && helper.role !== "coordinator") {
-      await this.renewAfterTask(project, helper, "its task was done");
-    }
-    return `${task.id} is now ${task.status}.`;
+  mergeWork(project: Project, agent: Agent, force: boolean): Promise<string> {
+    return this.tasks.mergeWork(project, agent, force);
   }
 
   /** Resolves MCP callers: the token says which folder, the session says which agent. */
@@ -754,51 +649,9 @@ export class Team implements TeamCore {
     }
   }
 
-  /**
-   * Gives an agent a fresh OpenCode session, keeping its identity (name, folder, branch,
-   * tasks, assets). Long sessions get slow, costly (every step re-reads the context) and
-   * lossy (compactions), and they inflate OpenCode's memory. The new session starts from
-   * a handoff note built from what Symbio knows; the old one stays readable.
-   */
-  async renewSession(project: Project, agent: Agent, reason: string, opts: { moved?: boolean } = {}): Promise<void> {
-    if (agent.status === "busy" || agent.status === "waiting" || agent.status === "stuck") {
-      throw new Error(`${agent.name} is working; renew its session when it's idle.`);
-    }
-    if (agent.status === "stopped") throw new Error(`${agent.name} is stopped.`);
-    const runtime = this.rt(agent);
-    const oldSession = agent.sessionId;
-
-    // Count everything the old session used before leaving it.
-    await this.usage.refresh(project, agent).catch(() => {});
-    const handoff = await this.handoffNote(project, agent, oldSession, { moved: opts.moved });
-
-    const sessionId = await runtime.createSession({
-      title: `${project.name} · ${agent.name}`,
-      directory: agent.directory,
-      model: agent.model,
-      permissions: this.permissionsFor(project, agent),
-      toolsUrl: this.toolsUrl(project, agent.directory),
-      effort: await this.effortFor(project, agent, agent.model, runtime),
-    });
-    agent.previousSessions = [...(agent.previousSessions ?? []), { sessionId: oldSession, endedAt: Date.now(), runtime: runtimeOf(agent) }];
-    agent.sessionId = sessionId;
-    accountUsage(agent, agent.usage ?? emptyUsage());
-    agent.usage = emptyUsage();
-    agent.usageSeen = emptyUsage();
-    agent.status = "idle";
-    agent.lastActivity = Date.now();
-    this.inbox.delete(agent.id);
-    this.pendingQuestion.delete(agent.id);
-    await this.store.update(project);
-    await this.refreshInstructions(project, agent);
-    await runtime.setInstruction(agent.sessionId, "symbio-handoff", handoff);
-    await this.log(project, {
-      from: "symbio",
-      to: "human",
-      kind: "system",
-      text: `${agent.name} continues in a fresh session (${reason}). Its earlier conversation is still readable in its chat.`,
-    });
-    bus.publish({ type: "project.updated", projectId: project.id });
+  /** Gives an agent a fresh session (team/sessions.ts); the old one stays readable. */
+  renewSession(project: Project, agent: Agent, reason: string, opts: { moved?: boolean } = {}): Promise<void> {
+    return this.sessions.renew(project, agent, reason, opts);
   }
 
   /**
@@ -883,7 +736,7 @@ export class Team implements TeamCore {
         for (const agent of working) {
           this.switches.step(progress, `Asking ${agent.name} for its handoff`);
           const text = old
-            ? await this.lastWords(project, agent, handoffRequest(fromLabel, target.label)).catch((err) => {
+            ? await this.sessions.lastWords(project, agent, handoffRequest(fromLabel, target.label)).catch((err) => {
                 console.error(`[switch] ${project.name}: no handoff from ${agent.name}:`, err.message);
                 return "";
               })
@@ -905,7 +758,7 @@ export class Team implements TeamCore {
       for (const agent of moving) {
         this.switches.step(progress, `Starting ${agent.name} on ${target.label}`);
         await this.usage.refresh(project, agent).catch(() => {});
-        const handoff = await this.handoffNote(project, agent, agent.sessionId, {
+        const handoff = await this.sessions.handoffNote(project, agent, agent.sessionId, {
           switched: { from: fromLabel, to: target.label, own: own.get(agent.id) ?? null },
         });
         const model = agent.role === "coordinator" ? opts.coordinatorModel : defaultModel(next, agent.role);
@@ -1025,7 +878,7 @@ export class Team implements TeamCore {
   private async moveToProjectRuntime(project: Project, agent: Agent): Promise<string> {
     const target = await this.runtimeFor(project);
     const was = runtimeOf(agent);
-    const handoff = await this.handoffNote(project, agent, agent.sessionId, {
+    const handoff = await this.sessions.handoffNote(project, agent, agent.sessionId, {
       switched: { from: this.runtimes.get(was)?.label ?? was, to: target.label, own: null },
     });
     const model = modelsFor(project, agent.role).includes(agent.model) ? agent.model : defaultModel(project, agent.role);
@@ -1054,146 +907,9 @@ export class Team implements TeamCore {
     return handoff;
   }
 
-  /**
-   * One more turn for an agent, answered as text (its handoff before a runtime switch): sent even
-   * while the team is paused, and waited for (up to 5 minutes, then interrupted).
-   */
-  private async lastWords(project: Project, agent: Agent, request: string): Promise<string> {
-    await this.prepare(project, agent);
-    const runtime = this.rt(agent);
-    await this.log(project, { from: "symbio", to: agent.id, kind: "system", text: request });
-    await runtime.prompt(agent.sessionId, request, "queue");
-    this.setStatus(project, agent, "busy");
-    const end = Date.now() + 5 * 60_000;
-    // The status follows the session's events (busy → idle); a question to the human ends it too.
-    await new Promise((r) => setTimeout(r, 1000));
-    while (agent.status === "busy" && Date.now() < end) await new Promise((r) => setTimeout(r, 500));
-    if (agent.status !== "idle") {
-      await runtime.interrupt(agent.sessionId).catch(() => {});
-      this.setStatus(project, agent, "idle");
-    }
-    // Its answer: the text of the assistant messages after the request.
-    const { messages } = await runtime.historyPage(agent.sessionId, 20);
-    const after = messages.slice(messages.findLastIndex((m: any) => m.type === "user") + 1);
-    return after
-      .filter((m: any) => m.type === "assistant")
-      .flatMap((m: any) => (m.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text))
-      .join("\n")
-      .trim();
-  }
-
-  /** What an agent needs to carry on in a fresh session, from Symbio's own records. */
-  private async handoffNote(
-    project: Project,
-    agent: Agent,
-    oldSession: string,
-    opts: { moved?: boolean; switched?: { from: string; to: string; own: string | null } } = {},
-  ): Promise<string> {
-    const { moved, switched } = opts;
-    const plan = (await this.plan(project)).plan;
-    const reg = await this.assets(project);
-    const mine = plan.tasks.filter((t) => t.assignee === agent.id);
-    const open = mine.filter((t) => t.status !== "done");
-    const done = mine.filter((t) => t.status === "done").slice(-8);
-    const lastNote = (t: (typeof mine)[number]) => t.notes?.filter((n) => n.by === agent.name).at(-1)?.text;
-    const held = reg.list().filter((a) => a.holder === agent.id).map((a) => a.name);
-    const log = (await this.store.readMessages(project)).filter((m) => m.from === agent.id || m.to === agent.id).slice(-8);
-    const nameOf = (id: string) => (id === "human" ? "human" : id === "symbio" ? "Symbio" : this.agentName(project, id) ?? id);
-    // The old session's runtime may be gone (a switch away from an uninstalled one): the note still works.
-    const lastText = await Promise.resolve()
-      .then(() => this.rt(agent).historyPage(oldSession, 30))
-      .then(({ messages }) => {
-        const last = messages.filter((m) => m.type === "assistant" && (m.content ?? []).some((c: any) => c.type === "text" && c.text)).at(-1);
-        return (last?.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
-      })
-      .catch(() => "");
-    const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
-
-    const parts = [
-      `# Handoff: you are continuing as ${agent.name} in a fresh session`,
-      (switched
-        ? `The human moved this project from ${switched.from} to ${switched.to}, so you continue in a new session on ${switched.to}. ` +
-          `Nothing about your role changed, but your tools may be named and behave a little differently here: check before relying on habits. ` +
-          `Background processes you had running were stopped; start again the ones you need. `
-        : moved
-          ? `You now work in the project folder itself instead of your own copy, so Symbio started a new session there. ` +
-            `Nothing else about your role changed. `
-          : `Your previous session had grown long, so Symbio started a new one. Nothing about your role changed. `) +
-        `This note is what carries over; the project's docs (AGENTS.md, docs/) hold the durable knowledge, ` +
-        `and your work is in your folder.`,
-      agent.purpose ? `**Your purpose:** ${agent.purpose}` : "",
-      agent.role === "coordinator"
-        ? `**Plan:** ${plan.status}${plan.goal ? ` — ${plan.goal}` : ""}\n${plan.tasks.map((t) => `- ${t.id} [${t.status}] ${t.title}${t.assignee ? ` (${nameOf(t.assignee)})` : ""}`).join("\n")}`
-        : "",
-      agent.role === "coordinator"
-        ? ""
-        : agent.branch
-          ? `**Your folder:** ${agent.directory} (branch ${agent.branch}).`
-          : `**Your folder:** ${agent.directory} (the project folder, shared with the team).`,
-      open.length ? `**Your open tasks:**\n${open.map((t) => `- ${t.id} [${t.status}] ${t.title}\n  ${cut(t.description, 600)}`).join("\n")}` : "**Open tasks:** none right now; wait for the next one.",
-      done.length ? `**Recently finished:**\n${done.map((t) => `- ${t.id} ${t.title}${lastNote(t) ? ` — ${cut(lastNote(t)!, 300)}` : ""}`).join("\n")}` : "",
-      held.length ? `**Shared assets you hold:** ${held.join(", ")} (release them when done).` : "",
-      log.length ? `**Latest messages:**\n${log.map((m) => `- ${nameOf(m.from)} → ${nameOf(m.to)} (${m.kind}): ${cut(m.text.replace(/\s+/g, " "), 400)}`).join("\n")}` : "",
-      switched?.own
-        ? `**Your own handoff, written at the end of your previous session:**\n${cut(switched.own, 6000)}`
-        : lastText
-          ? `**Your last answer in the previous session:**\n${cut(lastText, 2500)}`
-          : "",
-    ];
-    return parts.filter(Boolean).join("\n\n");
-  }
-
   /** With "after-task" renewal, a helper with no other task under way gets a fresh session. */
-  async renewAfterTask(project: Project, agent: Agent, reason: string): Promise<boolean> {
-    const plan = await this.plan(project);
-    const renew =
-      project.renewSessions === "after-task" &&
-      agent.status === "idle" &&
-      !plan.plan.tasks.some((t) => t.assignee === agent.id && t.status !== "done" && t.status !== "todo");
-    if (!renew) return false;
-    await this.renewSession(project, agent, reason).catch((err) => console.error(`[renew] ${agent.name}:`, err.message));
-    return true;
-  }
-
-  async mergeWork(project: Project, agent: Agent, force: boolean): Promise<string> {
-    const { committed, uncommitted } = await changedFiles(agent);
-    const reg = await this.assets(project);
-    // Asset patterns are relative to the project folder; a sub-repository's paths are relative to it.
-    const inProject = (f: string) => (agent.repo ? `${agent.repo}/${f}` : f);
-    const violations = reg.violations([...committed, ...uncommitted].map(inProject), agent.id, agent.workSince ?? agent.createdAt);
-    if (violations.length && !force) {
-      const list = violations.map((v) => `- "${v.asset.name}": ${v.files.join(", ")}`).join("\n");
-      return `Not merged: ${agent.name} changed shared assets it was not granted:\n${list}\nReview the changes, then grant the asset and merge again, ask ${agent.name} to revert them, or merge with force=true.`;
-    }
-    const result = await mergeWorkspace(project, agent);
-    if (!result.ok) return `Not merged: ${result.reason}${result.files?.length ? `\nFiles: ${result.files.join(", ")}` : ""}`;
-
-    agent.base = await syncWorkspace(project, agent);
-    agent.workSince = Date.now();
-    await this.store.update(project);
-
-    // Merged work completes the helper's tasks that were waiting for review (or hands them to the
-    // human, when they review the work).
-    const plan = await this.plan(project);
-    const completed: string[] = [];
-    const waiting: string[] = [];
-    for (const task of plan.plan.tasks.filter((t) => t.assignee === agent.id && t.status === "review" && t.humanReview?.state !== "waiting")) {
-      if ((await this.reviews.complete(project, task.id, "symbio (merged)")) === "done") completed.push(task.id);
-      else waiting.push(task.id);
-    }
-    if (!(completed.length > 0 && (await this.renewAfterTask(project, agent, "its task was merged")))) {
-      await this.system(
-        project,
-        agent,
-        "Symbio: your committed work was merged into the project, and your workspace now includes the latest project state.",
-        false,
-      );
-    }
-    return (
-      `${result.summary}\n${result.files.map((f) => `- ${f}`).join("\n")}` +
-      (completed.length ? `\nMarked done: ${completed.join(", ")}.` : "") +
-      (waiting.length ? `\nWaiting for the human's review: ${waiting.join(", ")} (done when they approve).` : "")
-    );
+  renewAfterTask(project: Project, agent: Agent, reason: string): Promise<boolean> {
+    return this.sessions.renewAfterTask(project, agent, reason);
   }
 
   // ---------------------------------------------------------------- messages
@@ -1358,7 +1074,8 @@ export class Team implements TeamCore {
   }
 
   /** Delivers held messages (after a pause, or once the machine recovered); returns the agents woken. */
-  private async deliverHeld(project: Project, held: { agentId: string; text: string }[]): Promise<Set<string>> {
+  /** Delivers held messages (paused team, or an overloaded machine). */
+  async deliverHeld(project: Project, held: { agentId: string; text: string }[]): Promise<Set<string>> {
     const woken = new Set<string>();
     for (const m of held) {
       const agent = project.agents.find((a) => a.id === m.agentId && active(a));
@@ -1373,111 +1090,10 @@ export class Team implements TeamCore {
 
   // ---------------------------------------------------------------- the machine (machine.ts)
 
-  /** The load guard: tells the human and core when the computer is overloaded, and holds new turns if asked. */
+  /** The load guard (team/machine-watch.ts): tells the human and core when the computer is overloaded. */
   attachMachine(machine: MachineMonitor) {
     this.machine = machine;
-    machine.attribution = {
-      shells: () => this.backgroundShells(),
-      workingAt: (at, runtime) => {
-        // A turn is marked when its prompt has been sent, which a fast runtime may answer by starting a shell already:
-        // agents whose turn covers the moment come first, then ones whose turn began just after it.
-        const covering: ProgramOwner[] = [];
-        const justAfter: ProgramOwner[] = [];
-        for (const project of this.store.list()) {
-          for (const agent of project.agents) {
-            if (this.runtimes.get(runtimeOf(agent))?.label !== runtime) continue;
-            const turns = this.turns.get(agent.id) ?? [];
-            if (turns.some((t) => t.start - 100 <= at && at <= (t.end ?? Date.now()))) covering.push(ownerOf(project, agent));
-            else if (turns.some((t) => t.start - 5000 <= at && at <= (t.end ?? Date.now()))) justAfter.push(ownerOf(project, agent));
-          }
-        }
-        return covering.length ? covering : justAfter;
-      },
-    };
-    machine.on("changed", (load) => bus.publish({ type: "machine.updated", load }));
-    machine.on("overloaded", (load, heavy) => void this.onOverloaded(load, heavy).catch((err) => console.error("[machine]", err.message)));
-    machine.on("recovered", (load) => void this.onRecovered(load).catch((err) => console.error("[machine]", err.message)));
-  }
-
-  /** The runtimes' background shells by pid, with the agent that started each (cached briefly: listings come every few seconds). */
-  private async backgroundShells(): Promise<Map<number, ProgramOwner>> {
-    if (this.shellsCache && Date.now() - this.shellsCache.at < 10_000) return this.shellsCache.shells;
-    const folders = new Map<string, { runtime: AgentRuntime; directory: string; agents: { project: Project; agent: Agent }[] }>();
-    for (const project of this.store.list()) {
-      for (const agent of project.agents.filter(active)) {
-        const runtime = this.runtimes.get(runtimeOf(agent));
-        if (!runtime || runtime.state !== "running") continue;
-        const key = `${runtime.kind}\n${path.resolve(agent.directory).toLowerCase()}`;
-        const folder = folders.get(key) ?? { runtime, directory: agent.directory, agents: [] };
-        folder.agents.push({ project, agent });
-        folders.set(key, folder);
-      }
-    }
-    const shells = new Map<number, ProgramOwner>();
-    for (const { runtime, directory, agents } of folders.values()) {
-      for (const s of await runtime.shells(directory).catch(() => [])) {
-        if (!s.running || !s.pid) continue;
-        const found = (s.sessionId && this.store.findAgentBySession(s.sessionId)) || (agents.length === 1 ? agents[0] : undefined);
-        if (found) shells.set(s.pid, ownerOf(found.project, found.agent));
-      }
-    }
-    this.shellsCache = { at: Date.now(), shells };
-    return shells;
-  }
-
-  private async onOverloaded(load: MachineLoad, heavy: AgentProcess[]) {
-    const gb = (bytes: number) => (bytes / 1024 ** 3).toFixed(1);
-    const top = heavy
-      .slice(0, 5)
-      .map((p) => `${p.name} (pid ${p.pid}${p.cpu !== null ? `, ${p.cpu}% CPU` : ""}, ${Math.round(p.memory / 1024 ** 2)} MB${p.owners.length ? `, ${startedBy(p)}` : ""})`)
-      .join(", ");
-    const state = `CPU ${load.cpu}%, ${gb(load.memory.free)} of ${gb(load.memory.total)} GB memory free`;
-    console.warn(`[machine] overloaded: ${state}${top ? `; agents' programs: ${top}` : ""}`);
-    for (const project of this.store.list()) {
-      if (!project.agents.some((a) => a.status === "busy" || a.status === "waiting" || a.status === "stuck")) continue;
-      this.overloadNotified.add(project.id);
-      await this.log(project, {
-        from: "symbio",
-        to: "human",
-        kind: "system",
-        text:
-          `This computer is overloaded (${state}).${top ? ` The heaviest programs agents started: ${top}.` : ""} ` +
-          `${load.holding ? "New agent turns wait until it recovers. " : ""}You can stop them from the machine indicator at the top.`,
-      });
-      const coordinator = this.coordinator(project);
-      if (coordinator && active(coordinator)) {
-        await this.note(
-          project,
-          coordinator,
-          `Symbio: this computer is overloaded (${state}).${top ? ` Programs agents started, heaviest first: ${top}.` : ""} ` +
-            "Don't start more heavy work now; have helpers finish or stop what isn't needed, and run heavy jobs one at a time." +
-            (load.holding ? " Messages between agents wait until the machine recovers." : ""),
-        );
-      }
-    }
-  }
-
-  private async onRecovered(load: MachineLoad) {
-    console.log(`[machine] recovered: CPU ${load.cpu}%`);
-    for (const project of this.store.list()) {
-      const told = this.overloadNotified.delete(project.id);
-      // Held because of the machine (not paused by the human): deliver them now.
-      const held = !project.paused ? (project.heldMessages ?? []) : [];
-      if (held.length) {
-        project.heldMessages = [];
-        await this.store.update(project);
-        await this.deliverHeld(project, held);
-      }
-      if (told || held.length) {
-        await this.log(project, {
-          from: "symbio",
-          to: "human",
-          kind: "system",
-          text: `This computer has recovered (CPU ${load.cpu}%).${held.length ? ` ${held.length} held message(s) delivered.` : ""}`,
-        });
-        bus.publish({ type: "project.updated", projectId: project.id });
-      }
-    }
+    this.machineWatch.attach(machine);
   }
 
   private async hold(project: Project, agent: Agent, text: string) {
@@ -1545,76 +1161,21 @@ export class Team implements TeamCore {
 
   // ---------------------------------------------------------------- reasoning effort
 
-  /** The reasoning effort levels a model takes in a runtime (cached for a few minutes). */
-  async levelsOf(runtime: AgentRuntime, model: string): Promise<string[]> {
-    let cache = this.levelCache.get(runtime.kind);
-    if (!cache || Date.now() - cache.at > 5 * 60_000 || !cache.levels.has(model)) {
-      const models = await runtime.listModels().catch(() => null);
-      if (models) {
-        cache = { at: Date.now(), levels: new Map(models.map((m) => [`${m.providerID}/${m.id}`, m.efforts ?? []])) };
-        this.levelCache.set(runtime.kind, cache);
-      }
-    }
-    return cache?.levels.get(model) ?? [];
+  // Reasoning effort lives in team/effort.ts.
+  levelsOf(runtime: AgentRuntime, model: string): Promise<string[]> {
+    return this.efforts.levelsOf(runtime, model);
   }
 
-  /**
-   * The level an agent's session uses on a model: its own level, else the project's for the model,
-   * when the model takes it; otherwise none (the model's default).
-   */
-  async effortFor(project: Project, agent: Pick<Agent, "effort"> | null, model: string, runtime: AgentRuntime): Promise<string | undefined> {
-    const wanted = [agent?.effort?.level, project.modelEfforts?.[model]].filter((l): l is string => !!l);
-    if (!wanted.length) return undefined;
-    const levels = await this.levelsOf(runtime, model);
-    return wanted.find((l) => levels.includes(l));
+  effortFor(project: Project, agent: Pick<Agent, "effort"> | null, model: string, runtime: AgentRuntime): Promise<string | undefined> {
+    return this.efforts.effortFor(project, agent, model, runtime);
   }
 
-  /** Sets an agent's own reasoning effort level (null: back to the project's level for its model). core can't change the human's. */
-  async setEffort(project: Project, agent: Agent, level: string | null, by: "human" | "coordinator"): Promise<string> {
-    if (agent.status === "stopped") throw new Error(`${agent.name} is stopped.`);
-    if (by === "coordinator" && agent.effort?.by === "human" && agent.effort.level !== level) {
-      throw new Error(`The human set ${agent.name}'s reasoning effort to ${agent.effort.level}; only they can change it.`);
-    }
-    const runtime = this.rt(agent);
-    if (level) {
-      const levels = await this.levelsOf(runtime, agent.model);
-      if (!levels.includes(level)) throw new Error(levelError(agent.model, level, levels));
-    }
-    // The session moves first: once the setting shows, the agent's next turn runs at it.
-    const next = level ? { level, by } : null;
-    const effective = await this.effortFor(project, { effort: next }, agent.model, runtime);
-    await runtime.switchModel(agent.sessionId, agent.model, effective ?? null);
-    agent.effort = next;
-    await this.store.update(project);
-    bus.publish({ type: "project.updated", projectId: project.id });
-    const text = `${agent.name}'s reasoning effort: ${effective ?? "the model's default"}${level ? "" : " (as set for its model in the project)"}.`;
-    await this.log(project, { from: "symbio", to: "human", kind: "system", text: `${text} (${by === "human" ? "by the human" : "by core"})` });
-    const coordinator = this.coordinator(project);
-    if (by === "human" && coordinator && coordinator.id !== agent.id && active(coordinator)) {
-      await this.note(project, coordinator, `Symbio: the human set ${text}`);
-    }
-    return text;
+  setEffort(project: Project, agent: Agent, level: string | null, by: "human" | "coordinator"): Promise<string> {
+    return this.efforts.setEffort(project, agent, level, by);
   }
 
-  /** Sets the project's level per model and applies it to the agents on those models that have no level of their own. */
-  async setModelEfforts(project: Project, efforts: Record<string, string | null>) {
-    const next = { ...(project.modelEfforts ?? {}) };
-    for (const [model, level] of Object.entries(efforts)) {
-      if (level) next[model] = level;
-      else delete next[model];
-    }
-    const changed = Object.keys(efforts);
-    const modelEfforts = Object.keys(next).length ? next : undefined;
-    // Sessions move first: once the setting shows, agents' next turns run at it.
-    for (const agent of project.agents.filter((a) => active(a) && !a.effort && changed.includes(a.model))) {
-      const runtime = this.runtimes.get(runtimeOf(agent));
-      if (runtime?.state !== "running") continue; // applied when its session next changes
-      const effort = await this.effortFor({ ...project, modelEfforts }, agent, agent.model, runtime);
-      await runtime.switchModel(agent.sessionId, agent.model, effort ?? null).catch((err) => console.error(`[team] effort for ${agent.name}:`, err.message));
-    }
-    project.modelEfforts = modelEfforts;
-    await this.store.update(project);
-    bus.publish({ type: "project.updated", projectId: project.id });
+  setModelEfforts(project: Project, efforts: Record<string, string | null>): Promise<void> {
+    return this.efforts.setModelEfforts(project, efforts);
   }
 
   /** Whether agents working in this folder may add AI co-author lines to commits (the project's setting). */
@@ -1705,7 +1266,7 @@ export class Team implements TeamCore {
   }
 
   /** The URL of Symbio's MCP tool server for a working folder (a token per folder, for this run). */
-  private toolsUrl(project: Project, directory: string): string {
+  toolsUrl(project: Project, directory: string): string {
     let token = [...this.mcpTokens.entries()].find(([, t]) => t.projectId === project.id && t.directory === directory)?.[0];
     if (!token) {
       token = randomBytes(18).toString("base64url");
@@ -1725,7 +1286,7 @@ export class Team implements TeamCore {
   }
 
   /** Before starting an agent's turn: make sure its tools and private docs are in place. */
-  private async prepare(project: Project, agent: Agent) {
+  async prepare(project: Project, agent: Agent) {
     // Runtimes start when needed: waking an agent (or adding to its conversation) is a need.
     await this.runtimeFor({ runtime: runtimeOf(agent) });
     await this.reattach(project, agent);
@@ -1859,18 +1420,24 @@ export class Team implements TeamCore {
     }
   }
 
+  /** Counts what an agent's session has used so far (team/usage.ts). */
+  refreshUsage(project: Project, agent: Agent): Promise<void> {
+    return this.usage.refresh(project, agent);
+  }
+
+  /** Forgets what was tied to an agent's old session: messages queued in it, an open question. */
+  forgetSession(agent: Agent) {
+    this.inbox.delete(agent.id);
+    this.pendingQuestion.delete(agent.id);
+  }
+
   setStatus(project: Project, agent: Agent, status: Agent["status"]) {
     if (agent.status === status) return;
     // A message arriving while the agent waits on the human (a question, a permission request) is
     // queued until it's answered. Turning "busy" here hid the question from the chat and let the
     // watchdog interrupt it as a hang ten minutes later.
     if (status === "busy" && agent.status === "waiting" && this.waitsOnHuman(project, agent)) return;
-    // When each agent was working, so the programs started then can be told apart (machine.ts).
-    const working = (s: Agent["status"]) => s === "busy" || s === "waiting";
-    const turns = (this.turns.get(agent.id) ?? []).filter((t) => t.end === null || Date.now() - t.end < 6 * 3600_000).slice(-100);
-    if (working(status) && !turns.some((t) => t.end === null)) turns.push({ start: Date.now(), end: null });
-    if (!working(status)) for (const t of turns) t.end ??= Date.now();
-    this.turns.set(agent.id, turns);
+    this.machineWatch.statusChanged(agent, status);
     agent.status = status;
     agent.lastActivity = Date.now();
     bus.publish({ type: "agent.status", projectId: project.id, agentId: agent.id, status });
@@ -1926,15 +1493,4 @@ export class Team implements TeamCore {
 export type { PendingPermission } from "./team/permissions.js";
 export type { HousekeepingReport } from "./team/housekeeper.js";
 
-const levelError = (model: string, level: string, levels: string[]) =>
-  levels.length
-    ? `${model} doesn't take the reasoning effort "${level}". Its levels: ${levels.join(", ")}.`
-    : `${model} has no reasoning effort levels to choose.`;
 
-const ownerOf = (project: Project, agent: Agent): ProgramOwner => ({
-  projectId: project.id,
-  project: project.name,
-  agentId: agent.id,
-  agent: agent.name,
-  directory: agent.directory,
-});

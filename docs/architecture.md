@@ -75,8 +75,12 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `origin.ts` | Host/Origin checks on every request (against DNS rebinding and cross-site requests) |
 | `ui-token.ts` | The UI key (`~/.symbio/ui-token`) every API request must carry |
 | `store.ts` | Projects and agents on disk (`~/.symbio/config.json`, `<project>/.symbio/`) and the message log |
-| `team.ts` | The heart: creating, stopping, restarting and renewing agents, delivering messages, status, the plan, pause/resume, routing the runtime's events. Its parts live in `team/` and use only the `TeamCore` interface (`team/core.ts`) |
+| `team.ts` | The heart: creating, stopping and restarting agents, delivering messages, status, pause/resume, routing the runtime's events, and the wiring of its parts. The parts live in `team/` and use the `TeamCore` interface (`team/core.ts`), or a host interface naming the few more things they need (`SessionsHost`, `TaskFlowHost`, `MachineWatchHost`) |
 | `team/asset-protocol.ts` | The shared-asset protocol: request (free ones granted at once), grant, deny, release |
+| `team/sessions.ts` | Fresh sessions: a new session for an agent with its identity kept, the handoff note Symbio writes from its records, the agent's own last words (its handoff), and the fresh session after a task |
+| `team/tasks.ts` | The plan's task flow: proposing and deciding the plan, adding and assigning tasks, a helper's report (`update_task`), merging a helper's work |
+| `team/effort.ts` | Reasoning effort: the levels each model takes, the level a session runs at, changing it (the human's or core's) |
+| `team/machine-watch.ts` | The load guard's side of the team: telling the human and core about an overloaded machine, delivering held messages after, and who started each program |
 | `team/watchdog.ts` | Hung agents interrupted and told why, OpenCode restarted before its memory makes it crash, interrupted agents woken after a restart |
 | `team/switch.ts` | Moving a project to another runtime: progress (the `runtime.switch` event), the handoff request |
 | `team/fallback.ts` | Failing providers: switch to the next allowed model (or, for a pinned agent, wait and retry its own), a fresh session when the conversation is too large, resuming stuck agents |

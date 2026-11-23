@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- `team.ts` split: fresh sessions and handoffs, the task flow, reasoning effort and the load guard now live in their own
+  modules under `src/server/team/` (no change in behavior) (#44).
 - **A glossary for Symbio itself** ([docs/glossary.md](docs/glossary.md)): one word per thing across the interface, docs and
   briefs. The agent's *New session* button is now *Fresh session*, like the setting; the Portuguese interface says
   *auxiliar* everywhere (#43).
