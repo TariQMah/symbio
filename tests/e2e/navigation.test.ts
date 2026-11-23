@@ -29,7 +29,8 @@ test("Settings: Back names the project, and Back, Settings again or Escape retur
     assert.equal(await page.locator("button.tab.active").innerText(), "Plan");
   };
   await open();
-  assert.equal(await page.locator(".settings-back").innerText(), "Back to Nav check");
+  // "Back to the project" until its name has loaded.
+  await until("Back to name the project", async () => (await page.locator(".settings-back").innerText()) === "Back to Nav check");
   await page.locator(".settings-back").click();
   await onPlan();
   await open();

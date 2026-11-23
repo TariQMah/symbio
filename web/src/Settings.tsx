@@ -33,7 +33,8 @@ function useBackLabel(): string {
   useEffect(() => {
     if (id) api.project(id).then((p) => setName(p.name)).catch(() => {});
   }, [id]);
-  return id ? t("app.backTo", { name: name ?? t("app.backToProject") }) : t("app.backToProjects");
+  if (!id) return t("app.backToProjects");
+  return name ? t("app.backTo", { name }) : t("app.backToProject");
 }
 
 export function Settings() {

@@ -28,7 +28,7 @@ node bin/symbio.js run     # foreground, http://127.0.0.1:4310
 | `npm start` | Same as `sym`: starts the built app in the background and opens the browser (`node bin/symbio.js run` runs it in the foreground) |
 | `npm test` | Unit tests (`node:test` via tsx, `tests/*.test.ts`) |
 | `npm run test:contract` | The runtimes' APIs as Symbio uses them: a real `opencode serve`, and the real GitHub Copilot CLI when signed in (`tests/contract/`) |
-| `npm run test:e2e` | The whole app (built first), driven in Edge/Chrome, once per runtime: against a stand-in OpenCode, then a stand-in Copilot (`tests/e2e/`, `scripts/e2e.mjs`) |
+| `npm run test:e2e` | The whole app (built first), driven in Edge/Chrome, once per runtime (both at once, several files in parallel): against a stand-in OpenCode and a stand-in Copilot (`tests/e2e/`, `scripts/e2e.mjs`) |
 | `npm run typecheck` | Type-checks the server and the UI |
 | `prepublishOnly` | Runs typecheck, tests and build before `npm publish` |
 
@@ -188,6 +188,30 @@ A session on the model `UNAVAILABLE_MODEL` (`fake/unavailable`, `copilot/unavail
 turn at once. `tests/e2e/harness.ts` has the helpers (`startSymbio`, `projectWithCore`, `idle`,
 `history`, `openPage` for a desktop or phone page). When a runtime changes how a turn looks, record it
 again with a real model and update its stand-in to match.
+
+### Running them fast, and keeping them steady
+
+Each file starts its own Symbio, ports and folders, so files run several at a time: both runtimes at
+once, each with a few files in parallel (`--jobs N` or `SYMBIO_E2E_JOBS`; by default from the CPU
+threads and memory, at most 4 per runtime). On a 28-thread machine the whole suite takes about 1 min 45 s
+(8 min one file at a time); on a 4-thread one, one file per runtime at a time. `--serial` runs one
+runtime after the other, one file at a time, as before. Each runtime's lines are tagged
+(`[opencode]`, `[copilot]`) and the end says how long each took.
+
+Running several files at once makes a slow machine slower, so tests must not depend on timing:
+
+- **Wait for what you check.** After an action, poll with `until(…)` (or a Playwright locator's
+  `waitFor`) instead of asserting at once; the UI and the agents get there a moment later.
+- **Wait for the team** with `idle(…)` before reading an agent's history; it waits until nobody has
+  been working for half a second.
+- **Never `page.waitForFunction` with a promise** (like `navigator.clipboard.readText()`): it doesn't
+  wait for the promise, so it passes at once. Read the value in `until(…)`.
+- **Text that loads**: a label can show a placeholder until its data arrives (the project's name in
+  Settings' Back); wait for the final text.
+- The limits (`until` 30 s, `idle` 40 s) only matter when something is wrong; don't lower them, and
+  give a test's slow step its own larger limit rather than adding sleeps.
+- A long file is a long pole: when one grows past ~15 s, split it by theme (each file is one
+  Symbio).
 
 ## Testing remote access
 

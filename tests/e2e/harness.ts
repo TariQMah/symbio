@@ -114,12 +114,15 @@ export async function startSymbio(env: Record<string, string> = {}): Promise<Sym
   };
 }
 
-/** Polls until `check` is true. */
-export async function until(what: string, check: () => boolean | Promise<boolean>, ms = 15_000, context?: () => string) {
+/**
+ * Polls until `check` is true. The limit only matters when something is wrong: test files run
+ * several at a time (scripts/e2e.mjs), so a busy machine gets room before a wait counts as failed.
+ */
+export async function until(what: string, check: () => boolean | Promise<boolean>, ms = 30_000, context?: () => string) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     if (await check()) return;
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error(`Timed out waiting for ${what}${context ? `\n--- Symbio output ---\n${context().slice(-3000)}` : ""}`);
 }
@@ -152,17 +155,22 @@ export async function projectWithCore(symbio: Symbio, name: string, opts: { dire
 }
 
 /** Waits until no agent of the project is working. */
-export async function idle(symbio: Symbio, projectId: string, ms = 20_000) {
-  let quiet = 0;
+export async function idle(symbio: Symbio, projectId: string, ms = 40_000) {
+  // Quiet for a moment, not just once: a message can wake an agent right after its turn ends.
+  let quietSince = 0;
+  let busy = "";
   await until(
     "the team to be idle",
     async () => {
       const p = await symbio.call("GET", `/projects/${projectId}`);
-      quiet = p.agents.every((a: any) => a.status !== "busy") ? quiet + 1 : 0;
-      return quiet >= 3;
+      busy = p.agents.filter((a: any) => a.status === "busy").map((a: any) => a.name).join(", ");
+      const quiet = !busy;
+      if (!quiet) quietSince = 0;
+      else quietSince ||= Date.now();
+      return quiet && Date.now() - quietSince >= 500;
     },
     ms,
-    symbio.output,
+    () => `still working: ${busy}\n${symbio.output()}`,
   );
 }
 

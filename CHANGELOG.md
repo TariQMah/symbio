@@ -5,6 +5,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Fixed: Settings' Back button read "Back to Back to the project" for a moment, until the project's name loaded.
+- The end-to-end tests run both runtimes at once, several files in parallel: about 1 min 45 s instead of 8 min on a
+  28-thread machine, and about 5 min on a small one (#45).
+
 ## [0.26.0]
 
 - **Copy buttons in the chat**: on each code block, and on each message (its text as written, Markdown included). They show
