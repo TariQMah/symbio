@@ -240,7 +240,7 @@ Thanks to everyone who has contributed to Symbio:
 - [Veeramanikandan R (@Veeramanikandanr48)](https://github.com/Veeramanikandanr48): copy buttons in the chat (#42).
 
 <a href="https://github.com/linkzy/symbio/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=linkzy/symbio&max=100" alt="Contributors" />
+  <img src="https://contrib.rocks/image?repo=linkzy/symbio&max=99" alt="Contributors" />
 </a>
 
 ## License
