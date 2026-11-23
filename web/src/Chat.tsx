@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { EffortSelect } from "./Effort";
+import { AgentSkills } from "./Skills";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUp, Brain, Check, CircleAlert, CircleStop, Folder, FolderInput, GitBranch, Info, Loader2, Pencil, Pin, PinOff, RefreshCw, Repeat, RotateCcw, Wrench, X } from "lucide-react";
 import { api, subscribe, type Agent, type Project, type CoreMode } from "./api";
@@ -368,6 +369,7 @@ export function Chat({ project, agent }: { project: Project; agent: Agent }) {
               </select>
             )}
             {agent.status !== "stopped" && <EffortSelect project={project} agent={agent} />}
+            {agent.status !== "stopped" && <AgentSkills project={project} agent={agent} />}
             {agent.status !== "stopped" && <PinButton project={project} agent={agent} />}
             {agent.branch ? (
               <>

@@ -49,6 +49,7 @@ and align the rest.
 | **shared asset** | Anything more than one agent could change (files, data, a spreadsheet, a database). One holder at a time; core decides | recurso compartilhado | asset register, `asset-protocol.ts` |
 | **rules register** | The project's rules (requirements, decisions, constraints), each with its source and whether the work meets it | registro de regras | `rules*` |
 | **project documentation** | What agents (and people) need to work on the project: `AGENTS.md` and `docs/`, or private docs | documentação do projeto | `docs.ts` |
+| **skill** | A packaged method (a folder with a `SKILL.md`) an agent loads when a task calls for it. Symbio's, or the human's **library** (`~/.symbio/skills`); each agent has only the ones it's given | skill (biblioteca de skills) | `skills.ts`, `Agent.skills`, `Project.coreSkills` |
 | **glossary** | A project's terms, what each means and the words not to use; core keeps it, every agent gets it (`docs/glossary.md`) | glossário | `glossaryPath`, `symbio-glossary` |
 | **Done when** | A task's acceptance criteria: what the helper reports against and the review checks | Pronto quando | `doneWhen`, `done_when` |
 | **shared file** | A file an agent showed the human (in the chat and the Files tab) | arquivo compartilhado | `share_file` |
@@ -71,7 +72,6 @@ Names fixed now, before the features ([roadmap](roadmap.md)):
 
 | Term | Means | pt-BR |
 |---|---|---|
-| **skill** | A packaged method (`SKILL.md`) an agent can use, from Symbio's library | skill |
 | **check** | A command Symbio runs itself on a helper's work (build, tests, spellcheck…) | verificação |
 | **reviewer** | A one-off helper that checks a task's work against *Done when*, the rules and the glossary | revisor |
 | **briefing** | The questions about one feature, asked together before work starts; the answers become its spec | briefing |

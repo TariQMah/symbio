@@ -57,6 +57,10 @@ export interface Agent {
   usageByModel?: Record<string, NonNullable<Agent["usage"]>>;
   /** The current session's totals already counted in usageByModel. */
   usageSeen?: NonNullable<Agent["usage"]>;
+  /** Its skills (names from the library, skills.ts); unset: core gets the project's, a helper none. */
+  skills?: string[];
+  /** Who set a helper's skills: core can't change the ones the human set. */
+  skillsBy?: "human" | "coordinator";
   /** How big its current conversation is (tokens the model reads on its next step), and the model's limit when known. */
   context?: { tokens: number; limit: number | null; at: number } | null;
   /** Usage of earlier sessions, for agents that predate usageByModel. */
@@ -126,6 +130,10 @@ export interface Project {
    * before further ones are refused. 0 turns the guard off. Unset = DEFAULT_MESSAGE_LIMIT.
    */
   messageLimit?: number;
+  /** core's skills (unset: Symbio's defaults, DEFAULT_CORE_SKILLS). */
+  coreSkills?: string[];
+  /** Skills core may give helpers (unset: every skill in the library). */
+  helperSkills?: string[];
   /** "after-task": helpers get a fresh session when their task is merged (or, without a branch, marked done). Unset/"manual": only on request. */
   renewSessions?: "manual" | "after-task";
   /**

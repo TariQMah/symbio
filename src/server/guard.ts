@@ -116,7 +116,7 @@ const SECRET_SHELL = [
 // executables are covered by name too, so none can be planted on the PATH. Shell commands are
 // matched on their text, so like the secrets above this is best effort for shell writes.
 const SYMBIO_FILES = ["runtime-settings.json", "config.json", "connections.json", "machine.json", "updates.json", "opencode.pid"];
-const SYMBIO_FOLDERS = ["runtimes", "bin", "copilot"];
+const SYMBIO_FOLDERS = ["runtimes", "bin", "copilot", "skills"];
 const RUNTIME_EXECUTABLES = ["opencode.cmd", "opencode.exe", "opencode.ps1", "opencode.bat"];
 const SYMBIO_CONTROL_PATHS = [
   ...SYMBIO_FILES.flatMap((f) => [`*\\.symbio\\${f}`, `*/.symbio/${f}`]),
@@ -125,7 +125,8 @@ const SYMBIO_CONTROL_PATHS = [
 ];
 const SYMBIO_CONTROL_SHELL = [
   ...SYMBIO_FILES.flatMap((f) => [`*.symbio\\${f}*`, `*.symbio/${f}*`]),
-  ...SYMBIO_FOLDERS.flatMap((d) => [`*.symbio\\${d}\\*`, `*.symbio/${d}/*`]),
+  // Skills' own scripts run from their folder: only their files are protected (edit rules above).
+  ...SYMBIO_FOLDERS.filter((d) => d !== "skills").flatMap((d) => [`*.symbio\\${d}\\*`, `*.symbio/${d}/*`]),
   // Running `opencode.exe --version` is harmless; the shims are only ever written.
   ...RUNTIME_EXECUTABLES.filter((f) => f !== "opencode.exe").map((f) => `*${f}*`),
 ];

@@ -17,6 +17,9 @@ export interface Agent {
   runtime?: RuntimeKind;
   /** Its own reasoning effort level (over the project's level for its model). */
   effort?: { level: string; by: "human" | "coordinator" } | null;
+  /** Its skills (helpers; core's come from the project). */
+  skills?: string[];
+  skillsBy?: "human" | "coordinator";
   /** Pinned and waiting for its model: when the next retry is. */
   modelWait?: { until: number; attempt: number; since: number; error: string } | null;
   status: AgentStatus;
@@ -193,6 +196,15 @@ export type RuntimeKind = "opencode" | "copilot";
 
 export const RUNTIME_LABEL: Record<RuntimeKind, string> = { opencode: "OpenCode", copilot: "GitHub Copilot CLI" };
 
+/** A skill (skills.ts): Symbio's, the human's, or one found elsewhere on this computer. */
+export interface SkillInfo {
+  name: string;
+  description: string;
+  source: "builtin" | "library" | "computer";
+  dir: string;
+  files: string[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -208,6 +220,9 @@ export interface Project {
   modelEfforts?: Record<string, string>;
   /** Agents may add Co-authored-by lines naming the AI to commits (off by default). */
   aiCoauthors?: boolean;
+  /** core's skills (unset: Symbio's defaults) and the ones core may give helpers (unset: all). */
+  coreSkills?: string[];
+  helperSkills?: string[];
   docsLocation: DocsLocation;
   origin: "new" | "existing";
   connections: ProjectConnection[];
@@ -754,8 +769,8 @@ export const api = {
   updateProject: (
     id: string,
     patch: Partial<
-      Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy" | "aiCoauthors">
-    > & { modelEfforts?: Record<string, string | null> },
+      Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy" | "aiCoauthors" | "coreSkills">
+    > & { modelEfforts?: Record<string, string | null>; helperSkills?: string[] | null },
   ) =>
     call<Project>("PATCH", `/projects/${id}`, patch),
   connections: () => call<ConnectionView[]>("GET", "/connections"),
@@ -845,6 +860,13 @@ export const api = {
   answerQuestions: (projectId: string, answers: { id: string; answer: string; attachments?: string[] }[]) =>
     call<Question[]>("POST", `/projects/${projectId}/questions/answers`, { answers }),
   setAsideQuestion: (projectId: string, id: string, note?: string) => call<Question[]>("POST", `/projects/${projectId}/questions/${id}/set-aside`, { note }),
+  skills: () => call<{ skills: SkillInfo[]; computer: SkillInfo[] }>("GET", "/skills"),
+  skillText: (name: string) => call<{ text: string }>("GET", `/skills/${encodeURIComponent(name)}`),
+  createSkill: (skill: { name: string; description: string; instructions: string }) => call<SkillInfo>("POST", "/skills", skill),
+  importSkill: (from: string) => call<SkillInfo>("POST", "/skills", { from }),
+  removeSkill: (name: string) => call<{ ok: true }>("DELETE", `/skills/${encodeURIComponent(name)}`),
+  setAgentSkills: (projectId: string, agentId: string, skills: string[]) =>
+    call<Agent>("POST", `/projects/${projectId}/agents/${agentId}/skills`, { skills }),
   setDoneWhen: (projectId: string, taskId: string, doneWhen: string) =>
     call<Plan>("POST", `/projects/${projectId}/plan/tasks/${taskId}/done-when`, { doneWhen }),
   markTask: (projectId: string, taskId: string, review: boolean) => call<Plan>("POST", `/projects/${projectId}/plan/tasks/${taskId}/mark`, { review }),

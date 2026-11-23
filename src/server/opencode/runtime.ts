@@ -2,6 +2,7 @@
 // and keeps a single event subscription alive across restarts.
 
 import { killTreeSync, listProcesses, lowerPriority, treeMemory } from "../machine.js";
+import { skillRoots } from "../skills.js";
 import { spawn, execFile, execFileSync, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -37,6 +38,9 @@ const NON_INTERACTIVE_ENV = {
 };
 
 export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements AgentRuntime {
+  /** Each session's own permission rules and skills (the skills go to OpenCode as more rules). */
+  private readonly rules = new Map<string, PermissionRule[]>();
+  private readonly skills = new Map<string, string[]>();
   readonly kind = "opencode";
   readonly label = "OpenCode";
   state: RuntimeState = "stopped";
@@ -72,7 +76,7 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
     // change their own permissions). It also exits when our end of stdin closes, so the
     // server never outlives Symbio.
     const proc = spawn(command, [...args, "serve", "--hostname", "127.0.0.1", "--port", String(port), "--stdio"], {
-      env: { ...process.env, ...NON_INTERACTIVE_ENV, OPENCODE_SERVER_PASSWORD: password },
+      env: { ...process.env, ...NON_INTERACTIVE_ENV, OPENCODE_SERVER_PASSWORD: password, OPENCODE_CONFIG_CONTENT: withSkillRoots(process.env.OPENCODE_CONFIG_CONTENT) },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
       shell,
@@ -176,8 +180,10 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
       title: opts.title,
       directory: opts.directory,
       model: parseModel(opts.model, opts.effort),
-      permissions: opts.permissions,
+      permissions: [...opts.permissions, ...skillRules(opts.skills)],
     });
+    this.rules.set(session.id, opts.permissions);
+    if (opts.skills) this.skills.set(session.id, opts.skills);
     return session.id;
   }
 
@@ -186,7 +192,18 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
   }
 
   async setPermissions(sessionId: string, rules: PermissionRule[]): Promise<void> {
-    await this.api().setPermissions(sessionId, rules);
+    this.rules.set(sessionId, rules);
+    await this.api().setPermissions(sessionId, [...rules, ...skillRules(this.skills.get(sessionId))]);
+  }
+
+  /** Nothing to do: OpenCode sees new skills in its folders by itself (verified 2.1.4), and the rules deny every skill not given. */
+  skillsChanged(): void {}
+
+  /** A session's skills are permission rules on the skill tool, sent with its other rules. */
+  async setSkills(sessionId: string, skills: string[]): Promise<void> {
+    this.skills.set(sessionId, skills);
+    const rules = this.rules.get(sessionId);
+    if (rules) await this.api().setPermissions(sessionId, [...rules, ...skillRules(skills)]);
   }
 
   async setInstruction(sessionId: string, key: string, value: string | null): Promise<void> {
@@ -460,4 +477,29 @@ export function variantsOf(model: any): string[] {
   if (Array.isArray(v)) return v.map((x: any) => (typeof x === "string" ? x : x?.id)).filter((x: unknown): x is string => typeof x === "string" && !!x);
   if (v && typeof v === "object") return Object.keys(v);
   return [];
+}
+
+/**
+ * A session's skills as permission rules: OpenCode lists and loads only the skills whose
+ * {action: "skill", resource: <name>} evaluates to something other than deny, and the last matching
+ * rule wins (read in 2.1.4's code: skills filtered by Permission.evaluate("skill", id, rules), which
+ * is findLast). So: every skill denied, then the session's allowed. Unset: no rules (all of them).
+ */
+export function skillRules(skills: string[] | undefined): PermissionRule[] {
+  if (!skills) return [];
+  return [{ action: "skill", resource: "*", effect: "deny" }, ...skills.map((name) => ({ action: "skill", resource: name, effect: "allow" as const }))];
+}
+
+/** OpenCode's config from the environment, with Symbio's skill folders added (config `skills.paths`, verified 2.1.4). */
+export function withSkillRoots(content: string | undefined): string {
+  let config: any = {};
+  try {
+    config = content ? JSON.parse(content) : {};
+  } catch {
+    config = {};
+  }
+  const paths = Array.isArray(config.skills) ? config.skills : (config.skills?.paths ?? []);
+  const urls = Array.isArray(config.skills) ? [] : (config.skills?.urls ?? []);
+  config.skills = { paths: [...new Set([...paths, ...skillRoots()])], ...(urls.length ? { urls } : {}) };
+  return JSON.stringify(config);
 }

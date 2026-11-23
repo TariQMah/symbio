@@ -36,6 +36,7 @@ import { Usage } from "./team/usage.js";
 import { Watchdog } from "./team/watchdog.js";
 import { handoffRequest, Switches, type SwitchOptions } from "./team/switch.js";
 import { Sessions } from "./team/sessions.js";
+import { DEFAULT_CORE_SKILLS, listSkills } from "./skills.js";
 import { TaskFlow } from "./team/tasks.js";
 import { Efforts, levelError } from "./team/effort.js";
 import { MachineWatch } from "./team/machine-watch.js";
@@ -430,6 +431,7 @@ export class Team implements TeamCore {
       permissions: this.permissionsFor(project, { role: "coordinator" }),
       toolsUrl: this.toolsUrl(project, project.directory),
       effort: await this.effortFor(project, null, project.coordinatorModel, runtime),
+      skills: this.skillsFor(project, { role: "coordinator" }),
     });
 
     const agent: Agent = {
@@ -476,6 +478,8 @@ export class Team implements TeamCore {
       pinModel?: boolean;
       /** Its own reasoning effort level (one its model takes). */
       effort?: string;
+      /** Its skills (from the library; core only from the ones the project allows helpers). */
+      skills?: string[];
     },
   ): Promise<string> {
     if (!opts.byHuman && !opts.task && !opts.taskId) throw new Error("Give the helper a task: a plan task_id, or a task description.");
@@ -522,6 +526,7 @@ export class Team implements TeamCore {
       const levels = await this.levelsOf(runtime, model);
       if (!levels.includes(effort.level)) throw new Error(levelError(model, effort.level, levels));
     }
+    const skills = opts.skills?.length ? this.checkSkills(project, opts.skills, opts.byHuman ? "human" : "coordinator") : [];
     const workspace = await createWorkspace(project, name, mode, repo);
     const sessionId = await runtime.createSession({
       title: `${project.name} · ${name}`,
@@ -530,6 +535,7 @@ export class Team implements TeamCore {
       permissions: AGENT_PERMISSIONS,
       toolsUrl: this.toolsUrl(project, workspace.directory),
       effort: await this.effortFor(project, { effort }, model, runtime),
+      skills,
     });
     const agent: Agent = {
       id: newId("agt"),
@@ -546,6 +552,7 @@ export class Team implements TeamCore {
       model,
       ...(opts.pinModel ? { modelPinned: { by: opts.byHuman ? ("human" as const) : ("coordinator" as const), at: Date.now() } } : {}),
       ...(effort ? { effort } : {}),
+      ...(skills.length ? { skills, skillsBy: opts.byHuman ? ("human" as const) : ("coordinator" as const) } : {}),
       status: "idle",
       lastActivity: Date.now(),
       createdAt: Date.now(),
@@ -771,6 +778,7 @@ export class Team implements TeamCore {
           permissions: this.permissionsFor(project, agent),
           toolsUrl: this.toolsUrl(project, agent.directory),
           effort: await this.effortFor(project, agent, model, target),
+          skills: this.skillsFor(project, agent),
         });
         created.push({ agent, sessionId, model, handoff });
         this.switches.advance(progress);
@@ -891,6 +899,7 @@ export class Team implements TeamCore {
       permissions: this.permissionsFor(project, agent),
       toolsUrl: this.toolsUrl(project, agent.directory),
       effort: await this.effortFor(project, agent, model, target),
+      skills: this.skillsFor(project, agent),
     });
     accountUsage(agent, agent.usage ?? emptyUsage());
     agent.previousSessions = [
@@ -1181,6 +1190,85 @@ export class Team implements TeamCore {
     return this.efforts.setModelEfforts(project, efforts);
   }
 
+  // ---------------------------------------------------------------- skills (skills.ts)
+
+  /** The skills an agent's session has: core's from the project, a helper's own; only ones in the library. */
+  skillsFor(project: Project, agent: Pick<Agent, "role"> & Partial<Pick<Agent, "skills">>): string[] {
+    const have = new Set(listSkills().map((s) => s.name));
+    const wanted = agent.role === "coordinator" ? (project.coreSkills ?? DEFAULT_CORE_SKILLS) : (agent.skills ?? []);
+    return wanted.filter((s) => have.has(s));
+  }
+
+  /** The skills core may give helpers: the project's choice, or the whole library. */
+  helperSkillsAllowed(project: Project): string[] {
+    const all = listSkills().map((s) => s.name);
+    return project.helperSkills ? all.filter((s) => project.helperSkills!.includes(s)) : all;
+  }
+
+  /** Checks skills someone wants to give a helper; the human may give any skill in the library. */
+  private checkSkills(project: Project, skills: string[], by: "human" | "coordinator"): string[] {
+    const wanted = [...new Set(skills.map((s) => String(s).trim().toLowerCase()).filter(Boolean))];
+    const pool = by === "human" ? listSkills().map((s) => s.name) : this.helperSkillsAllowed(project);
+    const unknown = wanted.filter((s) => !pool.includes(s));
+    if (unknown.length) {
+      throw new Error(
+        `${by === "human" ? "Not in the library" : "Not among the skills helpers may use"}: ${unknown.join(", ")}. ` +
+          `Available: ${pool.join(", ") || "none"}.`,
+      );
+    }
+    return wanted;
+  }
+
+  /** Gives a helper its skills (the human's choice, or core's unless the human set them); it's told at its next turn. */
+  async setAgentSkills(project: Project, agent: Agent, skills: string[], by: "human" | "coordinator"): Promise<string> {
+    if (agent.role === "coordinator") throw new Error("core's skills are set in the project's settings.");
+    if (agent.status === "stopped") throw new Error(`${agent.name} is stopped.`);
+    if (by === "coordinator" && agent.skillsBy === "human") throw new Error(`The human chose ${agent.name}'s skills; only they can change them.`);
+    const next = this.checkSkills(project, skills, by);
+    agent.skills = next;
+    agent.skillsBy = by;
+    await this.store.update(project);
+    await this.rt(agent).setSkills(agent.sessionId, next);
+    bus.publish({ type: "project.updated", projectId: project.id });
+    const list = next.length ? next.join(", ") : "none";
+    await this.log(project, { from: "symbio", to: "human", kind: "system", text: `${agent.name}'s skills: ${list} (by ${by === "human" ? "the human" : "core"}).` });
+    await this.system(
+      project,
+      agent,
+      `Symbio: your skills are now: ${list}.${next.length ? " Load one with your skill tool when a task matches its description." : ""}`,
+      false,
+    );
+    const coordinator = this.coordinator(project);
+    if (by === "human" && coordinator && active(coordinator)) await this.system(project, coordinator, `Symbio: the human set ${agent.name}'s skills: ${list}.`, false);
+    return `${agent.name}'s skills: ${list}.`;
+  }
+
+  /** A skill was added to or removed from the library: every runtime keeps sessions to their own skills. */
+  skillLibraryChanged() {
+    for (const runtime of this.runtimes.values()) runtime.skillsChanged();
+  }
+
+  /** core's skills and the ones helpers may use (the human's project settings); core's session gets them at once. */
+  async setProjectSkills(project: Project, change: { coreSkills?: string[]; helperSkills?: string[] | null }) {
+    const all = listSkills().map((s) => s.name);
+    const clean = (list: string[]) => {
+      const unknown = list.filter((s) => !all.includes(s));
+      if (unknown.length) throw new Error(`Not in the library: ${unknown.join(", ")}.`);
+      return [...new Set(list)];
+    };
+    if (change.coreSkills) project.coreSkills = clean(change.coreSkills);
+    if (change.helperSkills === null) delete project.helperSkills;
+    else if (change.helperSkills) project.helperSkills = clean(change.helperSkills);
+    await this.store.update(project);
+    const core = this.coordinator(project);
+    if (change.coreSkills && core && active(core)) {
+      const runtime = this.runtimes.get(runtimeOf(core));
+      if (runtime?.state === "running") await runtime.setSkills(core.sessionId, this.skillsFor(project, core));
+      await this.system(project, core, `Symbio: the human set your skills: ${this.skillsFor(project, core).join(", ") || "none"}.`, false);
+    }
+    bus.publish({ type: "project.updated", projectId: project.id });
+  }
+
   /** Whether agents working in this folder may add AI co-author lines to commits (the project's setting). */
   coauthorsAllowed(directory: string): boolean {
     const same = (a: string) => path.resolve(a).toLowerCase() === path.resolve(directory).toLowerCase();
@@ -1219,6 +1307,7 @@ export class Team implements TeamCore {
         : workerBrief(project, agent, this.coordinator(project)?.name ?? "coordinator", connections);
     const runtime = this.rt(agent);
     await runtime.setInstruction(agent.sessionId, "symbio-role", brief);
+    await runtime.setSkills(agent.sessionId, this.skillsFor(project, agent));
     // Also covers sessions created before the guard existed.
     await runtime.setPermissions(agent.sessionId, this.permissionsFor(project, agent));
     this.docsSynced.delete(agent.id);

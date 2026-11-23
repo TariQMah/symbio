@@ -189,6 +189,26 @@ project the connections it needs.
   Don't share it. Deleting the file and restarting Symbio creates a new key (open tabs then need the
   new link).
 
+## Skills
+
+A skill is instructions agents follow, sometimes with scripts they run, often written by someone
+else. Symbio treats them that way:
+
+- **Nothing is picked up silently.** Agents get only the skills Symbio gives them: core the ones in
+  its project's settings, a helper the ones core or you gave it. Skills in other tools' folders on
+  this computer (`~/.agents/skills`, `~/.claude/skills`, `~/.copilot/skills`) and the runtimes' own
+  built-in skills are turned off for agents (OpenCode: permission rules on its skill tool; Copilot:
+  the session's turned-off skills, verified live). They're listed in Settings → Skills so you can
+  read one and add a copy.
+- **You read before you add.** Adding a skill from another folder shows its `SKILL.md` first. The
+  library keeps a **copy** (`~/.symbio/skills`): it doesn't change when the original does, so an
+  update can't slip in. Links inside a skill's folder are refused, and folders over 2 MB.
+- **Agents can't change skills.** The library is protected like Symbio's settings (`guard.ts`): an
+  agent editing a skill would be writing instructions for the others. Running a skill's scripts is
+  allowed, under the same rules as any command.
+- **core gives only what the project allows.** You choose which skills core may give helpers
+  (Project settings → Skills); skills you give a helper yourself, core can't change.
+
 ## Reporting a vulnerability
 
 See [SECURITY.md](../SECURITY.md).

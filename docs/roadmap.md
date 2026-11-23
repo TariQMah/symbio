@@ -21,7 +21,7 @@ carries over between sessions and runtimes.
    handoff, and its conversation size shown ([#49](https://github.com/linkzy/symbio/issues/49)); a fresh session
    after each task by default ([#50](https://github.com/linkzy/symbio/issues/50)); *Done when* on every task
    ([#51](https://github.com/linkzy/symbio/issues/51)).
-2. **Skills.** A skill library, and skills per agent: core's chosen by the human, helpers' by core
+2. ✅ **Skills** (done in 0.28.0). A skill library, and skills per agent: core's chosen by the human, helpers' by core
    ([#52](https://github.com/linkzy/symbio/issues/52)).
 3. **Quality gate.** Project checks Symbio runs itself ([#53](https://github.com/linkzy/symbio/issues/53)), then a
    separate reviewer against *Done when*, the rules and the glossary ([#54](https://github.com/linkzy/symbio/issues/54)).
@@ -164,6 +164,7 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.28.0** — Skills: Symbio's four for leading, your library in Settings (write one, or add a copy after reading it), core's chosen per project, helpers' given by core or by you; each agent has only its own, on both runtimes.
 - **0.27.0** — Core as lead, step 0 and phase 1: a glossary in every project, *Done when* on every task, fresh sessions from the agent's own handoff with the conversation's size shown, rules register and fresh session after each task on for new projects; end-to-end tests about 4× faster.
 - **0.26.0** — Copy buttons in the chat, by @Veeramanikandanr48 (#42).
 - **0.25.0** — The machine view says which project and agent started each program; system programs no longer listed as agents' (Windows pid reuse).

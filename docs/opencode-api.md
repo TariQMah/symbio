@@ -69,6 +69,16 @@ and idle), `session.text.*`, `session.reasoning.*`, `session.tool.*` (live outpu
 
 Verified on 2.1.4 (the free models of a fresh install; contract test):
 
+- **Skills** (verified 2.1.4): config `skills: {paths: [...]}` (or a list) adds skill folders (a folder
+  per skill with a `SKILL.md`, frontmatter `name` and `description`); Symbio passes its own through
+  `OPENCODE_CONFIG_CONTENT`, merged with the user's. `GET /api/skill?location[directory]=…` lists
+  them once a session has loaded the folder (empty before), with OpenCode's own (`opencode`,
+  `report`) and ones in `~/.agents/skills`; skills added to a folder later show up by themselves.
+  What a session may load is filtered by its permission rules: skills whose
+  `{action: "skill", resource: <id>}` evaluates to deny are left out, and the **last matching rule
+  wins** (read in the code: `Permission.evaluate` is a `findLast`), so Symbio sends *deny `*`*, then
+  *allow* each of the agent's skills (`skillRules`). Not yet seen in a real turn (the free models
+  were rate-limited when this was checked).
 - `GET /api/model` gives each model its context window as `limit.context` (tokens; checked by the
   contract test), which Symbio uses for the conversation's size shown in each chat.
 - **Each step's tokens** come in `session.step.ended` (`tokens: {input, output, reasoning, cache:

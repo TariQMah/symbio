@@ -88,6 +88,8 @@ export interface NewSession {
   toolsUrl: string;
   /** A reasoning effort level the model takes (one of its `efforts`); unset: the model's default. */
   effort?: string;
+  /** The skills (names, from skills.ts) the session may use; unset: whatever the runtime finds. */
+  skills?: string[];
 }
 
 export interface AgentRuntime extends EventEmitter<RuntimeEvents> {
@@ -121,6 +123,10 @@ export interface AgentRuntime extends EventEmitter<RuntimeEvents> {
   /** Deletes a session and its stored conversation. */
   deleteSession(sessionId: string): Promise<void>;
   setPermissions(sessionId: string, rules: PermissionRule[]): Promise<void>;
+  /** The skills (names) the session may use, from Symbio's library; no others. */
+  setSkills(sessionId: string, skills: string[]): Promise<void>;
+  /** The skill library changed (a skill added or removed): sessions must still have exactly their own. */
+  skillsChanged(): void;
   /** A named part of the session's instructions (the brief, private docs, a handoff note); null removes it. */
   setInstruction(sessionId: string, key: string, value: string | null): Promise<void>;
   /**

@@ -30,6 +30,8 @@ function fakeRuntime() {
     setPermissions: async (sessionId: string, permissions: any) => {
       calls.push({ method: "PERMISSIONS", path: sessionId, body: permissions });
     },
+    setSkills: async () => {},
+    skillsChanged: () => {},
     ensureTools: async () => {},
     queued: async () => [],
     cancelQueued: async () => true,

@@ -29,6 +29,7 @@ All optional, set as environment variables:
 |---|---|
 | `~/.symbio/config.json` | The list of projects |
 | `~/.symbio/runtime-settings.json` | Whether an OpenCode on PATH is used instead of Symbio's copy |
+| `~/.symbio/skills/` | Your skills (one folder with a `SKILL.md` each), added in Settings → Skills |
 | `~/.symbio/connections.json` | Connection settings (no secrets) |
 | `~/.symbio/secrets.enc` | Connection secrets, encrypted with a key kept in your OS credential store |
 | `~/.symbio/worktrees/` | Helpers' working copies |

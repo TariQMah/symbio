@@ -5,6 +5,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.28.0]
+
+- **Skills** (#52). Packaged methods agents load when a task calls for one (the `SKILL.md` format the agent runtimes share).
+  - Symbio comes with four for leading: *briefing* (questioning the human about one feature), *glossary*, *handoff* and
+    *review* (checking work against its Done when, the rules and the glossary).
+  - **Settings → Skills** is the library: read any skill, write your own, or add a copy of one from a folder. Skills other
+    tools keep on this computer (`~/.agents/skills`, `~/.claude/skills`, `~/.copilot/skills`) are listed to read and add.
+  - **Each agent has only the skills it's given.** core gets the ones chosen in the project's settings (Symbio's four by
+    default); core gives each helper the ones its work needs (`spawn_agent` `skills`, `set_skills`), from the ones the
+    project allows; you can change a helper's in its chat (core can't change those). Skills found elsewhere and the
+    runtimes' own are turned off for agents, on both runtimes.
+  - Agents can't edit skills (they'd be writing instructions for the others); a skill's scripts run like any command.
+
 ## [0.27.0]
 
 First steps of *Core as lead* (core is the strategic layer; helpers are tactical):

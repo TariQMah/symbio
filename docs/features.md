@@ -33,6 +33,11 @@
 - **One word per thing.** Every project has a glossary core keeps: the project's terms, what each
   means and the words not to use. Every agent gets it, so the work, the reports and what you read
   use the same words; when two words are used for one thing, core asks you which to keep.
+- **Skills.** Packaged methods agents load when a task calls for one: Symbio's for leading (a
+  briefing, keeping the glossary, a handoff, a review), yours (write one, or add a copy of one from
+  another folder after reading it), and the ones other tools keep on this computer, listed to add.
+  core gets the skills you choose for it, and gives each helper the ones its work needs (a front-end
+  checklist for the helper building pages); you can change a helper's in its chat.
 - **Documentation you can find your way in.** core keeps the project's docs up to date, and the
   Docs tab shows them as a folder tree with search across every doc, links between docs that open
   in place, an outline of long docs, and plain-text sources (e-mails, transcripts) with line

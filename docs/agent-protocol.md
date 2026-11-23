@@ -175,7 +175,9 @@ core only:
 | `submit_plan` | Propose (or revise) the plan for approval; each task with its `done_when` |
 | `add_task` | Add a task to the approved plan, with its `done_when` |
 | `assign_task` | Give a task to an existing helper |
-| `spawn_agent` | Create a helper with a name, purpose, first task, and optionally a model (and `pin_model` to keep it on that model), where it works (`workspace`: own / shared) and, in a folder of several repositories, which one (`repo`) |
+| `spawn_agent` | Create a helper with a name, purpose, first task, and optionally a model (and `pin_model` to keep it on that model), where it works (`workspace`: own / shared) and, in a folder of several repositories, which one (`repo`); its `skills` |
+| `list_skills` | The skills core may give helpers (name and what each is for), and its own |
+| `set_skills` | Set a helper's skills (from the ones the project allows); not skills the human chose |
 | `pin_model` | Pin a helper to its model (it waits and retries it when it fails, instead of switching) or unpin it; not a pin the human made |
 | `stop_agent` | Stop a helper; its assets are released |
 | `clean_build_outputs` | Delete an idle helper's git-ignored build folders (bin, obj, node_modules…) to free disk space |

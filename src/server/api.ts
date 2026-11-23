@@ -18,6 +18,7 @@ import { gitAvailable, initRepository } from "./git.js";
 import { pickFolder } from "./folder-picker.js";
 import { beginOauth, cancelOauth, completeOauth, connectWithKey, listProviders, oauthStatus, removeLogin } from "./providers.js";
 import { docsRoot, listDocs, rawDoc, readDoc, searchDocs, writeDoc } from "./docs.js";
+import { computerSkills, createSkill, DEFAULT_CORE_SKILLS, importSkill, listSkills, removeSkill, skillText } from "./skills.js";
 import { readRegister } from "./rules.js";
 import { addAttachment, attachmentNote, getAttachments, listAttachments, markSent, removeAttachment } from "./attachments.js";
 import { fileResponse, listDir, listShared, resolveFile, type ResolvedFile } from "./files.js";
@@ -280,6 +281,37 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     return team.machine;
   };
   api.get("/machine", (c) => c.json(machineOf().state()));
+
+  // ---- Skills (skills.ts): Symbio's and the human's, and others found on this computer (to add a copy of)
+  api.get("/skills", (c) => c.json({ skills: listSkills(), computer: computerSkills() }));
+  api.get("/skills/:name", (c) => {
+    try {
+      return c.json({ text: skillText(c.req.param("name")) });
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 404);
+    }
+  });
+  api.post("/skills", async (c) => {
+    const body = await c.req.json<{ name?: string; description?: string; instructions?: string; from?: string }>();
+    try {
+      const skill = body.from
+        ? await importSkill(String(body.from))
+        : await createSkill({ name: String(body.name ?? ""), description: String(body.description ?? ""), instructions: String(body.instructions ?? "") });
+      team.skillLibraryChanged();
+      return c.json(skill, 201);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+  });
+  api.delete("/skills/:name", async (c) => {
+    try {
+      await removeSkill(c.req.param("name"));
+      team.skillLibraryChanged();
+      return c.json({ ok: true });
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+  });
   api.get("/machine/processes", async (c) => {
     try {
       return c.json(await machineOf().processes());
@@ -530,6 +562,11 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       connections: cleanLinks(body.connections),
       runtime: body.runtime,
     });
+    // A new project's core starts with Symbio's skills for leading (a reopened one keeps its own).
+    if (!project.coreSkills && !project.agents.length) {
+      project.coreSkills = DEFAULT_CORE_SKILLS.filter((s) => listSkills().some((x) => x.name === s));
+      await store.update(project);
+    }
     if (roles.coreModels || roles.coreOnlyModels) {
       Object.assign(project, roles);
       if (!modelsFor(project, "coordinator").includes(project.coordinatorModel)) project.coordinatorModel = defaultModel(project, "coordinator");
@@ -640,6 +677,8 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       coreOnlyModels?: string[];
       modelEfforts?: Record<string, string | null>;
       aiCoauthors?: boolean;
+      coreSkills?: string[];
+      helperSkills?: string[] | null;
     }>();
     if (body.modelEfforts && typeof body.modelEfforts === "object") {
       try {
@@ -656,6 +695,16 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
         return c.json({ error: (err as Error).message }, 400);
       }
       await team.setModelEfforts(project, body.modelEfforts);
+    }
+    if (Array.isArray(body.coreSkills) || Array.isArray(body.helperSkills) || body.helperSkills === null) {
+      try {
+        await team.setProjectSkills(project, {
+          ...(Array.isArray(body.coreSkills) ? { coreSkills: body.coreSkills.map(String) } : {}),
+          ...(Array.isArray(body.helperSkills) ? { helperSkills: body.helperSkills.map(String) } : body.helperSkills === null ? { helperSkills: null } : {}),
+        });
+      } catch (err) {
+        return c.json({ error: (err as Error).message }, 400);
+      }
     }
     const coauthorsChanged = typeof body.aiCoauthors === "boolean" && body.aiCoauthors !== (project.aiCoauthors === true);
     if (coauthorsChanged) {
@@ -1142,6 +1191,20 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     if (typeof body.pinned !== "boolean") return c.json({ error: "pinned (true/false) is required" }, 400);
     try {
       await team.pinModel(project, agent, body.pinned, "human");
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    return c.json(agent);
+  });
+
+  // A helper's skills, chosen by the human.
+  api.post("/projects/:id/agents/:agentId/skills", async (c) => {
+    const project = withProject(c.req.param("id"));
+    const agent = withAgent(project, c.req.param("agentId"));
+    const body = await c.req.json<{ skills?: unknown }>();
+    if (!Array.isArray(body.skills)) return c.json({ error: "skills (a list of names) is required" }, 400);
+    try {
+      await team.setAgentSkills(project, agent, body.skills.map(String), "human");
     } catch (err) {
       return c.json({ error: (err as Error).message }, 400);
     }

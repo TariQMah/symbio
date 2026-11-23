@@ -10,6 +10,7 @@ import { DEFAULT_IMAGE_SIZE, viewImage } from "./images.js";
 import { readDocument } from "./documents.js";
 import { describeOuterRepository, gitRepoFor } from "./repos.js";
 import { startedBy } from "./machine.js";
+import { listSkills } from "./skills.js";
 import type { Team } from "./team.js";
 
 export interface ToolContext {
@@ -106,13 +107,13 @@ const shareFile: Tool = {
 
 const listTeam: Tool = {
   name: "list_team",
-  description: "List the agents on this project: name, role, purpose, status, model and reasoning effort.",
+  description: "List the agents on this project: name, role, purpose, status, model, reasoning effort and skills.",
   inputSchema: obj({}),
-  run(_args, { project }) {
+  run(_args, { team, project }) {
     return project.agents
       .map(
         (a) =>
-          `- ${a.name} (${a.role}${a.status === "stopped" ? ", stopped" : `, ${a.status}`}) — ${a.purpose ?? "coordinates the project"}${a.repo ? ` · repository ${a.repo}` : ""} · model ${a.model}${a.modelPinned ? ` (pinned by ${a.modelPinned.by === "human" ? "the human" : "you"})` : ""}${effortText(project, a)}`,
+          `- ${a.name} (${a.role}${a.status === "stopped" ? ", stopped" : `, ${a.status}`}) — ${a.purpose ?? "coordinates the project"}${a.repo ? ` · repository ${a.repo}` : ""} · model ${a.model}${a.modelPinned ? ` (pinned by ${a.modelPinned.by === "human" ? "the human" : "you"})` : ""}${effortText(project, a)}${skillsText(team, project, a)}`,
       )
       .join("\n");
   },
@@ -185,6 +186,11 @@ const spawnAgent: Tool = {
       effort: str("Optional reasoning effort level its model takes (e.g. 'low', 'medium', 'high'); defaults to the project's setting for the model"),
       workspace: { type: "string", enum: ["own", "shared"], description: "Where it works (git projects); defaults to the project's setting" },
       repo: str("In a project made of several repositories: the one it works in (e.g. 'server'); its own copy comes from it"),
+      skills: {
+        type: "array",
+        items: { type: "string" },
+        description: "Skills it gets (names from list_skills): the methods its work calls for, e.g. a front-end or a review skill",
+      },
     },
     ["name", "purpose"],
   ),
@@ -199,7 +205,43 @@ const spawnAgent: Tool = {
       model: args.model ? String(args.model) : undefined,
       pinModel: args.pin_model === true,
       effort: args.effort ? String(args.effort) : undefined,
+      skills: Array.isArray(args.skills) ? args.skills.map(String) : undefined,
     });
+  },
+};
+
+const listSkillsTool: Tool = {
+  name: "list_skills",
+  description:
+    "The skills you can give helpers (packaged methods an agent loads when a task calls for one), with what each is for, " +
+    "and your own. Give them with spawn_agent (skills) or set_skills.",
+  inputSchema: obj({}),
+  async run(_args, { team, project, agent }) {
+    const all = listSkills();
+    const allowed = new Set(team.helperSkillsAllowed(project));
+    const mine = new Set(team.skillsFor(project, agent));
+    const line = (s: (typeof all)[number]) => `- ${s.name}: ${s.description}`;
+    const forHelpers = all.filter((s) => allowed.has(s.name));
+    return [
+      `Yours: ${[...mine].join(", ") || "none"}.`,
+      forHelpers.length ? `For helpers:\n${forHelpers.map(line).join("\n")}` : "No skills are available for helpers (the human chooses them in the project's settings).",
+    ].join("\n\n");
+  },
+};
+
+const setSkills: Tool = {
+  name: "set_skills",
+  description:
+    "Set a helper's skills (names from list_skills; replaces its current ones, an empty list removes them). It's told at its next " +
+    "turn. You can't change skills the human chose for a helper.",
+  inputSchema: obj(
+    { agent: str("Helper name"), skills: { type: "array", items: { type: "string" }, description: "Skill names" } },
+    ["agent", "skills"],
+  ),
+  async run({ agent: name, skills }, { team, project }) {
+    const target = team.findAgent(project, name);
+    if (!target || target.role === "coordinator") throw new Error(`No helper agent named "${name}".`);
+    return team.setAgentSkills(project, target, Array.isArray(skills) ? skills.map(String) : [], "coordinator");
   },
 };
 
@@ -821,6 +863,8 @@ const COORDINATOR_ONLY = [
   addTask,
   assignTask,
   spawnAgent,
+  listSkillsTool,
+  setSkills,
   pinModel,
   setEffort,
   listPrograms,
@@ -930,6 +974,12 @@ function planGuard(tool: Tool): Tool {
 
 export const workerTools: Tool[] = COMMON.map(withInbox);
 export const coordinatorTools: Tool[] = [...COMMON, ...COORDINATOR_ONLY.map(coordinatorOnly)].map(planGuard).map(withInbox);
+
+/** An agent's skills, for list_team. */
+function skillsText(team: Team, project: Project, a: Agent): string {
+  const skills = team.skillsFor(project, a);
+  return skills.length ? ` · skills ${skills.join(", ")}${a.skillsBy === "human" ? " (chosen by the human)" : ""}` : "";
+}
 
 /** An agent's reasoning effort, for list_team: its own level, or the project's for its model. */
 function effortText(project: Project, a: Agent): string {

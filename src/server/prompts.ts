@@ -130,6 +130,10 @@ ${rulesSection(project, "coordinator")}
 - \`list_programs\`, \`stop_program\` — this computer's load and the programs the
   team's agents started (builds, 3D tools, browsers…), heaviest first; stop one by
   its pid when it's runaway or the machine is overloaded.
+- \`list_skills\`, \`set_skills\` — skills: packaged methods (a review, a briefing, a
+  front-end checklist, a writing style…) an agent loads when a task calls for one.
+  Give each helper the skills its work needs when you create it (\`spawn_agent\`
+  \`skills\`) or later; \`list_skills\` shows the ones you may give. ${skillsLine(project.coreSkills, "Yours")}
 - \`set_effort\` — change a helper's reasoning effort level (more thinking costs
   more tokens; save the higher levels for hard work). You can't change a level
   the human set.
@@ -339,6 +343,13 @@ The folder already has content. Before planning anything:
 Respect what is there: follow existing conventions and guidance files.`;
 }
 
+/** An agent's skills, for its brief: loaded with the runtime's skill tool when a task matches one. */
+function skillsLine(skills: string[] | undefined, label: string): string {
+  return skills?.length
+    ? `${label}: ${skills.join(", ")}. Load one with your skill tool when a task matches its description, and follow it.`
+    : `${label}: none for now.`;
+}
+
 /** What carries over from one task to the next for a helper (Project.renewSessions). */
 function afterTaskNote(project: Project): string {
   return project.renewSessions === "after-task"
@@ -488,6 +499,7 @@ assets. ${agent.startedBy === "human" ? STARTED_BY_HUMAN : "Your tasks come from
   for plan tasks (see below), otherwise with \`send_message\` to the coordinator
   (what you did, where, anything they should know). Then end your turn; new
   instructions arrive as messages and wake you up.
+- ${skillsLine(agent.skills, "Your skills")}
 - When your task has a **Done when**, check each point before you report, and in
   your report say for each whether it's met and how you checked.
 - When you report a task for review, include a guide (\`guide\`): where to look

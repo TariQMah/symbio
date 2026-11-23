@@ -109,7 +109,8 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `documents.ts` | `read_document`: text from PDF (`unpdf`), Word, Excel, PowerPoint and OpenDocument files (unzipped with `fflate`), a part at a time |
 | `images.ts` | `view_image`: scaled-down copies of images (or full-resolution crops) for agents |
 | `rules.ts` | The rules register (`docs/rules.json`, or `rules.json` in private docs): validated writes, one at a time, ids that are never reused |
-| `docs.ts` | Project documentation (in the project, or private under `.symbio/docs`): list, read, write, search |
+| `docs.ts` | Project documentation (in the project, or private under `.symbio/docs`): list, read, write, search; the glossary |
+| `skills.ts` | Skills: Symbio's (`skills/` in the package) and the human's library (`~/.symbio/skills`), others found on this computer (to add a copy of), creating, importing and removing. Each runtime is told an agent's skills (`setSkills`): OpenCode as permission rules on its skill tool, Copilot as the session's skill folders and turned-off skills |
 | `guard.ts` | OpenCode permission rules for every agent (kill/secret denies, install asks) |
 | `connections.ts`, `secrets.ts` | GitHub, Azure DevOps, server (SSH) and FTP connections, and the encrypted secret vault |
 | `remote.ts`, `ssh.ts`, `ftp.ts` | Running remote actions for agents (SSH exec/upload, FTP upload, git push/pull, GitHub and Azure DevOps APIs) with approvals |
@@ -126,7 +127,7 @@ The UI (`web/src/`) is React + Vite with Motion for animation and lucide icons. 
 client; `ProjectView.tsx` holds the project screen (team sidebar and tabs), `Chat.tsx` renders a
 live session (with `steps.ts` labelling the team's steps in plain words, and `files.tsx` and `paths.ts` turning paths
 into links, showing shared files as cards and the viewer page that opens them), `Machine.tsx` the computer's load and agents' programs (top bar), `Effort.tsx` reasoning effort (in a chat header and project settings), `Kanban.tsx` the plan, `Explorer.tsx` the project's folders and files (read-only), `Messages.tsx` the message log, `Attachments.tsx` attachments in the chat and the Files tab, `Docs.tsx` the Docs tab and
-`Rules.tsx` the rules register in it, `Inbox.tsx` the *Needs you* drawer, `Usage.tsx` tokens and
+`Rules.tsx` the rules register in it, `Skills.tsx` skills (the library in Settings, a project's in its settings, an agent's in its chat), `Inbox.tsx` the *Needs you* drawer, `Usage.tsx` tokens and
 costs, `Housekeeping.tsx` the daily check, `Remote.tsx` remote access, and
 `Settings.tsx`/`Providers.tsx` the global settings. `styles.css` holds the design tokens (colors,
 radii, fonts) and every rule uses them; `themes.css` overrides them per theme under

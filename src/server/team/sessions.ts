@@ -17,6 +17,8 @@ export interface SessionsHost extends TeamCore {
   /** The URL of Symbio's tool server for a folder. */
   toolsUrl(project: Project, directory: string): string;
   effortFor(project: Project, agent: Pick<Agent, "effort"> | null, model: string, runtime: AgentRuntime): Promise<string | undefined>;
+  /** The skills an agent's session has. */
+  skillsFor(project: Project, agent: Pick<Agent, "role"> & Partial<Pick<Agent, "skills">>): string[];
   /** Sends an agent's brief and permissions to its session again. */
   refreshInstructions(project: Project, agent: Agent): Promise<void>;
   /** Before starting an agent's turn: its runtime, folder, tools and private docs in place. */
@@ -88,6 +90,7 @@ export class Sessions {
       permissions: team.permissionsFor(project, agent),
       toolsUrl: team.toolsUrl(project, agent.directory),
       effort: await team.effortFor(project, agent, agent.model, runtime),
+      skills: team.skillsFor(project, agent),
     });
     agent.previousSessions = [...(agent.previousSessions ?? []), { sessionId: oldSession, endedAt: Date.now(), runtime: runtimeOf(agent) }];
     agent.sessionId = sessionId;

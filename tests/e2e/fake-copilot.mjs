@@ -18,7 +18,7 @@
 
 import { execSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
@@ -174,6 +174,11 @@ function view(state) {
         list: async () => ({ tasks: [] }),
         cancel: async () => ({ cancelled: false }),
       },
+      // Copilot's own skills (none here): the session's come from its config (the "skills" step).
+      skills: {
+        list: async () => ({ skills: [] }),
+        disable: async () => {},
+      },
       // Signing in with a device code: approved on "GitHub" a moment after it starts.
       accounts: {
         login: {
@@ -293,6 +298,14 @@ async function runStep(state, step, ctl) {
         await started;
       }
       return say(state, "started");
+    // "@core skills": the skills its session has, as Copilot finds them (its skill folders, minus the turned-off ones).
+    case "skills": {
+      const dirs = state.config.skillDirectories;
+      if (!dirs) return say(state, "skills: (all)");
+      const off = new Set(state.config.disabledSkills ?? []);
+      const names = dirs.flatMap((d) => (existsSync(d) ? readdirSync(d).filter((n) => existsSync(path.join(d, n, "SKILL.md"))) : []));
+      return say(state, `skills: ${[...new Set(names)].filter((n) => !off.has(n)).sort().join(", ") || "none"}`);
+    }
     // "@core knows <text>": whether its instructions (brief, glossary, handoff…) contain the text.
     case "knows":
       return say(state, `knows: ${String(state.config.systemMessage?.content ?? "").includes(step.rest) ? "yes" : "no"}`);

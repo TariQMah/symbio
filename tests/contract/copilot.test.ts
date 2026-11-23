@@ -113,6 +113,30 @@ test("reasoning effort: models list their levels, and a session takes one when c
   assert.equal((await current()).reasoningEffort, second, "changed with the model");
 });
 
+test("skills: a session has exactly its skills (Symbio's folders, every other skill turned off)", async (t) => {
+  if (skip) return t.skip(skip);
+  const ref = `copilot/${(await runtime.listModels()).find((m) => m.providerID === "copilot")!.id}`;
+  // No turn: nothing is billed.
+  const id = await runtime.createSession({ title: "Contract · skills", directory: work, model: ref, permissions: AGENT_PERMISSIONS, toolsUrl, skills: ["glossary"] });
+  sessions.push(id);
+  const list = async () => {
+    const res = await (runtime as any).open.get(id).session.rpc.skills.list();
+    return (res?.skills ?? []) as { name: string; enabled?: boolean; source?: string }[];
+  };
+  const on = (skills: { name: string; enabled?: boolean }[]) => skills.filter((s) => s.enabled !== false).map((s) => s.name);
+  const first = await list();
+  console.log(`# Copilot skills: ${first.map((s) => `${s.name}${s.enabled === false ? " (off)" : ""} [${s.source}]`).join(", ")}`);
+  assert.ok(on(first).includes("glossary"), "its skill is on");
+  assert.ok(!on(first).includes("briefing"), "Symbio's other skills are off");
+  assert.deepEqual(on(first), ["glossary"], "and Copilot's own skills too: exactly its skills");
+  // Changed later: the session is reopened with them before its next turn.
+  await runtime.setSkills(id, ["review"]);
+  await (runtime as any).close(id);
+  await (runtime as any).session(id);
+  const after = on(await list());
+  assert.ok(after.includes("review") && !after.includes("glossary"), "the new set");
+});
+
 test("signing in starts a GitHub device-code flow, and can be cancelled", async (t) => {
   if (skip) return t.skip(skip);
   const code = await runtime.beginSignIn();

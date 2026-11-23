@@ -299,6 +299,14 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "session, they can ask it to write its own handoff first: if you're asked, answer with what you're in the middle of, " +
       "decisions and what isn't written anywhere yet.",
   },
+  {
+    id: "2026-11-23-skills",
+    text:
+      "Skills: packaged methods an agent loads with its skill tool when a task matches one. You have Symbio's skills for leading " +
+      "(briefing, glossary, handoff, review); the human can change them in the project's settings. Give each helper the skills its " +
+      "work needs: spawn_agent takes skills, set_skills changes them, list_skills shows the ones you may give (the human chooses " +
+      "which). Agents only have the skills they're given.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

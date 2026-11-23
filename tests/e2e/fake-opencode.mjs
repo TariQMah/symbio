@@ -198,6 +198,14 @@ async function runStep(session, step, ctl) {
       spawn(step.rest, { cwd: session.directory, shell: true, stdio: "ignore", windowsHide: true });
       return sayStep(session, "started");
     // "@core coauthor": whether the agent was told to leave AI co-author lines out of commits.
+    // "@core skills": the skills its session may load, as OpenCode filters them (the last matching "skill" rule wins).
+    case "skills": {
+      const rules = session.permissions.filter((r) => r.action === "skill");
+      if (!rules.length) return sayStep(session, "skills: (all)");
+      const names = [...new Set(rules.filter((r) => r.resource !== "*").map((r) => r.resource))];
+      const allowed = names.filter((n) => rules.findLast((r) => wildcard(r.resource, n))?.effect !== "deny");
+      return sayStep(session, `skills: ${allowed.join(", ") || "none"}`);
+    }
     // "@core knows <text>": whether its instructions (brief, glossary, handoff…) contain the text.
     case "knows":
       return sayStep(session, `knows: ${Object.values(session.instructions).some((v) => String(v).includes(step.rest)) ? "yes" : "no"}`);

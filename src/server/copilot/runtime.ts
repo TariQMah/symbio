@@ -15,6 +15,7 @@ import path from "node:path";
 import { emptyUsage, type Usage } from "../costs.js";
 import { evaluate, type PermissionRule } from "../guard.js";
 import { processTreeMemory } from "../opencode/runtime.js";
+import { knownSkillNames, skillRoots } from "../skills.js";
 import { importRuntime, NotInstalledError } from "../runtime/install.js";
 import type {
   AgentRuntime,
@@ -85,6 +86,8 @@ interface SessionState {
   directory: string | null;
   permissions: PermissionRule[];
   instructions: Map<string, string>;
+  /** The skills it may use (unset: whatever Copilot finds). */
+  skills?: string[];
   /** Instructions or tools changed since the session was opened: reopen it before its next turn. */
   stale: boolean;
   notes: string[];
@@ -304,6 +307,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
     const state = this.state_(sessionId);
     state.directory = opts.directory;
     state.permissions = opts.permissions;
+    state.skills = opts.skills;
     const session = await this.api().createSession({
       ...this.config(sessionId, state),
       sessionId,
@@ -312,7 +316,25 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       ...(opts.effort ? { reasoningEffort: opts.effort } : {}),
     });
     this.attach(sessionId, session);
+    await this.onlyItsSkills(session, state);
     return sessionId;
+  }
+
+  /**
+   * Copilot also has skills of its own (built in, verified: customize-cloud-agent, github-pr-media,
+   * pr-stack) that the session config can't name in advance: they're turned off once it's open, so
+   * the session has exactly its skills (rpc.skills.list / disable, experimental).
+   */
+  private async onlyItsSkills(session: SdkSession, state: SessionState) {
+    if (!state.skills) return;
+    try {
+      const listed = ((await (session as any).rpc.skills.list())?.skills ?? []) as { name: string; enabled?: boolean }[];
+      for (const s of listed) {
+        if (s.enabled !== false && !state.skills.includes(s.name)) await (session as any).rpc.skills.disable({ name: s.name });
+      }
+    } catch (err) {
+      console.error("[copilot] couldn't limit a session's skills:", (err as Error).message);
+    }
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -324,6 +346,22 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
   async setPermissions(sessionId: string, rules: PermissionRule[]): Promise<void> {
     // Applied by Symbio on each request (onPermission): nothing to send.
     this.state_(sessionId).permissions = rules;
+  }
+
+  /**
+   * A skill added to the library shows up in open sessions at once (verified), on: those are reopened
+   * before their next turn, with the new skill among the ones turned off.
+   */
+  skillsChanged(): void {
+    for (const [id, state] of this.sessions) if (state.skills && this.open.has(id)) state.stale = true;
+  }
+
+  /** Copilot takes skills when a session is opened: an open one is reopened before its next turn. */
+  async setSkills(sessionId: string, skills: string[]): Promise<void> {
+    const state = this.state_(sessionId);
+    if (state.skills && state.skills.length === skills.length && state.skills.every((s, i) => s === skills[i])) return;
+    state.skills = [...skills];
+    if (this.open.has(sessionId)) state.stale = true;
   }
 
   async setInstruction(sessionId: string, key: string, value: string | null): Promise<void> {
@@ -639,6 +677,8 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       enableFileChangeTracking: true,
       ...(state.directory ? { workingDirectory: state.directory } : {}),
       ...(instructions ? { systemMessage: { mode: "append", content: instructions } } : {}),
+      // Symbio's skill folders, and every other skill it knows of turned off, so the session has exactly its own.
+      ...(state.skills ? { skillDirectories: skillRoots(), disabledSkills: knownSkillNames().filter((n) => !state.skills!.includes(n)) } : {}),
       mcpServers: url ? { symbio: { type: "http", url, headers: { "x-symbio-session": sessionId }, tools: ["*"] } } : {},
       onPermissionRequest: (request: any) => this.onPermission(sessionId, request),
       onUserInputRequest: (request: any) => this.onQuestion(sessionId, request),
@@ -665,6 +705,7 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
         const session = await this.api().resumeSession(sessionId, this.config(sessionId, state));
         state.stale = false;
         this.attach(sessionId, session);
+        await this.onlyItsSkills(session, state);
         return session;
       })().finally(() => this.opening.delete(sessionId));
       this.opening.set(sessionId, pending);

@@ -1,3 +1,4 @@
+import { SkillsSection } from "./Skills";
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { ArrowLeft, Check, Pencil, Plug, Plus, ShieldCheck, Trash2, X } from "lucide-react";
@@ -99,6 +100,8 @@ export function Settings() {
       </div>
 
       <RuntimesSection />
+
+      <SkillsSection />
 
       <section className="section">
         <div className="section-head">

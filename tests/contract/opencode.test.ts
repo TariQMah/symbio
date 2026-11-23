@@ -124,6 +124,25 @@ test("reasoning effort: models list variants, and a session's model takes one (c
   }
 });
 
+test("skills: Symbio's folders are in OpenCode's config (skills.paths) and listed for a folder with a session", async () => {
+  // Listed once a session has loaded the folder (verified 2.1.4: empty before).
+  const listed = async () => ((await client.request("GET", `/api/skill?${where}`))?.data ?? []).map((s: any) => s.id);
+  const end = Date.now() + 20_000;
+  let ids: string[] = [];
+  while (Date.now() < end && !ids.includes("glossary")) {
+    ids = await listed();
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  for (const name of ["briefing", "glossary", "handoff", "review"]) assert.ok(ids.includes(name), `Symbio's ${name} skill is listed`);
+  // A session's skills are permission rules on the skill tool (skillRules): accepted like any rule.
+  const id = await runtime.createSession({ title: "contract · skills", directory: work, model: `${model.providerID}/${model.id}`, permissions: [], toolsUrl: "http://127.0.0.1:1/mcp/none", skills: ["glossary"] });
+  try {
+    await runtime.setSkills(id, ["review"]);
+  } finally {
+    await client.request("DELETE", `/api/session/${id}`).catch(() => {});
+  }
+});
+
 test("instructions (experimental): set and remove an entry", async () => {
   await client.setInstruction(sessionId, "symbio-role", "You are a contract test.");
   await client.setInstruction(sessionId, "symbio-role", "Replaced.");
