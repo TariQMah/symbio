@@ -80,6 +80,8 @@ test("server info and models (GET /api/info, /api/model)", async () => {
   const providerID = m.providerID ?? m.provider?.id;
   assert.equal(typeof providerID, "string", "models carry providerID");
   assert.equal(typeof m.id, "string", "models carry id");
+  // Their context window, for the conversation's size shown in each chat (team/effort.ts limitOf).
+  assert.ok(models.some((x: any) => Number(x.limit?.context) > 0), "models carry their context window (limit.context)");
   model = { providerID, id: m.id };
 });
 

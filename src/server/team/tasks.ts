@@ -5,7 +5,7 @@
 import { changedFiles, mergeWorkspace, syncWorkspace } from "../workspaces.js";
 import type { TaskInput, TaskStatus } from "../plan.js";
 import type { Agent, Project } from "../store.js";
-import type { TeamCore } from "./core.js";
+import { active, type TeamCore } from "./core.js";
 import type { QuietHelpers } from "./quiet-helpers.js";
 import type { Reviews } from "./review.js";
 
@@ -17,6 +17,26 @@ export interface TaskFlowHost extends TeamCore {
 
 export class TaskFlow {
   constructor(private readonly team: TaskFlowHost) {}
+
+  /** Changes a task's Done when (core, or the human on the board); the helper working on it is told. */
+  async setDoneWhen(project: Project, taskId: string, text: string, by: string): Promise<void> {
+    const store = await this.team.plan(project);
+    const before = store.task(taskId);
+    const was = before.doneWhen ?? "";
+    const task = await store.update(before.id, { doneWhen: text });
+    if ((task.doneWhen ?? "") === was) return;
+    this.team.planChanged(project);
+    const now = task.doneWhen ? `\n${task.doneWhen}` : " (none now)";
+    await this.team.log(project, { from: "symbio", to: "human", kind: "system", text: `${task.id}'s Done when was changed by ${by}.` });
+    const helper = task.assignee ? project.agents.find((a) => a.id === task.assignee) : undefined;
+    if (helper && active(helper) && task.status !== "done") {
+      await this.team.system(project, helper, `Symbio: ${by} changed ${task.id}'s Done when:${now}`, helper.status !== "idle");
+    }
+    const coordinator = this.team.coordinator(project);
+    if (by === "the human" && coordinator && active(coordinator)) {
+      await this.team.system(project, coordinator, `Symbio: the human changed ${task.id}'s Done when:${now}`, false);
+    }
+  }
 
   async submitPlan(project: Project, coordinator: Agent, goal: string, tasks: TaskInput[]): Promise<string> {
     const store = await this.team.plan(project);
@@ -76,8 +96,9 @@ export class TaskFlow {
       coordinator,
       helper,
       "request",
-      `Task ${task.id}: ${task.title}\n\n${task.description}${assets}${extra ? `\n\n${extra}` : ""}\n\n` +
-        `When it's done, ${helper.branch ? "commit your work and " : ""}call update_task("${task.id}", "review", <summary>) — that is your report. ` +
+      `Task ${task.id}: ${task.title}\n\n${task.description}${task.doneWhen ? `\n\nDone when:\n${task.doneWhen}` : ""}${assets}${extra ? `\n\n${extra}` : ""}\n\n` +
+        `When it's done, ${helper.branch ? "commit your work and " : ""}call update_task("${task.id}", "review", <summary>) — that is your report` +
+        `${task.doneWhen ? ", saying for each point of Done when whether it's met and how you checked" : ""}. ` +
         `If you get stuck, update_task("${task.id}", "blocked", <why>).`,
       { protocol: true },
     );

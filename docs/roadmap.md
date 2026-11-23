@@ -16,7 +16,7 @@ carries over between sessions and runtimes.
    `team.ts` split along the parts that change ([#44](https://github.com/linkzy/symbio/issues/44)), steadier and
    faster end-to-end tests ([#45](https://github.com/linkzy/symbio/issues/45)), and what in the agents' briefs
    contradicts the plan ([#46](https://github.com/linkzy/symbio/issues/46)).
-1. **Foundation.** A project glossary core keeps ([#47](https://github.com/linkzy/symbio/issues/47)); the rules
+1. ✅ **Foundation** (done in 0.27.0). A project glossary core keeps ([#47](https://github.com/linkzy/symbio/issues/47)); the rules
    register on by default ([#48](https://github.com/linkzy/symbio/issues/48)); a fresh session with the agent's own
    handoff, and its conversation size shown ([#49](https://github.com/linkzy/symbio/issues/49)); a fresh session
    after each task by default ([#50](https://github.com/linkzy/symbio/issues/50)); *Done when* on every task
@@ -164,6 +164,7 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.27.0** — Core as lead, step 0 and phase 1: a glossary in every project, *Done when* on every task, fresh sessions from the agent's own handoff with the conversation's size shown, rules register and fresh session after each task on for new projects; end-to-end tests about 4× faster.
 - **0.26.0** — Copy buttons in the chat, by @Veeramanikandanr48 (#42).
 - **0.25.0** — The machine view says which project and agent started each program; system programs no longer listed as agents' (Windows pid reuse).
 - **0.24.0** — Connection requests: Approve all, allow an agent for a while, always allow plain server commands; agents group commands into one request.

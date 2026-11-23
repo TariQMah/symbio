@@ -5,6 +5,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.27.0]
+
+First steps of *Core as lead* (core is the strategic layer; helpers are tactical):
+
+- **A glossary in every project** (#47). core keeps `docs/glossary.md` (or `glossary.md` in private docs): the project's
+  terms, what each means and the words not to use. Symbio gives it to every agent with their instructions and sends it
+  again when it changes; when two words are used for one thing, core asks you which to keep. It's listed right after
+  `AGENTS.md` in the Docs tab.
+- **Done when on every task** (#51). core writes each task's acceptance criteria when it plans; the helper gets them with
+  the task and reports against each; you see and edit them in the task's details on the board (cards with one show a
+  checklist icon), and the helper working on it is told when they change.
+- **A fresh session can start from the agent's own handoff** (#49). *Fresh session* in a chat asks whether the agent
+  should write its handoff first (one more turn: what it's in the middle of, decisions, what isn't written anywhere), on
+  by default. Each chat now shows how big the conversation is (the share of its model's limit; the tokens too when you
+  show token counts), amber past 60% and red past 85%.
+- **New projects:** the rules register is on (#48), and helpers get a fresh session after each finished task (#50), so
+  each task starts from a clean conversation and the project's documents. Existing projects keep their settings.
 - `team.ts` split: fresh sessions and handoffs, the task flow, reasoning effort and the load guard now live in their own
   modules under `src/server/team/` (no change in behavior) (#44).
 - **A glossary for Symbio itself** ([docs/glossary.md](docs/glossary.md)): one word per thing across the interface, docs and

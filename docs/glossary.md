@@ -26,6 +26,7 @@ and align the rest.
 | **model** | The AI model an agent runs on (`provider/model`) | modelo | |
 | **reasoning effort** | How much a model thinks before answering (low, medium, high…) | esforço de raciocínio | `effort`, `modelEfforts` |
 | **session** | One conversation of an agent with its runtime. Earlier ones stay readable | sessão | `sessionId`, `previousSessions` |
+| **conversation size** | How much the model reads on an agent's next step, and the share of its model's limit; shown in its chat | tamanho da conversa (contexto) | `Agent.context`, `session.context.updated` |
 | **fresh session** | Continuing an agent in a new session, from a handoff note. Not "renew", "refresh" or "new session" in anything a person reads | sessão nova | `renewSession`, `renewSessions` (`"manual"` / `"after-task"`) |
 | **handoff note** | What a fresh session starts from: the agent's own note (when it wrote one) plus the facts Symbio has (plan, assets, recent messages) | nota de handoff | `handoffNote`, `lastWords` |
 | **brief** | The instructions Symbio gives an agent: its role, the project's rules, its tools | instruções | `prompts.ts` |
@@ -48,6 +49,8 @@ and align the rest.
 | **shared asset** | Anything more than one agent could change (files, data, a spreadsheet, a database). One holder at a time; core decides | recurso compartilhado | asset register, `asset-protocol.ts` |
 | **rules register** | The project's rules (requirements, decisions, constraints), each with its source and whether the work meets it | registro de regras | `rules*` |
 | **project documentation** | What agents (and people) need to work on the project: `AGENTS.md` and `docs/`, or private docs | documentação do projeto | `docs.ts` |
+| **glossary** | A project's terms, what each means and the words not to use; core keeps it, every agent gets it (`docs/glossary.md`) | glossário | `glossaryPath`, `symbio-glossary` |
+| **Done when** | A task's acceptance criteria: what the helper reports against and the review checks | Pronto quando | `doneWhen`, `done_when` |
 | **shared file** | A file an agent showed the human (in the chat and the Files tab) | arquivo compartilhado | `share_file` |
 | **program** | Something an agent started that keeps running (a server, a tunnel, a build) | programa | `AgentProcess`, `list_programs` |
 
@@ -68,8 +71,6 @@ Names fixed now, before the features ([roadmap](roadmap.md)):
 
 | Term | Means | pt-BR |
 |---|---|---|
-| **glossary** | A project's terms, kept by core and followed by every agent (this file, for a project) | glossário |
-| **Done when** | A task's acceptance criteria: what the helper reports against and the reviewer checks | Pronto quando |
 | **skill** | A packaged method (`SKILL.md`) an agent can use, from Symbio's library | skill |
 | **check** | A command Symbio runs itself on a helper's work (build, tests, spellcheck…) | verificação |
 | **reviewer** | A one-off helper that checks a task's work against *Done when*, the rules and the glossary | revisor |

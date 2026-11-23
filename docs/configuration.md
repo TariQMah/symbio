@@ -41,7 +41,7 @@ All optional, set as environment variables:
 | `~/.symbio/logs/symbio.log` | Symbio's log when started in the background (`sym logs`); `update.log` next to it for updates |
 | `~/.symbio/updates.json` | Your update setting (automatic, tell me, off) |
 | `<project>/.symbio/` | Project state: agents, plan, message log, shared assets, and the files attached in chats (`attachments/`) — git-ignored automatically |
-| `<project>/AGENTS.md`, `<project>/docs/` | Project documentation for agents (unless you chose *private*), and `docs/rules.json` if the rules register is on |
+| `<project>/AGENTS.md`, `<project>/docs/` | Project documentation for agents (unless you chose *private*), `docs/glossary.md` (the project's glossary), and `docs/rules.json` if the rules register is on |
 | The runtime's own storage | The conversations themselves: each agent is a session of its runtime. OpenCode keeps them in its database (open one with `opencode -s <session-id>`); GitHub Copilot CLI in `~/.symbio/copilot/`. |
 
 Symbio never deletes your project files. Removing a project from Symbio only forgets it, and can

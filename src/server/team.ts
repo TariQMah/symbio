@@ -9,7 +9,7 @@ import path from "node:path";
 import { AssetRegister } from "./assets.js";
 import { AGENT_PERMISSIONS, PLAN_MODE_PERMISSIONS } from "./guard.js";
 import { bus } from "./bus.js";
-import { privateDocsInstruction } from "./docs.js";
+import { glossaryInstruction, privateDocsInstruction } from "./docs.js";
 import type { McpResolver } from "./mcp.js";
 import { runtimeOf, type AgentRuntime, type RuntimeEvent, type RuntimeKind } from "./runtime/types.js";
 import { PlanStore, type TaskInput, type TaskStatus } from "./plan.js";
@@ -77,6 +77,8 @@ const QUESTION_TOOLS = new Set(["question"]);
 export class Team implements TeamCore {
   /** Last private-docs text sent to each agent, to avoid re-sending unchanged docs. */
   private docsSynced = new Map<string, string>();
+  /** Last glossary text sent to each session. */
+  private glossarySynced = new Map<string, string>();
   private registers = new Map<string, Promise<AssetRegister>>();
   private plans = new Map<string, Promise<PlanStore>>();
   /** MCP URL token → which project/folder it serves. Valid for this run only. */
@@ -650,7 +652,7 @@ export class Team implements TeamCore {
   }
 
   /** Gives an agent a fresh session (team/sessions.ts); the old one stays readable. */
-  renewSession(project: Project, agent: Agent, reason: string, opts: { moved?: boolean } = {}): Promise<void> {
+  renewSession(project: Project, agent: Agent, reason: string, opts: { moved?: boolean; ownHandoff?: boolean } = {}): Promise<void> {
     return this.sessions.renew(project, agent, reason, opts);
   }
 
@@ -902,6 +904,7 @@ export class Team implements TeamCore {
     agent.modelWait = null;
     agent.usage = emptyUsage();
     agent.usageSeen = emptyUsage();
+    agent.context = null;
     this.docsSynced.delete(agent.id);
     await this.store.update(project);
     return handoff;
@@ -1219,7 +1222,9 @@ export class Team implements TeamCore {
     // Also covers sessions created before the guard existed.
     await runtime.setPermissions(agent.sessionId, this.permissionsFor(project, agent));
     this.docsSynced.delete(agent.id);
+    this.glossarySynced.delete(agent.sessionId);
     await this.syncPrivateDocs(project, agent);
+    await this.syncGlossary(project, agent);
   }
 
   // ---------------------------------------------------------------- internals
@@ -1292,6 +1297,7 @@ export class Team implements TeamCore {
     await this.reattach(project, agent);
     await this.ensureTools(project, agent);
     await this.syncPrivateDocs(project, agent);
+    await this.syncGlossary(project, agent);
   }
 
   /** A helper whose folder disappeared gets it back from its branch (see reattachWorkspace). */
@@ -1352,6 +1358,18 @@ export class Team implements TeamCore {
     }
   }
 
+  /** The glossary goes to every agent with its instructions, sent again when it changes (per session). */
+  private async syncGlossary(project: Project, agent: Agent) {
+    const text = (await glossaryInstruction(project).catch(() => null)) ?? "";
+    if (this.glossarySynced.get(agent.sessionId) === text) return;
+    await this.rt(agent)
+      .setInstruction(agent.sessionId, "symbio-glossary", text || null)
+      .catch((err) => {
+        if (text) throw err;
+      });
+    this.glossarySynced.set(agent.sessionId, text);
+  }
+
   /** Private docs aren't visible to OpenCode on its own; inject them, but only when they changed. */
   private async syncPrivateDocs(project: Project, agent: Agent) {
     const text = await privateDocsInstruction(project);
@@ -1373,6 +1391,7 @@ export class Team implements TeamCore {
 
     agent.lastActivity = Date.now();
     if (e.type === "session.usage.updated") this.usage.schedule(project, agent);
+    if (e.type === "session.context.updated" && Number(e.data?.tokens) > 0) void this.contextChanged(project, agent, Number(e.data.tokens), e.data.limit ?? null);
     if (e.type === "permission.asked") {
       void this.permissions.asked(project, agent, e.data).catch((err) => console.error("[permission]", err.message));
     } else if (e.type === "permission.replied") {
@@ -1429,6 +1448,14 @@ export class Team implements TeamCore {
   forgetSession(agent: Agent) {
     this.inbox.delete(agent.id);
     this.pendingQuestion.delete(agent.id);
+  }
+
+  /** How big an agent's conversation is now (kept on the agent, saved with its next change). */
+  private async contextChanged(project: Project, agent: Agent, tokens: number, limit: number | null) {
+    const runtime = this.runtimes.get(runtimeOf(agent));
+    const known = limit ?? (runtime ? await this.efforts.limitOf(runtime, agent.model).catch(() => null) : null);
+    agent.context = { tokens, limit: known, at: Date.now() };
+    bus.publish({ type: "agent.context", projectId: project.id, agentId: agent.id, context: agent.context });
   }
 
   setStatus(project: Project, agent: Agent, status: Agent["status"]) {

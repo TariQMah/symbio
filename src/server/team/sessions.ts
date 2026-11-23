@@ -30,15 +30,41 @@ export interface SessionsHost extends TeamCore {
 export interface HandoffOptions {
   /** It moved from its own copy into the project folder. */
   moved?: boolean;
+  /** The human gave it the fresh session; `own` is the agent's own handoff, when it wrote one. */
+  byHuman?: { own: string | null };
   /** The project moved to another runtime; `own` is the agent's own handoff, when it wrote one. */
   switched?: { from: string; to: string; own: string | null };
 }
 
+/** What the agent is asked for in a last turn, before a fresh session the human gave it. */
+export const RENEW_HANDOFF_REQUEST =
+  "Symbio: the human is giving you a fresh session. This is your last turn in this one: you'll continue as yourself in a new " +
+  "session that starts only from a handoff note. Write your part of that note now, as your answer (no tools, and don't start new " +
+  "work): what you're in the middle of and the exact next step, decisions made and why, what you learned that isn't in the plan, " +
+  "tasks or the project's documents (gotchas, commands, where things are), and anything you're waiting for. Be specific; skip " +
+  "what the plan, your tasks and the documents already say. If something belongs in the documents or the glossary, say so.";
+
 export class Sessions {
+  /** Agents getting a fresh session right now (one at a time each). */
+  private readonly renewing = new Set<string>();
+
   constructor(private readonly team: SessionsHost) {}
 
-  /** Gives an agent a fresh session; the old one stays readable. */
-  async renew(project: Project, agent: Agent, reason: string, opts: { moved?: boolean } = {}): Promise<void> {
+  /**
+   * Gives an agent a fresh session; the old one stays readable. With `ownHandoff`, the agent first
+   * writes its own handoff in a last turn (the human's choice), which goes into the note.
+   */
+  async renew(project: Project, agent: Agent, reason: string, opts: { moved?: boolean; ownHandoff?: boolean } = {}): Promise<void> {
+    if (this.renewing.has(agent.id)) throw new Error(`${agent.name} is already moving to a fresh session.`);
+    this.renewing.add(agent.id);
+    try {
+      await this.renewNow(project, agent, reason, opts);
+    } finally {
+      this.renewing.delete(agent.id);
+    }
+  }
+
+  private async renewNow(project: Project, agent: Agent, reason: string, opts: { moved?: boolean; ownHandoff?: boolean }): Promise<void> {
     const team = this.team;
     if (agent.status === "busy" || agent.status === "waiting" || agent.status === "stuck") {
       throw new Error(`${agent.name} is working; give it a fresh session when it's idle.`);
@@ -47,9 +73,13 @@ export class Sessions {
     const runtime = team.rt(agent);
     const oldSession = agent.sessionId;
 
+    const own = opts.ownHandoff ? await this.lastWords(project, agent, RENEW_HANDOFF_REQUEST).catch(() => "") : null;
     // Count everything the old session used before leaving it.
     await team.refreshUsage(project, agent).catch(() => {});
-    const handoff = await this.handoffNote(project, agent, oldSession, { moved: opts.moved });
+    const handoff = await this.handoffNote(project, agent, oldSession, {
+      moved: opts.moved,
+      ...(opts.ownHandoff ? { byHuman: { own: own || null } } : {}),
+    });
 
     const sessionId = await runtime.createSession({
       title: `${project.name} · ${agent.name}`,
@@ -64,6 +94,7 @@ export class Sessions {
     accountUsage(agent, agent.usage ?? emptyUsage());
     agent.usage = emptyUsage();
     agent.usageSeen = emptyUsage();
+    agent.context = null;
     agent.status = "idle";
     agent.lastActivity = Date.now();
     team.forgetSession(agent);
@@ -123,7 +154,7 @@ export class Sessions {
   /** What an agent needs to carry on in a fresh session, from Symbio's own records. */
   async handoffNote(project: Project, agent: Agent, oldSession: string, opts: HandoffOptions = {}): Promise<string> {
     const team = this.team;
-    const { moved, switched } = opts;
+    const { moved, switched, byHuman } = opts;
     const plan = (await team.plan(project)).plan;
     const reg = await team.assets(project);
     const mine = plan.tasks.filter((t) => t.assignee === agent.id);
@@ -152,7 +183,9 @@ export class Sessions {
         : moved
           ? `You now work in the project folder itself instead of your own copy, so Symbio started a new session there. ` +
             `Nothing else about your role changed. `
-          : `Your previous session had grown long, so Symbio started a new one. Nothing about your role changed. `) +
+          : byHuman
+            ? `The human gave you a fresh session. Nothing about your role changed. `
+            : `Your previous session had grown long, so Symbio started a new one. Nothing about your role changed. `) +
         `This note is what carries over; the project's docs (AGENTS.md, docs/) hold the durable knowledge, ` +
         `and your work is in your folder.`,
       agent.purpose ? `**Your purpose:** ${agent.purpose}` : "",
@@ -164,12 +197,14 @@ export class Sessions {
         : agent.branch
           ? `**Your folder:** ${agent.directory} (branch ${agent.branch}).`
           : `**Your folder:** ${agent.directory} (the project folder, shared with the team).`,
-      open.length ? `**Your open tasks:**\n${open.map((t) => `- ${t.id} [${t.status}] ${t.title}\n  ${cut(t.description, 600)}`).join("\n")}` : "**Open tasks:** none right now; wait for the next one.",
+      open.length
+        ? `**Your open tasks:**\n${open.map((t) => `- ${t.id} [${t.status}] ${t.title}\n  ${cut(t.description, 600)}${t.doneWhen ? `\n  Done when: ${cut(t.doneWhen.replace(/\s*\n\s*/g, "; "), 600)}` : ""}`).join("\n")}`
+        : "**Open tasks:** none right now; wait for the next one.",
       done.length ? `**Recently finished:**\n${done.map((t) => `- ${t.id} ${t.title}${lastNote(t) ? ` — ${cut(lastNote(t)!, 300)}` : ""}`).join("\n")}` : "",
       held.length ? `**Shared assets you hold:** ${held.join(", ")} (release them when done).` : "",
       log.length ? `**Latest messages:**\n${log.map((m) => `- ${nameOf(m.from)} → ${nameOf(m.to)} (${m.kind}): ${cut(m.text.replace(/\s+/g, " "), 400)}`).join("\n")}` : "",
-      switched?.own
-        ? `**Your own handoff, written at the end of your previous session:**\n${cut(switched.own, 6000)}`
+      switched?.own || byHuman?.own
+        ? `**Your own handoff, written at the end of your previous session:**\n${cut((switched?.own || byHuman?.own)!, 6000)}`
         : lastText
           ? `**Your last answer in the previous session:**\n${cut(lastText, 2500)}`
           : "",

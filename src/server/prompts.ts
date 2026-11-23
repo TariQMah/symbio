@@ -4,7 +4,7 @@
 import { machineNote } from "./machine.js";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { docsPaths } from "./docs.js";
+import { docsPaths, glossaryPath } from "./docs.js";
 import { PROCESS_RULES } from "./guard.js";
 import { listRepositories, projectRepositoriesSync } from "./repos.js";
 import { runtimeOf, type RuntimeKind } from "./runtime/types.js";
@@ -69,7 +69,10 @@ ${onboarding(project)}
 2. **Agree on scope.** Summarize the scope back in a short list and get the
    human's explicit OK before planning.
 3. **Plan.** Break the scope into tasks with dependencies and clear deliverables,
-   and propose it with \`submit_plan\`. The human reviews it in Symbio's Plan
+   each with a **Done when** (\`done_when\`): the checks that tell its work is
+   finished, specific enough that someone who didn't do it can verify them (what
+   must exist, what it must do or say, what must not break). Helpers report
+   against it. Propose the plan with \`submit_plan\`. The human reviews it in Symbio's Plan
    tab (a kanban); wait for their approval before assigning work. Keep the plan
    current: follow-up requests become tasks (\`add_task\`); bigger changes of
    direction are a revised plan (\`submit_plan\` again, reusing task ids).
@@ -87,8 +90,8 @@ ${onboarding(project)}
    that can proceed in parallel, and justify each one.
 6. **Reuse helpers.** Prefer giving a new task to an existing helper who already
    knows that part of the project (\`send_message\`) over spawning a new one. Don't
-   stop helpers right after merging their work — an idle helper costs nothing and
-   keeps its context. Stop them when their area is finished for good.
+   stop helpers right after merging their work — an idle helper costs nothing.
+   ${afterTaskNote(project)} Stop them when their area is finished for good.
 7. **Protect shared assets.** A shared asset is anything more than one agent
    could change: files or folders, documents, data, configuration, or external
    things like a database, a spreadsheet or a design file. Each shared asset has
@@ -103,6 +106,8 @@ ${onboarding(project)}
    No note means Auto: work as described above.
 ${humanReviewPoint(project)}${QUESTIONS_POINTS}
 ${docsSection(project)}
+
+${glossarySection(project, "coordinator")}
 
 ${rulesSection(project, "coordinator")}
 
@@ -334,6 +339,45 @@ The folder already has content. Before planning anything:
 Respect what is there: follow existing conventions and guidance files.`;
 }
 
+/** What carries over from one task to the next for a helper (Project.renewSessions). */
+function afterTaskNote(project: Project): string {
+  return project.renewSessions === "after-task"
+    ? `After each finished task a helper continues in a fresh session: it keeps its
+   name, area and folder, and what carries over is the project's documents, the
+   glossary, the rules and a handoff note, so make sure what the next task needs
+   is written there, and describe each task fully.`
+    : "It keeps its conversation, and with it what it learned.";
+}
+
+/** The project's glossary: core keeps it, every agent gets it with its instructions (team.ts). */
+function glossarySection(project: Project, role: "coordinator" | "worker"): string {
+  const file = glossaryPath(project);
+  if (role === "worker") {
+    return `## The project's glossary
+
+The project's terms are in ${file} (Symbio puts it in your instructions). Use them
+in your work and in your reports, one word per thing, and not the words it says
+not to use. When you meet a term that's missing, or one used in two ways, tell the
+coordinator; don't edit the glossary yourself.`;
+  }
+  return `## The project's glossary
+
+The project keeps a glossary at ${file}: the words the human and the team use for
+the things in this project, each with what it means and the words not to use for
+it. Symbio gives it to every agent with their instructions, so the whole team,
+and what you all write for the human, use one word per thing.
+
+- **Start it early** (from what the human tells you and what's in the folder) and
+  keep it current: add a term when the human uses or agrees on a word for
+  something, when a document defines one, or when a helper reports one.
+- **One word per thing.** When two words are used for the same thing, or one word
+  for two things, ask the human which to keep (\`ask_human\`), then record it with
+  the words not to use.
+- **Format:** a Markdown table \`| Term | Means | Not |\` (group it under headings as
+  it grows). Short, factual entries in the project's language.
+- You keep it; helpers tell you about terms instead of editing it.`;
+}
+
 /** The rules register, when the project keeps one. */
 function rulesSection(project: Project, role: "coordinator" | "worker"): string {
   if (!project.rulesRegister) return "";
@@ -444,6 +488,8 @@ assets. ${agent.startedBy === "human" ? STARTED_BY_HUMAN : "Your tasks come from
   for plan tasks (see below), otherwise with \`send_message\` to the coordinator
   (what you did, where, anything they should know). Then end your turn; new
   instructions arrive as messages and wake you up.
+- When your task has a **Done when**, check each point before you report, and in
+  your report say for each whether it's met and how you checked.
 - When you report a task for review, include a guide (\`guide\`): where to look
   (URLs, files or folders), the steps to check it and what should be seen, and
   whether you ran those steps yourself.${(project.reviewBy ?? "core") === "core" ? "" : " The human reviews your work with it, so it's required."}
@@ -461,6 +507,8 @@ documents, data, configuration, external systems). Before changing one:
 4. When done, call \`release_asset\` with a short summary of what you changed.
 
 If you are unsure whether something is shared, ask the coordinator.
+
+${glossarySection(project, "worker")}
 
 ${rulesSection(project, "worker")}
 

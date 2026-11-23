@@ -287,6 +287,18 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "The human sees the same in the machine view: when you leave a server or a tunnel running on purpose, say so in your report, " +
       "and stop what you no longer need.",
   },
+  {
+    id: "2026-11-23-glossary-done-when",
+    text:
+      "Three changes in how you lead. (1) Every project keeps a glossary (docs/glossary.md, or glossary.md in private docs): " +
+      "the project's terms, what each means and the words not to use. You keep it (start it now if this project has none, from " +
+      "what you know so far); Symbio gives it to every agent with their instructions. When two words are used for one thing, ask " +
+      "the human which to keep. (2) Tasks have a Done when (done_when in submit_plan, add_task, and update_task to change it): " +
+      "the checks that tell the work is finished, specific enough for someone who didn't do it. Write one for every new task; " +
+      "helpers report against it, and the human sees and can edit it on the board. (3) When the human gives an agent a fresh " +
+      "session, they can ask it to write its own handoff first: if you're asked, answer with what you're in the middle of, " +
+      "decisions and what isn't written anywhere yet.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

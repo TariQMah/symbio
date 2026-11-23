@@ -198,6 +198,9 @@ async function runStep(session, step, ctl) {
       spawn(step.rest, { cwd: session.directory, shell: true, stdio: "ignore", windowsHide: true });
       return sayStep(session, "started");
     // "@core coauthor": whether the agent was told to leave AI co-author lines out of commits.
+    // "@core knows <text>": whether its instructions (brief, glossary, handoff…) contain the text.
+    case "knows":
+      return sayStep(session, `knows: ${Object.values(session.instructions).some((v) => String(v).includes(step.rest)) ? "yes" : "no"}`);
     case "coauthor":
       return sayStep(session, `coauthor: ${Object.values(session.instructions).some((v) => String(v).includes("Co-authored-by")) ? "off" : "on"}`);
     case "say":

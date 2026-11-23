@@ -13,7 +13,7 @@ export const levelError = (model: string, level: string, levels: string[]) =>
     : `${model} has no reasoning effort levels to choose.`;
 
 export class Efforts {
-  private readonly levelCache = new Map<RuntimeKind, { at: number; levels: Map<string, string[]> }>();
+  private readonly levelCache = new Map<RuntimeKind, { at: number; levels: Map<string, string[]>; limits: Map<string, number> }>();
 
   constructor(private readonly team: TeamCore) {}
 
@@ -23,11 +23,22 @@ export class Efforts {
     if (!cache || Date.now() - cache.at > 5 * 60_000 || !cache.levels.has(model)) {
       const models = await runtime.listModels().catch(() => null);
       if (models) {
-        cache = { at: Date.now(), levels: new Map(models.map((m) => [`${m.providerID}/${m.id}`, m.efforts ?? []])) };
+        cache = {
+          at: Date.now(),
+          levels: new Map(models.map((m) => [`${m.providerID}/${m.id}`, m.efforts ?? []])),
+          // OpenCode's catalog gives each model's context window as limit.context.
+          limits: new Map(models.flatMap((m) => (Number(m.raw?.limit?.context) > 0 ? [[`${m.providerID}/${m.id}`, Number(m.raw.limit.context)] as const] : []))),
+        };
         this.levelCache.set(runtime.kind, cache);
       }
     }
     return cache?.levels.get(model) ?? [];
+  }
+
+  /** A model's context window in tokens, when the runtime's catalog says (null otherwise). */
+  async limitOf(runtime: AgentRuntime, model: string): Promise<number | null> {
+    await this.levelsOf(runtime, model);
+    return this.levelCache.get(runtime.kind)?.limits.get(model) ?? null;
   }
 
   /**

@@ -338,7 +338,16 @@ export class OpencodeRuntime extends EventEmitter<RuntimeEvents> implements Agen
     const loop = async () => {
       while (!controller.signal.aborted && this.client === client) {
         try {
-          await client.subscribe((e) => this.emit("event", e), controller.signal);
+          await client.subscribe((e) => {
+      this.emit("event", e);
+      // Each step's tokens (verified 2.1.4: session.step.ended carries {input, output, reasoning, cache: {read, write}}):
+      // what it read plus what it wrote is what the next step reads.
+      const t = e.type === "session.step.ended" ? e.data?.tokens : null;
+      if (t && e.data?.sessionID) {
+        const tokens = (t.input ?? 0) + (t.cache?.read ?? 0) + (t.cache?.write ?? 0) + (t.output ?? 0);
+        if (tokens > 0) this.emit("event", { id: `${e.id}-context`, type: "session.context.updated", data: { sessionID: e.data.sessionID, tokens, limit: null } });
+      }
+    }, controller.signal);
         } catch (err) {
           if (controller.signal.aborted) return;
           console.error("[runtime] event stream error:", (err as Error).message);

@@ -523,7 +523,8 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       allowedModels: allowed,
       coordinatorModel: body.coordinatorModel,
       docsLocation: body.docsLocation === "private" ? "private" : "project",
-      rulesRegister: body.rulesRegister === true,
+      // On unless turned off (the New project dialog has it checked).
+      rulesRegister: body.rulesRegister !== false,
       origin: inspection.empty ? "new" : "existing",
       inspectionSummary: describeInspection(inspection),
       connections: cleanLinks(body.connections),
@@ -851,6 +852,19 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     return c.json((await team.plan(project)).plan);
   });
 
+  // A task's Done when (its acceptance criteria), changed by the human on the board.
+  api.post("/projects/:id/plan/tasks/:taskId/done-when", async (c) => {
+    const project = withProject(c.req.param("id"));
+    const { doneWhen } = await c.req.json<{ doneWhen?: string }>();
+    if (typeof doneWhen !== "string") return c.json({ error: "doneWhen (text) is required" }, 400);
+    try {
+      await team.tasks.setDoneWhen(project, c.req.param("taskId"), doneWhen, "the human");
+    } catch (err) {
+      throw new HttpError(404, (err as Error).message);
+    }
+    return c.json((await team.plan(project)).plan);
+  });
+
   // The human's review of a finished task (team/review.ts): approve it, or send it back with a note.
   api.post("/projects/:id/plan/tasks/:taskId/review", async (c) => {
     const project = withProject(c.req.param("id"));
@@ -1053,11 +1067,21 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   });
 
   // A fresh session for a long-running agent (keeps its identity; the old session stays readable).
+  // With ownHandoff the agent first writes its handoff (a last turn, up to a few minutes): that runs on
+  // after the answer, and the browser follows the agent's status.
   api.post("/projects/:id/agents/:agentId/renew", async (c) => {
     const project = withProject(c.req.param("id"));
     const agent = withAgent(project, c.req.param("agentId"));
+    const body = await c.req.json<{ ownHandoff?: boolean }>().catch(() => ({}) as { ownHandoff?: boolean });
     try {
-      await team.renewSession(project, agent, "renewed by the human");
+      if (body.ownHandoff) {
+        if (agent.status !== "idle") throw new Error(`${agent.name} is ${agent.status}; give it a fresh session when it's idle.`);
+        void team.renewSession(project, agent, "given by the human, with its own handoff", { ownHandoff: true }).catch((err) =>
+          team.log(project, { from: "symbio", to: "human", kind: "system", text: `${agent.name}'s fresh session failed: ${(err as Error).message}` }),
+        );
+        return c.json(project, 202);
+      }
+      await team.renewSession(project, agent, "given by the human");
       return c.json(project);
     } catch (err) {
       return c.json({ error: (err as Error).message }, 400);

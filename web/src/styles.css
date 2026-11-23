@@ -380,6 +380,15 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .msg-user { position: relative; align-self: flex-end; max-width: 82%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px 12px 4px 12px; padding: 9px 13px; white-space: pre-wrap; line-height: 1.55; font-size: 14px; }
 .msg-assistant { position: relative; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.65; }
 .msg-blocks { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.context-size.mid { color: var(--amber); }
+.context-size.high { color: var(--red); }
+.fresh-own-handoff { margin-top: 12px; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--text); }
+.fresh-own-handoff input { margin-top: 3px; }
+.fresh-own-handoff .hint { display: block; margin-top: 3px; font-size: 12px; color: var(--text-3); }
+.done-when { margin-top: 14px; }
+.done-when-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.done-when-head h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
+.done-when textarea { width: 100%; }
 .msg-copy { position: absolute; top: -2px; right: -2px; opacity: 0; z-index: 2; }
 .msg-user > .msg-copy { top: 4px; right: 4px; }
 .msg-user:hover > .msg-copy, .msg-user:focus-within > .msg-copy,

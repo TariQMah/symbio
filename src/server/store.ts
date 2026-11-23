@@ -57,6 +57,8 @@ export interface Agent {
   usageByModel?: Record<string, NonNullable<Agent["usage"]>>;
   /** The current session's totals already counted in usageByModel. */
   usageSeen?: NonNullable<Agent["usage"]>;
+  /** How big its current conversation is (tokens the model reads on its next step), and the model's limit when known. */
+  context?: { tokens: number; limit: number | null; at: number } | null;
   /** Usage of earlier sessions, for agents that predate usageByModel. */
   pastUsage?: NonNullable<Agent["usage"]>;
   /**
@@ -324,6 +326,8 @@ export class Store {
           kickedOff: false,
           connections: input.connections ?? [],
           allowedPatterns: [],
+          // Helpers start each task from a clean conversation; what carries over is in documents.
+          renewSessions: "after-task",
           agents: [],
           createdAt: Date.now(),
         };

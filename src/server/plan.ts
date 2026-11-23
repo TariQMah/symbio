@@ -25,6 +25,8 @@ export interface Task {
   id: string; // T1, T2…
   title: string;
   description: string;
+  /** Done when: how the work will be judged finished (acceptance criteria), checkable by someone who didn't do it. */
+  doneWhen?: string;
   assignee: string | null; // agent id
   status: TaskStatus;
   dependsOn: string[];
@@ -58,11 +60,15 @@ export interface TaskInput {
   key?: string;
   title: string;
   description?: string;
+  done_when?: string;
   depends_on?: string[];
   assets?: string[];
   /** The human reviews it before it's done (Project.reviewBy "marked"). */
   review?: boolean;
 }
+
+const MAX_DONE_WHEN = 4000;
+const doneWhen = (text: string | undefined) => (text?.trim() ? { doneWhen: text.trim().slice(0, MAX_DONE_WHEN) } : {});
 
 const emptyPlan = (): Plan => ({ goal: "", status: "none", revision: 0, feedback: null, tasks: [], updatedAt: Date.now() });
 
@@ -118,6 +124,7 @@ export class PlanStore {
         id,
         title: input.title.trim(),
         description: (input.description ?? "").trim(),
+        ...doneWhen(input.done_when ?? old?.doneWhen),
         assignee: old?.assignee ?? null,
         status: old?.status ?? "todo",
         dependsOn,
@@ -161,6 +168,7 @@ export class PlanStore {
       id: `T${next}`,
       title: input.title.trim(),
       description: (input.description ?? "").trim(),
+      ...doneWhen(input.done_when),
       assignee: null,
       status: "todo",
       dependsOn: (input.depends_on ?? []).map((d) => this.task(d).id),
@@ -187,6 +195,8 @@ export class PlanStore {
       humanReview?: HumanReview | null;
       review?: boolean;
       work?: Task["work"];
+      /** New acceptance criteria; empty removes them. */
+      doneWhen?: string;
     },
   ) {
     const task = this.task(id);
@@ -197,6 +207,10 @@ export class PlanStore {
     if (change.assignee !== undefined) task.assignee = change.assignee;
     if (change.guide?.trim()) task.guide = change.guide.trim();
     if (change.review !== undefined) task.review = change.review;
+    if (change.doneWhen !== undefined) {
+      if (change.doneWhen.trim()) task.doneWhen = change.doneWhen.trim().slice(0, MAX_DONE_WHEN);
+      else delete task.doneWhen;
+    }
     if (change.work) task.work = change.work;
     if (change.humanReview === null) delete task.humanReview;
     else if (change.humanReview) task.humanReview = change.humanReview;

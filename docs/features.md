@@ -30,16 +30,20 @@
   other AI chats. Agents get them as files they can open (images as scaled-down copies, PDF, Word,
   Excel and PowerPoint as text), and each project's **Files** tab keeps everything sent, to open,
   resend or delete.
+- **One word per thing.** Every project has a glossary core keeps: the project's terms, what each
+  means and the words not to use. Every agent gets it, so the work, the reports and what you read
+  use the same words; when two words are used for one thing, core asks you which to keep.
 - **Documentation you can find your way in.** core keeps the project's docs up to date, and the
   Docs tab shows them as a folder tree with search across every doc, links between docs that open
   in place, an outline of long docs, and plain-text sources (e-mails, transcripts) with line
   numbers.
-- **A rules register (optional).** Agents record the project's rules (requirements, decisions,
+- **A rules register** (on for new projects; you can turn it off). Agents record the project's rules (requirements, decisions,
   constraints) with where each came from, a literal excerpt, who imposes it, how confirmed it is
   and whether it's met. The Docs tab shows them as an index you can filter and search, with each
   citation opening its source at the cited line.
 - **A live plan.** The Plan tab is an animated kanban that moves by itself as helpers pick up
-  tasks, ask for review and get merged.
+  tasks, ask for review and get merged. Each task says what *done* means (*Done when*): core writes
+  it, the helper reports against it, and you can change it on the board.
 - **You stay in control.** Questions, plan approvals, permission requests (like installing
   software) and deploy approvals collect in a **Needs you** inbox. Pause one team or everything at
   once.
@@ -52,9 +56,10 @@
   when a model fails (quota, outage) the agent switches to the next allowed model and carries on. Want
   an agent to stay on its model (say, to see how that model does)? Pin it in its chat: it then waits and
   retries that model instead.
-- **Long-running teams stay healthy.** Agents can continue in a fresh session with a handoff note
-  (when you ask, after each finished task, or automatically when a conversation grows too large to
-  send). A daily check backs up Symbio's state and tells you and core about work that exists only
+- **Long-running teams stay healthy.** Agents continue in a fresh session with a handoff note
+  (helpers after each finished task, by default for new projects; any agent when you ask, or
+  automatically when a conversation grows too large to send). When you ask, the agent can write its
+  own handoff first. Each chat shows how big the conversation is, so you can tell when it's time. A daily check backs up Symbio's state and tells you and core about work that exists only
   on this machine and build outputs filling the disk.
 - **Explorer.** The project's folders and files in a tab, read-only, to look at what the team wrote
   without leaving the browser (secrets stay hidden).

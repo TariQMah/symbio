@@ -5,7 +5,8 @@ import { ArrowUp, Brain, Check, CircleAlert, CircleStop, Folder, FolderInput, Gi
 import { api, subscribe, type Agent, type Project, type CoreMode } from "./api";
 import { PendingForms } from "./FormCard";
 import { AttachButton, DropOverlay, MessageAttachments, PendingFiles, splitAttachmentNote, usePendingFiles } from "./Attachments";
-import { Avatar, RetryIn, statusText, waitsForPinnedModel } from "./ui";
+import { Avatar, Dialog, RetryIn, statusText, waitsForPinnedModel } from "./ui";
+import { useCostsShown } from "./privacy";
 import { callsFromCode, stepLabels, summarize, type StepLabel, type ToolCall } from "./steps";
 import { FileCard, Md } from "./files";
 import { modelsForRole } from "./ModelPicker";
@@ -188,6 +189,7 @@ export function Chat({ project, agent }: { project: Project; agent: Agent }) {
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [renewing, setRenewing] = useState(false);
+  const [askRenew, setAskRenew] = useState(false);
   const pending = usePendingFiles(project.id, `symbio:draft-files:${project.id}:${agent.id}`);
   const [dragging, setDragging] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -380,6 +382,7 @@ export function Chat({ project, agent }: { project: Project; agent: Agent }) {
                 </span>
               )
             )}
+            {agent.status !== "stopped" && <ContextSize agent={agent} />}
             {(agent.previousSessions?.length ?? 0) > 0 && (
               <>
                 {" · "}
@@ -405,20 +408,29 @@ export function Chat({ project, agent }: { project: Project; agent: Agent }) {
             className="btn ghost sm"
             disabled={renewing || busy || agent.status === "waiting"}
             title={busy ? t("chat.renew.disabled") : t("chat.renew.title")}
-            onClick={() => {
-              if (!confirm(t("chat.renew.confirm", { name: agent.name }))) return;
-              setRenewing(true);
-              setViewSession(null);
-              api
-                .renewSession(project.id, agent.id)
-                .catch((e) => alert(e.message))
-                .finally(() => setRenewing(false));
-            }}
+            onClick={() => setAskRenew(true)}
           >
             <RefreshCw size={14} />
             <span className="btn-label">{renewing ? t("chat.renewing") : t("chat.newSession")}</span>
           </button>
         )}
+        <AnimatePresence>
+          {askRenew && (
+            <FreshSessionDialog
+              agent={agent}
+              onClose={() => setAskRenew(false)}
+              onConfirm={(ownHandoff) => {
+                setAskRenew(false);
+                setRenewing(true);
+                setViewSession(null);
+                api
+                  .renewSession(project.id, agent.id, ownHandoff)
+                  .catch((e) => alert(e.message))
+                  .finally(() => setRenewing(false));
+              }}
+            />
+          )}
+        </AnimatePresence>
         {agent.role !== "coordinator" && agent.branch && agent.status !== "stopped" && (
           <button
             className="btn ghost sm"
@@ -756,6 +768,58 @@ function partToBlock(p: any, key: string): Block {
     output: contentText(state.content) || state.error?.message || undefined,
     calls: Array.isArray(state.metadata?.toolCalls) ? state.metadata.toolCalls : undefined,
   };
+}
+
+/**
+ * How big the agent's conversation is: the share of its model's limit (and the tokens, when the human
+ * shows token counts). Every step re-reads it; a fresh session starts it light again.
+ */
+function ContextSize({ agent }: { agent: Agent }) {
+  const shown = useCostsShown();
+  const c = agent.context;
+  if (!c || !(c.tokens > 0)) return null;
+  const k = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
+  const pct = c.limit ? Math.min(100, Math.round((100 * c.tokens) / c.limit)) : null;
+  if (pct === null && !shown) return null;
+  const label = pct !== null ? t("chat.context.pct", { pct }) : t("chat.context.tokens", { tokens: k(c.tokens) });
+  const detail = shown ? ` (${k(c.tokens)}${c.limit ? ` / ${k(c.limit)}` : ""} tokens)` : "";
+  return (
+    <span className={`context-size ${pct !== null && pct >= 85 ? "high" : pct !== null && pct >= 60 ? "mid" : ""}`} title={t("chat.context.title", { name: agent.name }) + detail}>
+      {" · "}
+      {label}
+    </span>
+  );
+}
+
+/** Fresh session: the agent can write its own handoff first (one more turn), or start right away from Symbio's note. */
+function FreshSessionDialog({ agent, onClose, onConfirm }: { agent: Agent; onClose: () => void; onConfirm: (ownHandoff: boolean) => void }) {
+  const [own, setOwn] = useState(true);
+  return (
+    <Dialog
+      title={t("chat.renew.dialogTitle", { name: agent.name })}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            {t("common.cancel")}
+          </button>
+          <button className="btn primary" onClick={() => onConfirm(own)}>
+            <RefreshCw size={14} />
+            {t("chat.newSession")}
+          </button>
+        </>
+      }
+    >
+      <p>{t("chat.renew.body", { name: agent.name })}</p>
+      <label className="check fresh-own-handoff">
+        <input type="checkbox" checked={own} onChange={(e) => setOwn(e.target.checked)} />
+        <span>
+          {t("chat.renew.own", { name: agent.name })}
+          <span className="hint">{t("chat.renew.ownHint")}</span>
+        </span>
+      </label>
+    </Dialog>
+  );
 }
 
 type HistoryUnit = { kind: "assistant"; key: string; blocks: Block[] } | { kind: "other"; message: any };

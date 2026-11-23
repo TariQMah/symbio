@@ -126,6 +126,9 @@ export function ProjectView({ projectId }: { projectId: string }) {
       if (e.type === "agent.status" && e.projectId === projectId) {
         setProject((p) => p && { ...p, agents: p.agents.map((a) => (a.id === e.agentId ? { ...a, status: e.status } : a)) });
       }
+      if (e.type === "agent.context" && e.projectId === projectId) {
+        setProject((p) => p && { ...p, agents: p.agents.map((a) => (a.id === e.agentId ? { ...a, context: e.context } : a)) });
+      }
     });
   }, [projectId]);
 

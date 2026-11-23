@@ -66,3 +66,17 @@ test("decide only applies to a proposed plan", async () => {
   assert.equal(plan.status, "changes-requested");
   assert.equal(plan.feedback, "split A in two");
 });
+
+test("Done when: set when planning, kept by a revision that leaves it out, changed or cleared", async () => {
+  const store = await PlanStore.load(tmp());
+  await store.propose("Site", [{ key: "home", title: "Home page", description: "x", done_when: " Loads without errors\nShows the menu " }]);
+  assert.equal(store.task("T1").doneWhen, "Loads without errors\nShows the menu");
+  await store.propose("Site", [{ key: "T1", title: "Home page", description: "x" }]);
+  assert.equal(store.task("T1").doneWhen, "Loads without errors\nShows the menu", "kept when a revision doesn't say");
+  const added = await store.addTask({ title: "About page", done_when: "Says who we are" });
+  assert.equal(added.doneWhen, "Says who we are");
+  await store.update("T2", { doneWhen: "Says who we are and where" });
+  assert.equal(store.task("T2").doneWhen, "Says who we are and where");
+  await store.update("T2", { doneWhen: "  " });
+  assert.equal(store.task("T2").doneWhen, undefined);
+});

@@ -276,6 +276,10 @@ const taskShape = {
     key: str("Short key other tasks can reference in depends_on (e.g. 'skeleton'); reuse an existing id (T3) to keep that task"),
     title: str("Short title"),
     description: str("What to do, the deliverable, and constraints — enough for a helper to start"),
+    done_when: str(
+      "Done when: how the work will be judged finished, as checks someone who didn't do it can verify (what must exist, what it " +
+        "must do or say, what must not break), one per line. The helper reports against it and the review checks it.",
+    ),
     depends_on: { type: "array", items: { type: "string" }, description: "Keys/ids of tasks that must be done first" },
     assets: { type: "array", items: { type: "string" }, description: "Shared assets this task will change" },
     review: { type: "boolean", description: "The human reviews this task before it's done (when they review the tasks marked in the plan)" },
@@ -352,10 +356,16 @@ const updateTask: Tool = {
         "With review: how the human can check the work. Where to look (URLs, files, folders), the steps and what they should see, " +
           "and whether you already ran them. Required when the human reviews the project's work.",
       ),
+      done_when: str("Coordinator only: replace the task's Done when (its acceptance criteria)"),
     },
     ["task_id"],
   ),
-  async run({ task_id, status, note, summary, guide }, { team, project, agent }) {
+  async run({ task_id, status, note, summary, guide, done_when }, { team, project, agent }) {
+    if (done_when !== undefined) {
+      if (agent.role !== "coordinator") throw new Error("Only the coordinator changes a task's Done when; ask it if it should change.");
+      await team.tasks.setDoneWhen(project, String(task_id), String(done_when), agent.name);
+      if (status === undefined && note === undefined && summary === undefined && guide === undefined) return `${String(task_id).toUpperCase()}'s Done when is updated.`;
+    }
     // Agents often call it "summary"; dropping it silently lost their review notes.
     const text = note ?? summary;
     return team.updateTask(project, agent, String(task_id), status, text ? String(text) : undefined, guide ? String(guide) : undefined);

@@ -69,6 +69,12 @@ and idle), `session.text.*`, `session.reasoning.*`, `session.tool.*` (live outpu
 
 Verified on 2.1.4 (the free models of a fresh install; contract test):
 
+- `GET /api/model` gives each model its context window as `limit.context` (tokens; checked by the
+  contract test), which Symbio uses for the conversation's size shown in each chat.
+- **Each step's tokens** come in `session.step.ended` (`tokens: {input, output, reasoning, cache:
+  {read, write}}`, recorded from 2.1.4 in `tests/e2e/fixtures/opencode-turns.json`). input + cache
+  read + cache write + output is what the next step reads: the adapter turns it into
+  `session.context.updated` (`runtime/types.ts`).
 - `GET /api/model` gives each model `variants: [{id, settings: {reasoningEffort}}]`, e.g.
   `low` / `high` / `max`, or `none` … `max`; an empty array when there's nothing to choose. The ids are
   the levels Symbio offers (`opencode/runtime.ts` `variantsOf`).

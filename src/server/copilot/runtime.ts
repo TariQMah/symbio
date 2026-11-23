@@ -715,6 +715,12 @@ export class CopilotRuntime extends EventEmitter<RuntimeEvents> implements Agent
       case "assistant.turn_start":
         started();
         break;
+      // The context window: what the conversation holds now and the model's limit (SDK UsageInfoData).
+      case "session.usage_info":
+        if (typeof d.currentTokens === "number") {
+          this.emitEvent(sessionId, "session.context.updated", { tokens: d.currentTokens, limit: typeof d.tokenLimit === "number" ? d.tokenLimit : null });
+        }
+        break;
       case "assistant.message_start":
         this.emitEvent(sessionId, "session.text.started", { assistantMessageID: d.messageId });
         break;

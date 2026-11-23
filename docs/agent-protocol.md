@@ -79,6 +79,15 @@ being merged (unless core forces the merge).
 
 - core proposes the plan with `submit_plan`: a goal and tasks with dependencies. The human
   approves or requests changes in the Plan tab. No work is assigned before approval.
+- **Done when** (`done_when` on a task): how its work will be judged finished, as checks someone who
+  didn't do it can verify. core writes it when planning (`submit_plan`, `add_task`) and can change it
+  (`update_task` `done_when`, core only); the human sees and edits it on the board. The helper gets it
+  with the task and reports against it; when it changes, the helper (and, for the human's changes,
+  core) is told.
+- **The glossary** (`docs/glossary.md`, or `glossary.md` in private docs): the project's terms, what
+  each means and the words not to use. core keeps it; Symbio gives it to every agent with its
+  instructions (`symbio-glossary`) and sends it again when it changes. Helpers tell core about terms
+  instead of editing it.
 - `spawn_agent` with a `task_id`, or `assign_task`, gives a task to a helper and moves it to
   *in progress*. Tasks with unfinished dependencies can't be assigned.
 - **Helpers the human creates** (the **+** in the team list, `POST /projects/:id/agents`, `Agent.startedBy: "human"`):
@@ -144,7 +153,7 @@ All agents:
 | `release_asset` | Release a held asset with a summary of the changes |
 | `check_messages` | Collect messages that arrived mid-turn (any Symbio tool call also includes them) |
 | `list_tasks` | The plan: goal, approval status, tasks with status, assignee, dependencies |
-| `update_task` | Report progress on a task: in-progress, blocked, review |
+| `update_task` | Report progress on a task: in-progress, blocked, review (core can also change its `done_when`) |
 | `read_document` | The text of a document: PDF by pages, Word (.docx, .odt), Excel (every sheet as rows), PowerPoint (by slide), long text files; a part at a time. Reading PDFs with the read tool is refused |
 | `view_image` | Look at an image as a scaled-down copy (1024 px by default, at most 2048), or a crop at full resolution; reading image files directly is refused |
 | `list_rules` | The rules register (when the project keeps one): areas, sources, rules, with filters |
@@ -163,8 +172,8 @@ core only:
 
 | Tool | What it does |
 |---|---|
-| `submit_plan` | Propose (or revise) the plan for approval |
-| `add_task` | Add a task to the approved plan |
+| `submit_plan` | Propose (or revise) the plan for approval; each task with its `done_when` |
+| `add_task` | Add a task to the approved plan, with its `done_when` |
 | `assign_task` | Give a task to an existing helper |
 | `spawn_agent` | Create a helper with a name, purpose, first task, and optionally a model (and `pin_model` to keep it on that model), where it works (`workspace`: own / shared) and, in a folder of several repositories, which one (`repo`) |
 | `pin_model` | Pin a helper to its model (it waits and retries it when it fails, instead of switching) or unpin it; not a pin the human made |

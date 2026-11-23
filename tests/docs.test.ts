@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 process.env.SYMBIO_HOME = mkdtempSync(path.join(os.tmpdir(), "sym-docs-home-"));
-const { searchDocs } = await import("../src/server/docs.js");
+const { glossaryInstruction, glossaryPath, listDocs, searchDocs } = await import("../src/server/docs.js");
 
 test("docs search: every word, any case or accent, with line numbers; only docs are searched", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "sym-docs-"));
@@ -45,5 +45,24 @@ test("raw docs files: PDFs show inline, other types download, nothing outside th
   assert.equal(html.inline, false, "HTML is never shown inline (it could run scripts)");
   for (const outside of ["secret.txt", ".symbio/project.json", "docs/../secret.txt", "../outside.pdf"]) {
     await assert.rejects(rawDoc(project, outside), /Not a docs file/, outside);
+  }
+});
+
+test("the glossary: docs/glossary.md (or glossary.md in private docs), listed after AGENTS.md, given to agents when it exists", async () => {
+  for (const docsLocation of ["project", "private"] as const) {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "sym-glossary-"));
+    const project = { directory, docsLocation } as any;
+    const file = glossaryPath(project);
+    assert.equal(file, docsLocation === "project" ? path.join(directory, "docs", "glossary.md") : path.join(directory, ".symbio", "docs", "glossary.md"));
+    assert.equal(await glossaryInstruction(project), null, "nothing until it exists");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "| Term | Means | Not |\n|---|---|---|\n| shared asset | anything two agents could change | resource |\n");
+    writeFileSync(path.join(path.dirname(file), "a-guide.md"), "# Guide");
+    writeFileSync(path.join(docsLocation === "project" ? directory : path.dirname(file), "AGENTS.md"), "# Agents");
+    const order = (await listDocs(project)).map((f) => path.basename(f.path));
+    assert.deepEqual(order.slice(0, 3), ["AGENTS.md", "glossary.md", "a-guide.md"]);
+    const text = await glossaryInstruction(project);
+    assert.match(text!, /The project's glossary/);
+    assert.match(text!, /\| shared asset \| anything two agents could change \| resource \|/);
   }
 });

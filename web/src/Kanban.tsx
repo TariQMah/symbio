@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { CheckCircle2, Circle, CircleDashed, ClipboardList, Eye, Link2, Lock, MessageSquare, OctagonAlert } from "lucide-react";
+import { CheckCircle2, Circle, CircleDashed, ClipboardList, Eye, Link2, ListChecks, Lock, MessageSquare, OctagonAlert, Pencil } from "lucide-react";
 import { api, type Agent, type Plan, type Project, type Task, type TaskStatus } from "./api";
 import { Md } from "./files";
 import { Avatar, Drawer, EmptyState, clock } from "./ui";
@@ -150,6 +150,11 @@ function TaskCard({ task: t, agent, waitingOn, onOpen, reviewMarked }: { task: T
         ) : (
           <span className="subtle">Unassigned</span>
         )}
+        {t.doneWhen && (
+          <span className="subtle task-done-when" title={`Done when:\n${t.doneWhen}`}>
+            <ListChecks size={11} />
+          </span>
+        )}
         {t.notes.length > 0 && (
           <span className="subtle" title={t.notes[t.notes.length - 1].text}>
             <MessageSquare size={11} />
@@ -215,6 +220,7 @@ function TaskDetail({ project, task: t, agent, onClose }: { project: Project; ta
       <div className="md">
         <Md text={t.description || "_No description._"} projectId={projectId} agentId={t.assignee} className="" />
       </div>
+      <DoneWhen projectId={projectId} task={t} />
       {(t.status === "review" || t.status === "done" || t.guide) && <TaskChanges projectId={projectId} taskId={t.id} />}
       {!waitingForReview(t) && t.guide && (
         <>
@@ -289,6 +295,75 @@ function ApprovalBar({ project, plan }: { project: Project; plan: Plan }) {
       )}
       {error && <div className="error">{error}</div>}
     </motion.div>
+  );
+}
+
+/** Done when as written, one check per line: shown as a list unless it's already Markdown. */
+const checklist = (text: string) =>
+  /^\s*([-*+]|\d+[.)])\s/m.test(text)
+    ? text
+    : text
+        .split(/\r?\n/)
+        .filter((l) => l.trim())
+        .map((l) => `- ${l.trim()}`)
+        .join("\n");
+
+/** A task's Done when: how its work will be judged finished. The human can change it while the task isn't done. */
+function DoneWhen({ projectId, task }: { projectId: string; task: Task }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(task.doneWhen ?? "");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!editing) setText(task.doneWhen ?? "");
+  }, [task.doneWhen, editing]);
+  const editable = task.status !== "done";
+  async function save() {
+    setBusy(true);
+    try {
+      await api.setDoneWhen(projectId, task.id, text);
+      setEditing(false);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="done-when">
+      <div className="done-when-head">
+        <h3>
+          <ListChecks size={14} /> Done when
+        </h3>
+        {editable && !editing && (
+          <button className="btn ghost sm" onClick={() => setEditing(true)}>
+            <Pencil size={12} /> {task.doneWhen ? "Edit" : "Add"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <>
+          <textarea
+            autoFocus
+            rows={4}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="How you'll know it's finished, one check per line: what must exist, what it must do or say, what must not break."
+          />
+          <div className="row" style={{ justifyContent: "flex-end", gap: 6, marginTop: 6 }}>
+            <button className="btn ghost sm" onClick={() => setEditing(false)} disabled={busy}>
+              Cancel
+            </button>
+            <button className="btn primary sm" onClick={save} disabled={busy}>
+              Save
+            </button>
+          </div>
+        </>
+      ) : task.doneWhen ? (
+        <Md text={checklist(task.doneWhen)} projectId={projectId} agentId={task.assignee} />
+      ) : (
+        <p className="subtle small">Not set: core adds it when planning, or you can.</p>
+      )}
+    </div>
   );
 }
 

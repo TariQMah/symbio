@@ -18,6 +18,8 @@ export type RuntimeState = "stopped" | "starting" | "running" | "crashed";
  * - `session.text.*`, `session.reasoning.*`, `session.tool.*`, `session.step.*`: live output
  *   (forwarded to the chat as they are)
  * - `session.usage.updated`: token totals changed
+ * - `session.context.updated` (`data`: {tokens, limit}): how big the conversation is now (what the
+ *   model reads on its next step), and the model's limit when the runtime says it
  * - `permission.asked` (`data`: {id, action, resources, save}) / `permission.replied` ({requestID})
  * - `session.inbox.delivered` / `.cancelled` ({inboxID}): a queued prompt joined the conversation
  * - anything with "retr" in its type: the provider is being retried ({attempt, error})

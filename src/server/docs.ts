@@ -24,6 +24,26 @@ export function docsPaths(project: Project) {
   return { entry: path.join(root, "AGENTS.md"), folder: path.join(root, project.docsLocation === "private" ? "" : "docs") };
 }
 
+/** The project's glossary (one per project, kept by core): docs/glossary.md, or glossary.md in private docs. */
+export function glossaryPath(project: Project): string {
+  return path.join(docsPaths(project).folder, "glossary.md");
+}
+
+const MAX_GLOSSARY = 30_000;
+
+/** The glossary as an instruction every agent gets (null when the project has none yet). */
+export async function glossaryInstruction(project: Project): Promise<string | null> {
+  const text = (await fs.readFile(glossaryPath(project), "utf8").catch(() => "")).trim();
+  if (!text) return null;
+  const cut = text.length > MAX_GLOSSARY ? `${text.slice(0, MAX_GLOSSARY)}\n\n(cut here; the rest is in the file)` : text;
+  return [
+    `# The project's glossary (${glossaryPath(project)})`,
+    "The project's terms: use them, one word per thing, in your work and in what you write; not the words it says not to use.",
+    "",
+    cut,
+  ].join("\n");
+}
+
 export async function listDocs(project: Project): Promise<DocFile[]> {
   const root = docsRoot(project);
   const files: DocFile[] = [];
@@ -47,7 +67,9 @@ export async function listDocs(project: Project): Promise<DocFile[]> {
     await add(path.join(root, "AGENTS.md"));
     await walk(path.join(root, "docs"));
   }
-  return files.sort((a, b) => (a.path === "AGENTS.md" ? -1 : b.path === "AGENTS.md" ? 1 : a.path.localeCompare(b.path)));
+  // The entry point first, then the glossary.
+  const rank = (f: DocFile) => (f.path === "AGENTS.md" ? 0 : /^(docs\/)?glossary\.md$/i.test(f.path) ? 1 : 2);
+  return files.sort((a, b) => rank(a) - rank(b) || a.path.localeCompare(b.path));
 }
 
 export async function readDoc(project: Project, rel: string): Promise<string> {

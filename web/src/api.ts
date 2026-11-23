@@ -26,6 +26,8 @@ export interface Agent {
   previousSessions?: { sessionId: string; endedAt: number }[];
   aliases?: string[];
   lastActivity: number;
+  /** How big its current conversation is (tokens), and its model's limit when known. */
+  context?: { tokens: number; limit: number | null; at: number } | null;
 }
 
 /** "12.3k" style token counts. */
@@ -92,6 +94,8 @@ export interface Task {
   notes: { time: number; by: string; text: string }[];
   /** How the human checks the work, from its helper's review report. */
   guide?: string;
+  /** Done when: how the work will be judged finished. */
+  doneWhen?: string;
   review?: boolean;
   humanReview?: { state: "waiting" | "approved" | "sent-back"; at: number; note?: string };
   createdAt: number;
@@ -402,6 +406,7 @@ export type UiEvent =
   | { type: "approvals.updated"; projectId: string }
   | { type: "questions.updated"; projectId: string }
   | { type: "agent.status"; projectId: string; agentId: string; status: AgentStatus }
+  | { type: "agent.context"; projectId: string; agentId: string; context: NonNullable<Agent["context"]> }
   | { type: "agent.stream"; projectId: string; agentId: string; event: { type: string; data: any } }
   | { type: "message"; projectId: string; message: LoggedMessage }
   | { type: "machine.updated"; load: MachineLoad };
@@ -786,7 +791,8 @@ export const api = {
       "GET",
       `/projects/${projectId}/agents/${agentId}/history?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ""}${session ? `&session=${encodeURIComponent(session)}` : ""}`,
     ),
-  renewSession: (projectId: string, agentId: string) => call<Project>("POST", `/projects/${projectId}/agents/${agentId}/renew`),
+  renewSession: (projectId: string, agentId: string, ownHandoff = false) =>
+    call<Project>("POST", `/projects/${projectId}/agents/${agentId}/renew`, { ownHandoff }),
   send: (projectId: string, agentId: string, text: string, urgent = false, attachments: string[] = []) =>
     call<{ ok: true }>("POST", `/projects/${projectId}/agents/${agentId}/messages`, { text, urgent, attachments }),
   attachments: (projectId: string) => call<Attachment[]>("GET", `/projects/${projectId}/attachments`),
@@ -839,6 +845,8 @@ export const api = {
   answerQuestions: (projectId: string, answers: { id: string; answer: string; attachments?: string[] }[]) =>
     call<Question[]>("POST", `/projects/${projectId}/questions/answers`, { answers }),
   setAsideQuestion: (projectId: string, id: string, note?: string) => call<Question[]>("POST", `/projects/${projectId}/questions/${id}/set-aside`, { note }),
+  setDoneWhen: (projectId: string, taskId: string, doneWhen: string) =>
+    call<Plan>("POST", `/projects/${projectId}/plan/tasks/${taskId}/done-when`, { doneWhen }),
   markTask: (projectId: string, taskId: string, review: boolean) => call<Plan>("POST", `/projects/${projectId}/plan/tasks/${taskId}/mark`, { review }),
   reviewTask: (projectId: string, taskId: string, decision: "approve" | "send-back", note?: string, attachments?: string[]) =>
     call<Plan>("POST", `/projects/${projectId}/plan/tasks/${taskId}/review`, { decision, note, attachments }),

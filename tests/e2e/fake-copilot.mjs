@@ -232,6 +232,8 @@ function usage(state) {
   state.tokens.input += 10;
   state.tokens.output += 5;
   emit(state, "assistant.usage", { model: state.model, inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 1 }, false);
+  // Like Copilot: the context window's use after each model call (session.usage_info).
+  emit(state, "session.usage_info", { currentTokens: 1000 + state.tokens.input + state.tokens.output, tokenLimit: 128000, messagesLength: 2 }, false);
 }
 
 function say(state, text) {
@@ -291,6 +293,9 @@ async function runStep(state, step, ctl) {
         await started;
       }
       return say(state, "started");
+    // "@core knows <text>": whether its instructions (brief, glossary, handoff…) contain the text.
+    case "knows":
+      return say(state, `knows: ${String(state.config.systemMessage?.content ?? "").includes(step.rest) ? "yes" : "no"}`);
     case "coauthor":
       return say(state, `coauthor: ${state.config.coauthorEnabled === false ? "off" : "on"}`);
     case "say":

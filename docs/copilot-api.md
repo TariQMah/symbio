@@ -76,6 +76,7 @@ script, unless marked otherwise. Re-verify when either changes, and update this 
 | `permission.requested` / `permission.completed` | see below |
 | `user_input.requested` / `user_input.completed` | the agent asks the human (`ask_user`) |
 | `assistant.usage` (`model`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `cost`) | per model call |
+| `session.usage_info` (`currentTokens`, `tokenLimit`, `messagesLength`) | the context window's use; the adapter turns it into `session.context.updated` (from the SDK's types; not yet seen in a real turn: the chat shows no size until it comes) |
 | `session.idle` (`aborted?`) | the turn ended |
 | `session.error` (`errorType`, `message`, `statusCode?`) | the turn failed |
 
