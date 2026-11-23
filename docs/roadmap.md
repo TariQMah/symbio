@@ -7,13 +7,35 @@ welcome (open an issue). Each item in Next has an issue with where to start; tho
 
 ## Now
 
-Nothing in progress: the next items are open to anyone (see their issues). The likely next step
-for the maintainers is task priorities.
+**Core as lead** ([milestone](https://github.com/linkzy/symbio/milestone/5)). core is the strategic
+layer: it plans, keeps the project's language, standards and decisions straight, and gates quality.
+Helpers are tactical: one task, done well, checked. What the team knows lives in documents, so it
+carries over between sessions and runtimes.
+
+0. **Housekeeping first**, on Symbio itself: its own glossary ([#43](https://github.com/linkzy/symbio/issues/43)),
+   `team.ts` split along the parts that change ([#44](https://github.com/linkzy/symbio/issues/44)), steadier and
+   faster end-to-end tests ([#45](https://github.com/linkzy/symbio/issues/45)), and what in the agents' briefs
+   contradicts the plan ([#46](https://github.com/linkzy/symbio/issues/46)).
+1. **Foundation.** A project glossary core keeps ([#47](https://github.com/linkzy/symbio/issues/47)); the rules
+   register on by default ([#48](https://github.com/linkzy/symbio/issues/48)); Refresh session with the agent's own
+   handoff, and its conversation size shown ([#49](https://github.com/linkzy/symbio/issues/49)); a fresh session
+   after each task by default ([#50](https://github.com/linkzy/symbio/issues/50)); *Done when* on every task
+   ([#51](https://github.com/linkzy/symbio/issues/51)).
+2. **Skills.** A skill library, and skills per agent: core's chosen by the human, helpers' by core
+   ([#52](https://github.com/linkzy/symbio/issues/52)).
+3. **Quality gate.** Project checks Symbio runs itself ([#53](https://github.com/linkzy/symbio/issues/53)), then a
+   separate reviewer against *Done when*, the rules and the glossary ([#54](https://github.com/linkzy/symbio/issues/54)).
+4. **Briefings.** The questions about one feature, asked together, becoming its spec
+   ([#55](https://github.com/linkzy/symbio/issues/55)).
+5. **Evidence.** Files tagged by kind and task, easy to find ([#56](https://github.com/linkzy/symbio/issues/56)).
+
+Later: how risky a change is to merge (can it be undone, how much it affects) deciding how closely
+it's reviewed; a retro that turns review comments into rules and checks.
 
 ## Next
 
 The issues are also grouped into [milestones](https://github.com/linkzy/symbio/milestones):
-*Smarter teams*, *Never miss a thing*, *Everyday comfort* and *Show it to the world*.
+*Core as lead* (above), *Smarter teams*, *Never miss a thing*, *Everyday comfort* and *Show it to the world*.
 
 1. **Task priorities.** ([#4](https://github.com/linkzy/symbio/issues/4)) A priority on each task in the plan (e.g. urgent, high, normal, low), shown
    on the Kanban cards and used to sort columns. core sets it when it plans or adds tasks and can
