@@ -12,12 +12,12 @@ layer: it plans, keeps the project's language, standards and decisions straight,
 Helpers are tactical: one task, done well, checked. What the team knows lives in documents, so it
 carries over between sessions and runtimes.
 
-0. **Housekeeping first**, on Symbio itself: its own glossary ([#43](https://github.com/linkzy/symbio/issues/43)),
+0. ✅ **Housekeeping first** (done), on Symbio itself: its own glossary ([#43](https://github.com/linkzy/symbio/issues/43)),
    `team.ts` split along the parts that change ([#44](https://github.com/linkzy/symbio/issues/44)), steadier and
    faster end-to-end tests ([#45](https://github.com/linkzy/symbio/issues/45)), and what in the agents' briefs
    contradicts the plan ([#46](https://github.com/linkzy/symbio/issues/46)).
 1. **Foundation.** A project glossary core keeps ([#47](https://github.com/linkzy/symbio/issues/47)); the rules
-   register on by default ([#48](https://github.com/linkzy/symbio/issues/48)); Refresh session with the agent's own
+   register on by default ([#48](https://github.com/linkzy/symbio/issues/48)); a fresh session with the agent's own
    handoff, and its conversation size shown ([#49](https://github.com/linkzy/symbio/issues/49)); a fresh session
    after each task by default ([#50](https://github.com/linkzy/symbio/issues/50)); *Done when* on every task
    ([#51](https://github.com/linkzy/symbio/issues/51)).
