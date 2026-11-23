@@ -94,6 +94,12 @@ opening the right section, like the update badge opening Updates (#35). The Expl
 12. **Model fallback that fits the conversation.** ([#38](https://github.com/linkzy/symbio/issues/38)) Retry the same model on network errors
    before switching; prefer models whose context holds the conversation; when none does, ask the human
    (continue in a fresh session from a handoff note, go back to the original model, or pick another).
+13. **A clear first run.** ([#58](https://github.com/linkzy/symbio/issues/58)) With no agent runtime yet, Symbio says
+   what one is and lets the human install one for Symbio (a separate copy that doesn't touch anything already on the
+   computer) or use the one they already have.
+14. **Runtimes already on the computer, for every runtime.** ([#59](https://github.com/linkzy/symbio/issues/59)) What
+   #36 did for OpenCode (use the one on the PATH instead of Symbio's copy), for GitHub Copilot CLI and the runtimes
+   that come later.
 
 ## Ideas
 
