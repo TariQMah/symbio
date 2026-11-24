@@ -106,7 +106,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `repos.ts` | Folders of several git repositories: finding them, which one a helper or a push works in, and a repository created on top of others (which a project can switch away from: `subRepositories`) |
 | `git.ts` | Thin git wrapper |
 | `inspect.ts` | Deterministic folder inspection for onboarding (no model cost) |
-| `files.ts` | Project files for the browser: finding a path the way an agent meant it (its own copy first, then the project, then helpers' copies), serving it (with ranges), listing a folder for the Explorer tab (`listDir`), and the files agents shared (`share_file`, `.symbio/shared-files.json`) |
+| `files.ts` | Project files for the browser: finding a path the way an agent meant it (its own copy first, then the project, then helpers' copies), serving it (with ranges), listing a folder for the Explorer tab (`listDir`), and the files agents shared (`share_file`, `.symbio/shared-files.json`, with their tag and task) |
 | `attachments.ts` | Files the human attaches in the chat: stored in `.symbio/attachments` with an index (the Files tab), and the note telling the agent where they are and how to open them |
 | `documents.ts` | `read_document`: text from PDF (`unpdf`), Word, Excel, PowerPoint and OpenDocument files (unzipped with `fflate`), a part at a time |
 | `images.ts` | `view_image`: scaled-down copies of images (or full-resolution crops) for agents |

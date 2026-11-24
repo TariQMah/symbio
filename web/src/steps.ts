@@ -128,7 +128,9 @@ function toolLabel(tool: string, i: Record<string, unknown>): StepLabel {
     case "view_image":
       return { label: `Looked at ${fileName(i.path ?? i.file)}`, weight: 1 };
     case "share_file":
-      return { label: `Shared ${fileName(i.path)} with you`, detail: firstLine(i.caption), weight: 3 };
+      return { label: `Shared ${fileName(i.path)} with you${s(i.tag) === "evidence" ? " as evidence" : ""}`, detail: firstLine(i.caption), weight: 3 };
+    case "list_shared_files":
+      return { label: "Looked at the shared files", detail: [s(i.task_id).toUpperCase(), s(i.tag)].filter(Boolean).join(" · "), weight: 1 };
     case "save_rule":
     case "save_rule_area":
     case "save_rule_source":

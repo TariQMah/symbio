@@ -42,6 +42,9 @@
   you ask it to): Needs you shows them grouped under the feature, you answer them in one sitting,
   and the answers become the feature's spec, which its tasks link to and helpers and reviewers
   work from.
+- **Evidence you can find.** Files a helper shares to show its work (a screenshot, an output, a
+  test result) are tagged with their task: the task lists them, reviewers get them, and the Files
+  tab filters by kind (evidence, reports, yours) and task.
 - **Checks Symbio runs itself.** Commands you approve in the project's settings (a build, tests, a
   spellcheck, a link check…) run on a helper's work when it reports a task, and again before it's
   merged if it changed since. A failure goes back to the helper with the output, without taking

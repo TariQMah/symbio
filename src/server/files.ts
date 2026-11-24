@@ -203,7 +203,14 @@ export interface SharedFile {
   kind: FileKind;
   size: number;
   at: number;
+  /** What it is for the work: evidence that a task was done, a report, or anything else (unset: other). */
+  tag?: SharedTag;
+  /** The task it belongs to (T3). */
+  taskId?: string;
 }
+
+export const SHARED_TAGS = ["evidence", "report", "other"] as const;
+export type SharedTag = (typeof SHARED_TAGS)[number];
 
 const sharedIndex = (project: Project) => path.join(project.directory, ".symbio", "shared-files.json");
 
@@ -217,7 +224,7 @@ export async function listShared(project: Project): Promise<SharedFile[]> {
 }
 
 /** Records a file an agent shared. The file stays where it is (videos can be large); the record keeps where. */
-export async function addShared(project: Project, agent: Agent, given: string, caption?: string): Promise<SharedFile> {
+export async function addShared(project: Project, agent: Agent, given: string, caption?: string, tagged: { tag?: SharedTag; taskId?: string } = {}): Promise<SharedFile> {
   const file = await resolveFile(project, given, agent);
   if (!file) throw new Error(`Not found: ${given}. Give a path inside the project folder or your working folder.`);
   const list = await listShared(project);
@@ -231,6 +238,8 @@ export async function addShared(project: Project, agent: Agent, given: string, c
     kind: file.kind,
     size: file.size,
     at: Date.now(),
+    ...(tagged.tag && tagged.tag !== "other" ? { tag: tagged.tag } : {}),
+    ...(tagged.taskId ? { taskId: tagged.taskId } : {}),
   };
   list.push(entry);
   await writeFileAtomic(sharedIndex(project), JSON.stringify(list.slice(-1000), null, 2));

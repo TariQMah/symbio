@@ -27,7 +27,7 @@ carries over between sessions and runtimes.
    separate reviewer against *Done when*, the rules and the glossary ([#54](https://github.com/linkzy/symbio/issues/54)).
 4. ✅ **Briefings** (done in 0.30.0). The questions about one feature, asked together, becoming its spec
    ([#55](https://github.com/linkzy/symbio/issues/55)).
-5. **Evidence.** Files tagged by kind and task, easy to find ([#56](https://github.com/linkzy/symbio/issues/56)).
+5. ✅ **Evidence** (done in 0.31.0). Files tagged by kind and task, easy to find ([#56](https://github.com/linkzy/symbio/issues/56)).
 
 Later: how risky a change is to merge (can it be undone, how much it affects) deciding how closely
 it's reviewed; a retro that turns review comments into rules and checks.
@@ -164,6 +164,7 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.31.0** — Evidence: shared files tagged by kind and task, filtered in the Files tab, listed on their task and given to reviewers. *Core as lead* phases 0–5 are done.
 - **0.30.0** — Briefings: the questions about one feature asked together, grouped in Needs you, answered into the feature's spec that its tasks link to.
 - **0.29.0** — The quality gate: checks Symbio runs itself on every report and before merges (core proposes, you approve), and reviewers, one-off helpers that check a task against its *Done when* without changing it, by core's request or on every task.
 - **0.28.0** — Skills: Symbio's four for leading, your library in Settings (write one, or add a copy after reading it), core's chosen per project, helpers' given by core or by you; each agent has only its own, on both runtimes.

@@ -165,6 +165,8 @@ ${helperFolders(project)}
 - \`share_file\` — show the human a file (an image, a video, a report): it appears in the
   chat, played or displayed in place, or with a download button. Paths of project
   files you mention in replies become links to them, so write them out in full.
+- \`list_shared_files\` — the files the team shared, by task and tag: a task's
+  evidence (screenshots, outputs, results its helper tagged) is there.
 
 ${findingTools(project.runtime ?? "opencode")}${commitRule(project, "\n\n")}
 
@@ -537,7 +539,9 @@ assets. ${agent.startedBy === "human" ? STARTED_BY_HUMAN : "Your tasks come from
   it finds something, it comes back to you: fix it and report again.` : ""}
 - When you report a task for review, include a guide (\`guide\`): where to look
   (URLs, files or folders), the steps to check it and what should be seen, and
-  whether you ran those steps yourself.${(project.reviewBy ?? "core") === "core" ? "" : " The human reviews your work with it, so it's required."}
+  whether you ran those steps yourself. Share what shows the work was done (a
+  screenshot, an output, a test result) with \`share_file\`, tag \`evidence\` and the
+  task: the task links it, and the human and reviewers find it there.${(project.reviewBy ?? "core") === "core" ? "" : " The human reviews your work with it, so it's required."}
 
 ## Shared assets — always ask first
 
@@ -561,7 +565,7 @@ ${rulesSection(project, "worker")}
 
 \`send_message\`, \`ask_human\`, \`list_questions\`, \`close_question\`, \`list_team\`,
 \`list_assets\`, \`request_asset\`, \`release_asset\`, \`check_messages\`, \`list_tasks\`,
-\`update_task\`, \`share_file\`.
+\`update_task\`, \`share_file\`, \`list_shared_files\`.
 
 When you make something the human should look at (an image, a video, a report, a
 page), share it with \`share_file\`: it shows in the chat, instead of a path they
@@ -635,7 +639,7 @@ ${rulesSection(project, "worker")}
 
 ## Tools (from the "symbio" tool server)
 
-\`submit_review\`, \`send_message\`, \`list_tasks\`, \`list_team\`, \`check_messages\`.
+\`submit_review\`, \`send_message\`, \`list_tasks\`, \`list_shared_files\`, \`list_team\`, \`check_messages\`.
 
 ${findingTools(runtimeOf(agent))}
 

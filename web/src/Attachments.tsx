@@ -183,8 +183,14 @@ export function MessageAttachments({ projectId, files }: { projectId: string; fi
 
 /** Everything sent in this project's chats, to find, open, resend or delete. */
 export function FilesView({ project }: { project: Project }) {
-  const [list] = useAttachments(project.id);
-  const shared = useSharedFiles(project.id);
+  const [all] = useAttachments(project.id);
+  const sharedAll = useSharedFiles(project.id);
+  // Filters: what it is (evidence, reports, the human's own) and which task.
+  const [show, setShow] = useState<"all" | "evidence" | "report" | "mine">("all");
+  const [task, setTask] = useState("");
+  const tasks = [...new Set(sharedAll.map((s) => s.taskId).filter((t): t is string => !!t))].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  const shared = sharedAll.filter((s) => show !== "mine" && (show === "all" || s.tag === show) && (!task || s.taskId === task));
+  const list = (show === "all" && !task) || show === "mine" ? (all ?? []) : [];
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<number | null>(null);
@@ -243,6 +249,34 @@ export function FilesView({ project }: { project: Project }) {
         <AttachButtonLabeled onFiles={upload} busy={uploading !== null} progress={uploading} />
       </div>
       {error && <div className="error">{error}</div>}
+      {(sharedAll.length > 0 || (all?.length ?? 0) > 0) && (
+        <div className="files-filters row">
+          <div className="seg">
+            {(
+              [
+                ["all", "All"],
+                ["evidence", "Evidence"],
+                ["report", "Reports"],
+                ["mine", "Sent by you"],
+              ] as const
+            ).map(([id, label]) => (
+              <button key={id} className={show === id ? "on" : ""} onClick={() => setShow(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {tasks.length > 0 && show !== "mine" && (
+            <select value={task} onChange={(e) => setTask(e.target.value)} aria-label="Task">
+              <option value="">Any task</option>
+              {tasks.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
       {shared.length > 0 && (
         <>
           <h3 className="files-section">From the team</h3>
@@ -253,20 +287,22 @@ export function FilesView({ project }: { project: Project }) {
                 projectId={project.id}
                 agentId={s.agentId}
                 path={s.rel}
-                caption={[nameOf(s.agentId), timeAgo(s.at), s.caption].filter(Boolean).join(" · ")}
+                caption={[nameOf(s.agentId), timeAgo(s.at), s.tag, s.taskId, s.caption].filter(Boolean).join(" · ")}
               />
             ))}
           </div>
           {list && list.length > 0 && <h3 className="files-section">Sent by you</h3>}
         </>
       )}
-      {list && list.length === 0 && shared.length === 0 ? (
+      {all && all.length === 0 && sharedAll.length === 0 ? (
         <EmptyState icon={<Paperclip size={20} />} title="No files yet">
           Attach files in a chat (the paperclip, drag and drop, or paste a screenshot), or drop them here.
         </EmptyState>
+      ) : list.length === 0 && shared.length === 0 ? (
+        <div className="subtle small">No files match.</div>
       ) : (
         <div className="files-grid">
-          {list?.map((a) => (
+          {list.map((a) => (
             <div key={a.id} className="file-card">
               <button className="file-card-preview" onClick={() => openAttachment(project.id, a)} title={`Open ${a.name}`}>
                 <AttachmentThumb projectId={project.id} a={a} size={isImage(a.name) ? 132 : 56} />
@@ -345,7 +381,7 @@ function AttachButtonLabeled({ onFiles, busy, progress }: { onFiles: (files: Fil
 }
 
 /** Files agents shared with the human (share_file), newest first, kept current. */
-function useSharedFiles(projectId: string): SharedFile[] {
+export function useSharedFiles(projectId: string): SharedFile[] {
   const [list, setList] = useState<SharedFile[]>([]);
   useEffect(() => {
     const load = () => api.sharedFiles(projectId).then(setList).catch(() => {});

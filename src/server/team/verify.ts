@@ -5,6 +5,7 @@
 // the task once it got through. Checks run again before a merge when the work changed since.
 
 import { approvedChecks, describeFailures, passedNames, runChecks, type CheckRun } from "../checks.js";
+import { listShared } from "../files.js";
 import { git } from "../git.js";
 import type { Task } from "../plan.js";
 import type { Agent, Project } from "../store.js";
@@ -155,7 +156,8 @@ export class Verifier {
     const reviewer = await this.team.createReviewer(project, task, helper, by);
     await store.update(task.id, { reviewer: reviewer.id, note: { by: "symbio", text: `${reviewer.name} is reviewing it.` } });
     this.team.planChanged(project);
-    await this.team.system(project, reviewer, reviewAssignment(task, helper, focus));
+    const evidence = (await listShared(project)).filter((f) => f.taskId === task.id && f.tag === "evidence").map((f) => f.rel);
+    await this.team.system(project, reviewer, reviewAssignment(task, helper, focus, evidence));
     return `${reviewer.name} is reviewing ${task.id} in ${helper.name}'s folder. Its verdict comes to you as a message${by === "coordinator" ? "" : " if it passes"}.`;
   }
 
@@ -270,7 +272,7 @@ async function snapshot(directory: string): Promise<string | null> {
 }
 
 /** What a reviewer gets to start: the task, the helper's report, and what to do with its verdict. */
-function reviewAssignment(task: Task, helper: Agent, focus?: string): string {
+function reviewAssignment(task: Task, helper: Agent, focus: string | undefined, evidence: string[]): string {
   const report = [...task.notes].reverse().find((n) => n.by === helper.name)?.text;
   const earlier = (task.reviews ?? []).map((r) => `- ${r.by} (${r.verdict}): ${r.findings}`).join("\n");
   const checks =
@@ -285,6 +287,7 @@ function reviewAssignment(task: Task, helper: Agent, focus?: string): string {
     report ? `\n${helper.name}'s report:\n${report}` : "",
     task.guide ? `\nIts guide for checking it:\n${task.guide}` : "",
     checks ? `\n${checks}` : "",
+    evidence.length ? `\nIts evidence (files ${helper.name} shared): ${evidence.join(", ")}` : "",
     earlier ? `\nEarlier reviews:\n${earlier}` : "",
     focus ? `\nThe coordinator asks you to look especially at: ${focus}` : "",
     `\nLoad your review skill and follow it: check each point of Done when yourself, against the project's rules and glossary. ` +

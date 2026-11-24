@@ -558,6 +558,10 @@ export interface SharedFile {
   size: number;
   at: number;
   available: boolean;
+  /** What it is for the work (unset: other). */
+  tag?: "evidence" | "report";
+  /** The task it belongs to. */
+  taskId?: string;
 }
 
 const fileQuery = (rel: string, agentId?: string | null) => `path=${encodeURIComponent(rel)}${agentId ? `&agent=${encodeURIComponent(agentId)}` : ""}`;

@@ -56,7 +56,8 @@ and align the rest.
 | **spec** | A feature's document of what the human decided (often a briefing's result, in `docs/specs/`); its tasks link to it | especificação | `Task.spec` |
 | **check** | A command Symbio runs itself on a helper's work (build, tests, spellcheck…) when it reports a task and before a merge; the human approves each | verificação | `Project.checks`, `checks.ts`, `propose_check` |
 | **reviewer** | A one-off helper that checks a task's work against *Done when*, the rules and the glossary, and gives a verdict | revisor | `Agent.reviewer`, `team/verify.ts`, `request_review`, `submit_review` |
-| **shared file** | A file an agent showed the human (in the chat and the Files tab) | arquivo compartilhado | `share_file` |
+| **shared file** | A file an agent showed the human (in the chat and the Files tab), tagged with what it is and its task | arquivo compartilhado | `share_file` |
+| **evidence** | Shared files that show a task's work was done (screenshots, outputs, results), tied to the task | evidência | `share_file` `tag: "evidence"`, `list_shared_files` |
 | **program** | Something an agent started that keeps running (a server, a tunnel, a build) | programa | `AgentProcess`, `list_programs` |
 
 ## The human's side
@@ -69,11 +70,3 @@ and align the rest.
 | **connection** | A GitHub account, Azure DevOps organization, server or FTP account agents use through Symbio, never seeing its credentials. *Ask me* or *Allowed* | conexão | `Connections`, `policy` (`"ask"` / `"allow"`) |
 | **pause** | Stopping a team (or every team) from starting new turns until resumed | pausar | `paused` |
 | **This computer** | The machine view in the top bar: load, and the programs agents started | Este computador | `machine.ts`, `Machine.tsx` |
-
-## Coming with *Core as lead*
-
-Names fixed now, before the features ([roadmap](roadmap.md)):
-
-| Term | Means | pt-BR |
-|---|---|---|
-| **evidence** | Files that show a task's work was done (screenshots, outputs), tagged with the task | evidência |

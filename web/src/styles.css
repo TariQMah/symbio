@@ -948,6 +948,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .files-section { font-size: 13px; font-weight: 600; color: var(--text-2); margin: 18px 0 10px; }
 .shared-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .shared-files .shared-file { max-width: none; }
+.files-filters { gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
+.files-filters select { width: auto; }
+.task-evidence { margin-top: 14px; }
+.task-evidence h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
+.task-evidence .shared-files { grid-template-columns: 1fr; }
 /* Table rows don't draw outlines or backgrounds well: highlight their cells instead. */
 tr.file-view-target { outline: none; background: none; }
 tr.file-view-target > td, tr.file-view-target > th { background: var(--amber-soft); }

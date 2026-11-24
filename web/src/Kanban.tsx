@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { CheckCircle2, Circle, CircleDashed, ClipboardList, Eye, FileText, Link2, ListChecks, Lock, MessageSquare, OctagonAlert, Pencil } from "lucide-react";
+import { CheckCircle2, Circle, CircleDashed, ClipboardList, Eye, FileText, Link2, Paperclip, ListChecks, Lock, MessageSquare, OctagonAlert, Pencil } from "lucide-react";
 import { api, type Agent, type Plan, type Project, type Task, type TaskStatus } from "./api";
 import { Md } from "./files";
-import { Avatar, Drawer, EmptyState, clock } from "./ui";
+import { Avatar, Drawer, EmptyState, clock, timeAgo } from "./ui";
 import { ReviewActions, ReviewGuide, TaskChanges, waitingForReview } from "./Review";
 import { TaskChecks, TaskReviews } from "./Checks";
+import { useSharedFiles } from "./Attachments";
+import { FileCard } from "./files";
 
 const COLUMNS: { status: TaskStatus; title: string; icon: React.ReactNode }[] = [
   { status: "todo", title: "To do", icon: <Circle size={14} /> },
@@ -228,6 +230,7 @@ function TaskDetail({ project, task: t, agent, onClose }: { project: Project; ta
         </div>
       )}
       <DoneWhen projectId={projectId} task={t} />
+      <TaskEvidence project={project} taskId={t.id} />
       {t.checks && <TaskChecks run={t.checks} />}
       <TaskReviews task={t} reviewerName={t.reviewer ? project.agents.find((a) => a.id === t.reviewer)?.name : undefined} />
       {(t.status === "review" || t.status === "done" || t.guide) && <TaskChanges projectId={projectId} taskId={t.id} />}
@@ -253,6 +256,24 @@ function TaskDetail({ project, task: t, agent, onClose }: { project: Project; ta
         </>
       )}
     </Drawer>
+  );
+}
+
+/** A task's evidence: the files its helper shared as showing the work was done. */
+function TaskEvidence({ project, taskId }: { project: Project; taskId: string }) {
+  const files = useSharedFiles(project.id).filter((f) => f.taskId === taskId && f.tag === "evidence");
+  if (!files.length) return null;
+  return (
+    <div className="task-evidence">
+      <h3>
+        <Paperclip size={14} /> Evidence
+      </h3>
+      <div className="shared-files">
+        {files.map((f) => (
+          <FileCard key={f.id} projectId={project.id} agentId={f.agentId} path={f.rel} caption={[timeAgo(f.at), f.caption].filter(Boolean).join(" · ")} />
+        ))}
+      </div>
+    </div>
   );
 }
 

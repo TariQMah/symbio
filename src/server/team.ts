@@ -23,7 +23,7 @@ import { coordinatorTools, workerTools, type ToolContext } from "./tools.js";
 import { SharedAssets } from "./team/asset-protocol.js";
 import { Reviews } from "./team/review.js";
 import { Questions } from "./team/questions.js";
-import { addShared } from "./files.js";
+import { addShared, SHARED_TAGS, type SharedTag } from "./files.js";
 import type { QuestionInput } from "./questions.js";
 import { active, type TeamCore } from "./team/core.js";
 import { ModelFallback } from "./team/fallback.js";
@@ -1077,13 +1077,22 @@ export class Team implements TeamCore {
   }
 
   /** A file an agent wants the human to see: shown in its chat and in the Files tab (files.ts). */
-  async shareFile(project: Project, from: Agent, given: string, caption?: string): Promise<string> {
-    const shared = await addShared(project, from, given, caption);
+  async shareFile(project: Project, from: Agent, given: string, caption?: string, opts: { tag?: SharedTag; taskId?: string } = {}): Promise<string> {
+    if (opts.tag && !SHARED_TAGS.includes(opts.tag)) throw new Error(`tag is one of: ${SHARED_TAGS.join(", ")}.`);
+    const plan = await this.plan(project);
+    let taskId = opts.taskId?.trim() ? plan.task(opts.taskId).id : undefined;
+    // Evidence without a task: the one the agent is working on, when there's just one.
+    if (!taskId && opts.tag === "evidence") {
+      const mine = plan.plan.tasks.filter((t) => t.assignee === from.id && (t.status === "in-progress" || t.status === "review"));
+      if (mine.length === 1) taskId = mine[0].id;
+    }
+    const shared = await addShared(project, from, given, caption, { tag: opts.tag, taskId });
     await this.log(project, { from: from.id, to: "human", kind: "file", text: `${shared.rel}${shared.caption ? `: ${shared.caption}` : ""}` });
     bus.publish({ type: "attachments.updated", projectId: project.id });
+    if (taskId) this.planChanged(project);
     return (
       `Shared ${shared.rel} with the human: it shows in your chat (${shared.kind === "other" ? "with a download button" : "displayed in place"}) ` +
-      "and in the project's Files tab. No need to repeat its path in your reply."
+      `and in the project's Files tab${shared.tag ? ` as ${shared.tag}` : ""}${taskId ? `, linked from ${taskId}` : ""}. No need to repeat its path in your reply.`
     );
   }
 

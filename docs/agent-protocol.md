@@ -113,6 +113,10 @@ being merged (unless core forces the merge).
   link the feature's tasks to it. A task's `spec` (`submit_plan`, `add_task`, `update_task`, core
   only) is a doc path relative to the project folder: its helper gets it with the task ("read it
   first"), a reviewer with its review, and the Plan tab links it.
+- **Evidence** (`share_file` `tag: "evidence"`, `.symbio/shared-files.json`): files that show a task's
+  work was done (a screenshot, an output, a test result), tied to the task. The task's details list
+  them, a reviewer gets them with its review, the Files tab filters by tag (evidence, reports, the
+  human's own files) and task, and agents find them with `list_shared_files`.
 - **Open questions** (`team/questions.ts`, `.symbio/questions.json`). Questions for the human go to
   their list instead of the chat: `ask_human` adds one, numbered Q1, Q2… Asking what's already open
   (near-identical wording, any case or accents) is refused with the open one's number. The human
@@ -176,7 +180,8 @@ All agents:
 | `ask_human` | Add a question to the human's open questions (Needs you): one per call, with context, options, the task and whether work is blocked; the answer arrives later as a message |
 | `list_questions` | The open questions, and the ones closed recently with their answers |
 | `close_question` | Close an open question: with the answer the human gave in the chat, or without one when it's no longer needed |
-| `share_file` | Show the human a file (image, video, report…): a card in the chat, shown in place or with a download button, and in the Files tab |
+| `share_file` | Show the human a file (image, video, report…): a card in the chat, shown in place or with a download button, and in the Files tab. `tag` (evidence, report, other) and `task_id`: evidence without a task goes to the agent's one task in progress or review |
+| `list_shared_files` | The files the team shared, newest first, by task and tag (a task's evidence) |
 | `list_team` | Agents on the project: name, role, purpose, status, model |
 | `list_assets` | Declared shared assets, holders and queues |
 | `request_asset` | Ask core for a shared asset; don't touch it until granted |

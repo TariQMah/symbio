@@ -327,6 +327,13 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "Complete the spec, summarize it to the human, and link the feature's tasks to it with spec (submit_plan, add_task, " +
       "update_task): helpers get it with the task, and reviewers check against it.",
   },
+  {
+    id: "2026-11-24-evidence",
+    text:
+      "Evidence: share_file takes a tag (evidence, report, other) and a task_id. Helpers share what shows a task's work was done " +
+      "as evidence; the task lists it, reviewers get it, and the human filters the Files tab by it. list_shared_files finds the " +
+      "team's shared files by task and tag.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

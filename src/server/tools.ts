@@ -11,6 +11,7 @@ import { readDocument } from "./documents.js";
 import { describeOuterRepository, gitRepoFor } from "./repos.js";
 import { startedBy } from "./machine.js";
 import { listSkills } from "./skills.js";
+import { listShared, type SharedTag } from "./files.js";
 import type { Team } from "./team.js";
 
 export interface ToolContext {
@@ -143,9 +144,40 @@ const shareFile: Tool = {
   description:
     "Show the human a file you produced or found (an image, a video, a report, a spreadsheet, a page): it appears in the chat " +
     "(images, video, audio and PDFs in place, other files with a download button) and in the project's Files tab. " +
-    "Use it instead of only giving a path when they should look at the file. Files in the project folder or your working folder.",
-  inputSchema: obj({ path: str("The file, relative to your working folder or absolute"), caption: str("A line saying what it is") }, ["path"]),
-  run: ({ path, caption }, { team, project, agent }) => team.shareFile(project, agent, String(path), caption ? String(caption) : undefined),
+    "Use it instead of only giving a path when they should look at the file. Files in the project folder or your working folder. " +
+    "Tag what shows a task's work was done (a screenshot, an output, a test result) as evidence, with its task: the task links it, " +
+    "and the human and reviewers find it there.",
+  inputSchema: obj(
+    {
+      path: str("The file, relative to your working folder or absolute"),
+      caption: str("A line saying what it is"),
+      tag: { type: "string", enum: ["evidence", "report", "other"], description: "evidence (shows a task's work was done), report, or other (default)" },
+      task_id: str("The task it belongs to (e.g. T3); evidence without one goes to the task you're working on"),
+    },
+    ["path"],
+  ),
+  run: ({ path, caption, tag, task_id }, { team, project, agent }) =>
+    team.shareFile(project, agent, String(path), caption ? String(caption) : undefined, {
+      tag: tag ? (String(tag) as SharedTag) : undefined,
+      taskId: task_id ? String(task_id) : undefined,
+    }),
+};
+
+const listSharedFiles: Tool = {
+  name: "list_shared_files",
+  description: "The files the team shared with the human (share_file), newest first: by task (e.g. a task's evidence) and tag.",
+  inputSchema: obj({ task_id: str("Only this task's files"), tag: { type: "string", enum: ["evidence", "report", "other"] } }),
+  async run({ task_id, tag }, { team, project }) {
+    const task = task_id ? String(task_id).trim().toUpperCase() : undefined;
+    const list = (await listShared(project))
+      .filter((f) => (!task || f.taskId === task) && (!tag || (f.tag ?? "other") === tag))
+      .reverse()
+      .slice(0, 50);
+    if (!list.length) return "No shared files match.";
+    return list
+      .map((f) => `- ${f.rel} · ${f.tag ?? "other"}${f.taskId ? ` · ${f.taskId}` : ""} · by ${team.agentName(project, f.agentId) ?? "?"}${f.caption ? ` — ${f.caption}` : ""}`)
+      .join("\n");
+  },
 };
 
 const listTeam: Tool = {
@@ -938,6 +970,7 @@ const COMMON = [
   listQuestions,
   closeQuestion,
   shareFile,
+  listSharedFiles,
   listTeam,
   listAssets,
   requestAsset,

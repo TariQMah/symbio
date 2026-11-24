@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.31.0]
+
+- **Evidence** (#56). Files agents share (`share_file`) carry a tag (evidence, report) and the task they belong to; evidence
+  without a task goes to the one its helper is working on. The Files tab filters by kind (evidence, reports, the files you
+  sent) and task, a task's details list its evidence, reviewers get it with their review, and agents find it with
+  `list_shared_files`. This completes *Core as lead*'s planned phases.
+
 ## [0.30.0]
 
 - **Briefings** (#55). For a new, big or vague request, core asks the questions about it together (`start_briefing`), or you
