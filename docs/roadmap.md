@@ -103,6 +103,8 @@ opening the right section, like the update badge opening Updates (#35). The Expl
 14. **Runtimes already on the computer, for every runtime.** ([#59](https://github.com/linkzy/symbio/issues/59)) What
    #36 did for OpenCode (use the one on the PATH instead of Symbio's copy), for GitHub Copilot CLI and the runtimes
    that come later.
+15. **Filters for a project's skills.** ([#60](https://github.com/linkzy/symbio/issues/60)) Project settings → Skills
+   gets the library's search and categories, and Select all / Clear for the skills shown.
 
 ## Ideas
 
