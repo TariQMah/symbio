@@ -1,0 +1,2 @@
+# Shell scripts run on Linux and macOS too: keep them LF even when checked out on Windows (the release is built there).
+*.sh text eol=lf
