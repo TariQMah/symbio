@@ -114,8 +114,9 @@ const SECRET_SHELL = [
 // them. Otherwise an agent could, for example, turn on "OpenCode from the PATH" and put its own
 // opencode.cmd there, and Symbio would run it as the runtime, outside these rules. The OpenCode
 // executables are covered by name too, so none can be planted on the PATH. Shell commands are
-// matched on their text, so like the secrets above this is best effort for shell writes.
-const SYMBIO_FILES = ["runtime-settings.json", "config.json", "connections.json", "machine.json", "updates.json", "opencode.pid"];
+// matched on their text, so like the secrets above this is best effort for shell writes. A project's
+// own settings (.symbio/project.json in its folder) are covered too: they hold the checks Symbio runs.
+const SYMBIO_FILES = ["runtime-settings.json", "config.json", "connections.json", "machine.json", "updates.json", "opencode.pid", "project.json"];
 const SYMBIO_FOLDERS = ["runtimes", "bin", "copilot", "skills"];
 const RUNTIME_EXECUTABLES = ["opencode.cmd", "opencode.exe", "opencode.ps1", "opencode.bat"];
 const SYMBIO_CONTROL_PATHS = [
@@ -220,6 +221,10 @@ const PLAN_MODE_SHELL = [
   "Clear-Content*",
 ];
 export const PLAN_MODE_PERMISSIONS: PermissionRule[] = [...rules("edit", "deny", ["*"]), ...rules("shell", "deny", PLAN_MODE_SHELL)];
+
+// A reviewer checks another helper's work in that helper's folder: it reads and runs things, but
+// doesn't change the work it judges (team/verify.ts).
+export const REVIEWER_PERMISSIONS: PermissionRule[] = rules("edit", "deny", ["*"]);
 
 // Any matching deny blocks a call; otherwise any ask prompts. Deny rules come last
 // so they also win under "last match wins".

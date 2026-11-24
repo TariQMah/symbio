@@ -1,6 +1,7 @@
 // Background processes (the runtime's background shells) agents start: listed and stopped per agent, and all of an
 // agent's stopped when the agent is.
 
+import path from "node:path";
 import type { Agent, Project } from "../store.js";
 import { inProjectFolder } from "../workspaces.js";
 import type { BackgroundShell } from "../runtime/types.js";
@@ -11,12 +12,14 @@ export class Processes {
 
   /**
    * The agent's running background shells. An agent alone in its folder owns everything there;
-   * in the project folder (shared by the coordinator and shared helpers) a shell belongs to the
-   * session that started it, which OpenCode records in its metadata.
+   * in a folder it shares (the project folder, or a helper's own copy while a reviewer works in it)
+   * a shell belongs to the session that started it, which the runtime records.
    */
   private async own(project: Project, agent: Agent): Promise<BackgroundShell[]> {
     const running = (await this.team.rt(agent).shells(agent.directory)).filter((s) => s.running);
-    if (!inProjectFolder(project, agent)) return running;
+    const here = path.resolve(agent.directory);
+    const shared = inProjectFolder(project, agent) || project.agents.some((a) => a.id !== agent.id && a.status !== "stopped" && path.resolve(a.directory) === here);
+    if (!shared) return running;
     const sessionsOf = (a: Agent) => [a.sessionId, ...(a.previousSessions ?? []).map((p) => p.sessionId), ...Object.keys(a.childSessions ?? {})];
     const mine = new Set(sessionsOf(agent));
     const others = new Set(project.agents.filter((a) => a.id !== agent.id).flatMap(sessionsOf));

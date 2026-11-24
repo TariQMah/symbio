@@ -142,7 +142,13 @@ ${helperFolders(project)}
 - \`list_team\` — who exists, what they do, whether they are working.
 - \`merge_work\` — bring a helper's committed work into the project (helpers with
   their own copy). Merges are checked against shared-asset grants; ungranted
-  changes are reported to you.
+  changes are reported to you. ${checksNote(project)}
+- \`request_review\` — have a reviewer (a fresh, one-off helper with the review
+  skill) check a task in review against its Done when, the rules and the glossary
+  before you merge it: you didn't do the work, but you planned it, so a separate
+  reviewer judges it better. Worth it for big or risky tasks; small ones you can
+  check yourself. ${project.requireReviewer ? "The human requires one for every task, so Symbio starts it on its own and a task's report reaches you once it passed." : "Its verdict comes to you; findings go straight back to the helper."}
+- \`propose_check\` — propose a check for the human to approve (above).
 - \`move_to_project_folder\` — move an idle helper from its own copy into the
   project folder (after its work is merged); it continues in a fresh session.
 - \`stop_agent\` — stop a helper when its area of the project is finished for good.
@@ -343,6 +349,17 @@ The folder already has content. Before planning anything:
 Respect what is there: follow existing conventions and guidance files.`;
 }
 
+/** Core's brief: the project's checks, which Symbio runs on reports and before merges (checks.ts). */
+function checksNote(project: Project): string {
+  const approved = (project.checks ?? []).filter((c) => c.approved);
+  return approved.length
+    ? `Symbio runs the project's checks (${approved.map((c) => c.name).join(", ")}) itself when a helper reports a task (failures
+  go back to the helper; you only hear of tasks that passed) and again before a merge when the work changed since.`
+    : `The project has no checks yet: commands Symbio runs itself on every report and
+  before merges (a build, tests, a spellcheck, a link check…). When the project has
+  something that can be checked by a command, propose one with \`propose_check\`.`;
+}
+
 /** An agent's skills, for its brief: loaded with the runtime's skill tool when a task matches one. */
 function skillsLine(skills: string[] | undefined, label: string): string {
   return skills?.length
@@ -501,7 +518,12 @@ assets. ${agent.startedBy === "human" ? STARTED_BY_HUMAN : "Your tasks come from
   instructions arrive as messages and wake you up.
 - ${skillsLine(agent.skills, "Your skills")}
 - When your task has a **Done when**, check each point before you report, and in
-  your report say for each whether it's met and how you checked.
+  your report say for each whether it's met and how you checked.${(project.checks ?? []).some((c) => c.approved) ? `
+- When you report a task, Symbio runs the project's checks (${(project.checks ?? []).filter((c) => c.approved).map((c) => c.name).join(", ")})
+  on your work${project.requireReviewer ? ", then a reviewer checks it" : ""}. If something fails, it comes back to you with
+  what was found: fix it and report again.` : project.requireReviewer ? `
+- When you report a task, a reviewer checks it before the coordinator sees it. If
+  it finds something, it comes back to you: fix it and report again.` : ""}
 - When you report a task for review, include a guide (\`guide\`): where to look
   (URLs, files or folders), the steps to check it and what should be seen, and
   whether you ran those steps yourself.${(project.reviewBy ?? "core") === "core" ? "" : " The human reviews your work with it, so it's required."}
@@ -554,6 +576,57 @@ message. Don't ask it again meanwhile. When you finish a task, report once — t
 asset doesn't need to be repeated in your report.
 
 ${connectionsSection(connections)}
+
+## Rules for commands
+
+- Never run commands that wait for keyboard input. Use non-interactive flags
+  (--yes, -y, --no-input, CI=1).
+- Never start long-running processes (servers, watchers, anything that doesn't
+  exit on its own) in the foreground.
+${PROCESS_RULES}
+${KEEP_CONVERSATION_SMALL}
+`;
+}
+
+/**
+ * A reviewer's brief (team/verify.ts): a one-off helper that checks one task's work, in the folder
+ * of the helper who did it, without changing anything, and gives a verdict.
+ */
+export function reviewerBrief(project: Project, agent: Agent, coordinatorName: string): string {
+  const task = agent.reviewer?.taskId ?? "its task";
+  return `# You are "${agent.name}", a reviewer in a Symbio team
+
+Project: "${project.name}"
+The folder you review in: ${agent.directory}
+
+Symbio runs a team of AI agents; "${coordinatorName}" coordinates them. A helper finished
+${task}, and you check its work with fresh eyes before it goes on: you didn't plan it
+and you didn't do it, so judge what is there, not what was meant.
+
+## How you work
+
+- Your task arrives from Symbio with the task, its **Done when**, the helper's report
+  and its guide. Check each point of Done when yourself: open, read, run, compare.
+  Don't take the report's word for it.
+- Check it against the project's rules and glossary too (below).
+- **Don't change anything.** You can't edit files, and don't change things by other
+  means (commands that write, move or delete). If something needs fixing, that's
+  your finding.
+- ${skillsLine(agent.skills, "Your skills")}
+- Give your verdict once, with \`submit_review\`: "pass" when every point is met, or
+  "changes" with findings concrete enough to fix without asking you (what, where,
+  what you expected). Then end your turn: Symbio stops you, your work is done.
+- Ask ${coordinatorName} (\`send_message\`) only when you can't judge without an answer.
+
+${glossarySection(project, "worker")}
+
+${rulesSection(project, "worker")}
+
+## Tools (from the "symbio" tool server)
+
+\`submit_review\`, \`send_message\`, \`list_tasks\`, \`list_team\`, \`check_messages\`.
+
+${findingTools(runtimeOf(agent))}
 
 ## Rules for commands
 

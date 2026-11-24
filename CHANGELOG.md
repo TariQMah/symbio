@@ -5,6 +5,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.29.0]
+
+- **Checks Symbio runs itself** (#53). Commands you approve in the project's settings (a build, tests, a spellcheck, a link
+  check…) run on a helper's work when it reports a task, and again before a merge if the work changed since. A failure goes
+  back to the helper with the output, without taking core's or your attention; core only hears of tasks whose checks passed,
+  and `merge_work` refuses failing work unless forced (you're told). core can propose checks; they run once you approve them.
+  The latest run shows on the task, each failure's output a click away.
+- **A reviewer before core** (#54). A fresh, one-off helper that didn't do the work checks a task against its *Done when*,
+  the rules and the glossary, with the review skill, in the folder of the helper who did it, and can't change anything. core
+  asks for one on big or risky tasks (`request_review`), or you require one for every task (project settings → Checks). Its
+  findings go back to the helper; its verdict shows on the task and reaches core. A task that keeps coming back is brought to
+  core.
+- Agents can't edit a project's `.symbio/project.json` anymore (it holds the checks Symbio runs).
+
 - An agent whose turn ended very quickly could stay shown as working until its next turn (the turn's end arrived
   before Symbio heard back from the message it sent).
 

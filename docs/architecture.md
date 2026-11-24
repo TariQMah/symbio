@@ -85,6 +85,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `team/switch.ts` | Moving a project to another runtime: progress (the `runtime.switch` event), the handoff request |
 | `team/fallback.ts` | Failing providers: switch to the next allowed model (or, for a pinned agent, wait and retry its own), a fresh session when the conversation is too large, resuming stuck agents |
 | `team/review.ts` | The human's review of finished tasks (`reviewBy`): the gate on done, approve, send back |
+| `team/verify.ts` | Between a helper's report and core: the project's checks (on reports and before merges) and reviewers (one-off helpers, by core's request or on every task); what fails goes back to the helper |
 | `team/questions.ts` | The team's open questions for the human: asking (repeats refused), answering several at once, setting aside |
 | `team/quiet-helpers.ts` | Helpers that end their turn without reporting: reminded once, then core is told |
 | `team/permissions.ts` | OpenCode permission requests: answered from known rules, or held for the human |
@@ -97,6 +98,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `machine.ts` | This computer: agents' work at below-normal priority (the runtime's process, inherited by what it starts), the programs agents started (under a runtime's shells, tracked after their parent exits, with who started each) to list and stop by pid, and the load guard (CPU and free memory sampled every 15 s; overloaded → the human and core are told, and messages between agents wait if the human chose so). Settings in `machine.json` |
 | `housekeeping.ts` | Daily: backups of Symbio's state (`~/.symbio/backups`), commits no remote has, build outputs piling up in helpers' folders |
 | `plan.ts` | The plan and its tasks (`plan.json`) |
+| `checks.ts` | Project checks: validating the human's, running them in a folder (shell, low priority, time limit, process tree stopped past it), what a helper is told when they fail |
 | `questions.ts` | The team's questions for the human and their answers (`questions.json`) |
 | `costs.ts` | Token usage per agent and model, model prices (`~/.symbio/prices.json`) and estimated cost |
 | `assets.ts` | Shared-asset register: holders, queues, history, merge-time checks (`assets.json`) |

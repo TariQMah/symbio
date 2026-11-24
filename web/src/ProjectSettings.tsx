@@ -1,4 +1,5 @@
 import { ProjectSkillsSection } from "./Skills";
+import { ChecksSection } from "./Checks";
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { Trash2, X } from "lucide-react";
@@ -25,6 +26,7 @@ export function ProjectSettings({ project, onChanged }: { project: Project; onCh
         <Models project={project} onChanged={onChanged} />
       <EffortSection project={project} onChanged={onChanged} />
         <Team project={project} onChanged={onChanged} />
+        <ChecksSection project={project} onChanged={onChanged} />
         <ProjectSkillsSection project={project} onChanged={onChanged} />
         <UsageSection project={project} />
         <HousekeepingSection project={project} />

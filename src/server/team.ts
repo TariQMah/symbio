@@ -7,14 +7,14 @@ import { randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { AssetRegister } from "./assets.js";
-import { AGENT_PERMISSIONS, PLAN_MODE_PERMISSIONS } from "./guard.js";
+import { AGENT_PERMISSIONS, PLAN_MODE_PERMISSIONS, REVIEWER_PERMISSIONS } from "./guard.js";
 import { bus } from "./bus.js";
 import { glossaryInstruction, privateDocsInstruction } from "./docs.js";
 import type { McpResolver } from "./mcp.js";
 import { runtimeOf, type AgentRuntime, type RuntimeEvent, type RuntimeKind } from "./runtime/types.js";
-import { PlanStore, type TaskInput, type TaskStatus } from "./plan.js";
+import { PlanStore, type Task, type TaskInput, type TaskStatus } from "./plan.js";
 import type { RemoteOps } from "./remote.js";
-import { coordinatorBrief, kickoffMessage, modeNote, workerBrief } from "./prompts.js";
+import { coordinatorBrief, kickoffMessage, modeNote, reviewerBrief, workerBrief } from "./prompts.js";
 import { git } from "./git.js";
 import { defaultModel, globalDir, modelsFor, newId, type Agent, type CoreMode, type HelperWorkspace, type ReviewBy, type LoggedMessage, type MessageKind, type Project, type Store } from "./store.js";
 import { accountUsage, emptyUsage } from "./costs.js";
@@ -38,6 +38,8 @@ import { handoffRequest, Switches, type SwitchOptions } from "./team/switch.js";
 import { Sessions } from "./team/sessions.js";
 import { DEFAULT_CORE_SKILLS, listSkills } from "./skills.js";
 import { TaskFlow } from "./team/tasks.js";
+import { Verifier } from "./team/verify.js";
+import { normalizeChecks, type Check } from "./checks.js";
 import { Efforts, levelError } from "./team/effort.js";
 import { MachineWatch } from "./team/machine-watch.js";
 import { NotInstalledError } from "./runtime/install.js";
@@ -106,6 +108,7 @@ export class Team implements TeamCore {
   readonly reviews = new Reviews(this);
   readonly sessions = new Sessions(this);
   readonly tasks = new TaskFlow(this);
+  readonly verifier = new Verifier(this);
   readonly efforts = new Efforts(this);
   readonly machineWatch = new MachineWatch(this);
   readonly questions = new Questions(this);
@@ -280,8 +283,9 @@ export class Team implements TeamCore {
     bus.publish({ type: "project.updated", projectId: project.id });
   }
 
-  /** An agent's session rules: the guard for everyone, plus Plan mode's for core. */
-  permissionsFor(project: Project, agent: Pick<Agent, "role">) {
+  /** An agent's session rules: the guard for everyone, plus Plan mode's for core, and no edits for reviewers. */
+  permissionsFor(project: Project, agent: Pick<Agent, "role"> & Partial<Pick<Agent, "reviewer">>) {
+    if (agent.reviewer) return [...AGENT_PERMISSIONS, ...REVIEWER_PERMISSIONS];
     return agent.role === "coordinator" && project.coreMode === "plan" ? [...AGENT_PERMISSIONS, ...PLAN_MODE_PERMISSIONS] : AGENT_PERMISSIONS;
   }
 
@@ -364,6 +368,8 @@ export class Team implements TeamCore {
     if (!plan) {
       plan = PlanStore.load(project.directory);
       this.plans.set(project.id, plan);
+      // Checks that were running when Symbio stopped run again (after this load is cached).
+      void plan.then((store) => setTimeout(() => void this.verifier.resume(project, store).catch((err) => console.error("[checks]", err.message)), 0));
     }
     return plan;
   }
@@ -583,6 +589,85 @@ export class Team implements TeamCore {
           "Shared-asset grants keep it from colliding with others; it doesn't commit unless you ask."
         : "It works directly in the project folder (no git), so rely on shared-asset grants to avoid conflicts.";
     return [`Created ${name} on ${model} and sent it the task. ${where}`, workspace.warning].filter(Boolean).join("\n");
+  }
+
+  /**
+   * A reviewer for a task (team/verify.ts): a one-off helper in the folder of the helper who did it,
+   * with the review skill and no file edits. Named after the task (review-t3, review-t3-2…).
+   */
+  async createReviewer(project: Project, task: Task, helper: Agent, by: "coordinator" | "required"): Promise<Agent> {
+    const base = `review-${task.id.toLowerCase()}`;
+    let name = base;
+    for (let n = 2; this.nameTaken(project, name); n++) name = `${base}-${n}`;
+    const model = defaultModel(project, "worker");
+    const runtime = this.rt(helper);
+    const skills = listSkills().some((s) => s.name === "review") ? ["review"] : [];
+    const draft = { role: "worker" as const, reviewer: { taskId: task.id, of: helper.id, by } };
+    const sessionId = await runtime.createSession({
+      title: `${project.name} · ${name}`,
+      directory: helper.directory,
+      model,
+      permissions: this.permissionsFor(project, draft),
+      toolsUrl: this.toolsUrl(project, helper.directory),
+      effort: await this.effortFor(project, null, model, runtime),
+      skills,
+    });
+    const agent: Agent = {
+      id: newId("agt"),
+      name,
+      ...draft,
+      purpose: `Reviews ${task.id} (${helper.name}'s work)`,
+      sessionId,
+      runtime: runtime.kind,
+      directory: helper.directory,
+      ...(helper.repo ? { repo: helper.repo } : {}),
+      branch: null,
+      base: null,
+      workSince: Date.now(),
+      model,
+      ...(skills.length ? { skills, skillsBy: "coordinator" as const } : {}),
+      status: "idle",
+      lastActivity: Date.now(),
+      createdAt: Date.now(),
+    };
+    project.agents.push(agent);
+    await this.store.update(project);
+    await this.refreshInstructions(project, agent);
+    bus.publish({ type: "project.updated", projectId: project.id });
+    await this.log(project, { from: "symbio", to: "human", kind: "system", text: `${name} is reviewing ${task.id} (${helper.name}'s work).` });
+    return agent;
+  }
+
+  /** The human's checks (checks.ts) and whether every task gets a reviewer; briefs change with them. */
+  async setVerification(project: Project, change: { checks?: Check[]; requireReviewer?: boolean }): Promise<void> {
+    if (change.checks) project.checks = change.checks;
+    if (change.requireReviewer !== undefined) {
+      if (change.requireReviewer) project.requireReviewer = true;
+      else delete project.requireReviewer;
+    }
+    await this.store.update(project);
+    bus.publish({ type: "project.updated", projectId: project.id });
+    for (const agent of project.agents.filter(active)) await this.refreshInstructions(project, agent).catch(() => {});
+  }
+
+  /** core proposes a project check (checks.ts); it runs once the human approves it in the project's settings. */
+  async proposeCheck(project: Project, input: { name: string; command: string; folder?: unknown; timeout?: unknown }, why?: string): Promise<string> {
+    const existing = project.checks ?? [];
+    if (existing.some((c) => c.name.toLowerCase() === input.name.trim().toLowerCase())) {
+      throw new Error(`There is already a check named "${input.name.trim()}".`);
+    }
+    const [check] = normalizeChecks([{ ...input, approved: false, proposedBy: "coordinator" }]);
+    project.checks = [...existing, check];
+    await this.store.update(project);
+    bus.publish({ type: "project.updated", projectId: project.id });
+    await this.log(project, {
+      from: this.coordinator(project)?.id ?? "symbio",
+      to: "human",
+      kind: "system",
+      text: `Proposed a check, "${check.name}": \`${check.command}\`${check.folder ? ` (in ${check.folder})` : ""}.${why ? ` ${why}` : ""} ` +
+        "Approve it in the project's settings → Checks.",
+    });
+    return `Proposed "${check.name}". It runs once the human approves it (they see it in the project's settings); you don't need to remind them.`;
   }
 
   async stopAgent(project: Project, agent: Agent, reason: string): Promise<string> {
@@ -1301,7 +1386,9 @@ export class Team implements TeamCore {
     const brief =
       agent.role === "coordinator"
         ? coordinatorBrief(project, connections)
-        : workerBrief(project, agent, this.coordinator(project)?.name ?? "coordinator", connections);
+        : agent.reviewer
+          ? reviewerBrief(project, agent, this.coordinator(project)?.name ?? "coordinator")
+          : workerBrief(project, agent, this.coordinator(project)?.name ?? "coordinator", connections);
     const runtime = this.rt(agent);
     await runtime.setInstruction(agent.sessionId, "symbio-role", brief);
     await runtime.setSkills(agent.sessionId, this.skillsFor(project, agent));
@@ -1515,6 +1602,7 @@ export class Team implements TeamCore {
       }
       if (agent.status !== "stopped") this.setStatus(project, agent, "idle");
       if (e.type === "session.execution.failed") void this.fallback.onFailure(project, agent, e.data?.error);
+      else if (agent.reviewer) void this.verifier.reviewerTurnEnded(project, agent).catch((err) => console.error("[review]", err.message));
       else if (agent.role === "worker") this.quiet.afterTurn(project, agent);
     } else if (/retr/i.test(e.type)) {
       this.fallback.onRetry(project, agent, e.data);

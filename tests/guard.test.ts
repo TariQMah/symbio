@@ -153,6 +153,10 @@ test("agents can't change what decides which programs Symbio runs (its settings,
   assert.equal(effect("edit", `${home}\\bin\\cloudflared.exe`), "deny");
   assert.equal(effect("edit", `${home}\\config.json`), "deny");
   assert.equal(effect("edit", "/home/me/.symbio/machine.json"), "deny");
+  // A project's settings hold the checks Symbio runs: an agent can't plant or approve one.
+  assert.equal(effect("edit", String.raw`C:\proj\.symbio\project.json`), "deny");
+  assert.equal(effect("shell", `node -e "fs.writeFileSync('.symbio/project.json', x)"`), "deny");
+  assert.notEqual(effect("edit", String.raw`C:\proj\web\project.json`), "deny");
   // Reading is fine, and helpers' folders (under .symbio/worktrees) and projects' own files aren't affected.
   assert.notEqual(effect("read", `${home}\\runtime-settings.json`), "deny");
   assert.notEqual(effect("edit", `${home}\\worktrees\\p\\writer\\config.json`), "deny");

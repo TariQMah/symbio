@@ -18,6 +18,7 @@ import { gitAvailable, initRepository } from "./git.js";
 import { pickFolder } from "./folder-picker.js";
 import { beginOauth, cancelOauth, completeOauth, connectWithKey, listProviders, oauthStatus, removeLogin } from "./providers.js";
 import { docsRoot, listDocs, rawDoc, readDoc, searchDocs, writeDoc } from "./docs.js";
+import { normalizeChecks } from "./checks.js";
 import { computerSkills, createSkill, DEFAULT_CORE_SKILLS, importSkill, listSkills, removeSkill, skillText } from "./skills.js";
 import { readRegister } from "./rules.js";
 import { addAttachment, attachmentNote, getAttachments, listAttachments, markSent, removeAttachment } from "./attachments.js";
@@ -679,7 +680,19 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       aiCoauthors?: boolean;
       coreSkills?: string[];
       helperSkills?: string[] | null;
+      checks?: unknown;
+      requireReviewer?: boolean;
     }>();
+    if (body.checks !== undefined || typeof body.requireReviewer === "boolean") {
+      try {
+        await team.setVerification(project, {
+          ...(body.checks !== undefined ? { checks: normalizeChecks(body.checks) } : {}),
+          ...(typeof body.requireReviewer === "boolean" ? { requireReviewer: body.requireReviewer } : {}),
+        });
+      } catch (err) {
+        return c.json({ error: (err as Error).message }, 400);
+      }
+    }
     if (body.modelEfforts && typeof body.modelEfforts === "object") {
       try {
         const runtime = await team.runtimeFor(project);

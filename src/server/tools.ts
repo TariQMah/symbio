@@ -454,9 +454,10 @@ const cleanBuildOutputs: Tool = {
 const mergeWork: Tool = {
   name: "merge_work",
   description:
-    "Merge a helper's committed work into the project. Refuses if it changed shared assets it wasn't granted, unless force is true.",
+    "Merge a helper's committed work into the project. Refuses if it changed shared assets it wasn't granted, or if the project's " +
+    "checks fail on it, unless force is true.",
   inputSchema: obj(
-    { agent: str("Agent name"), force: { type: "boolean", description: "Merge despite ungranted asset changes" } },
+    { agent: str("Agent name"), force: { type: "boolean", description: "Merge despite ungranted asset changes or failing checks" } },
     ["agent"],
   ),
   async run({ agent: name, force }, { team, project }) {
@@ -816,6 +817,57 @@ const saveRuleSourceTool: Tool = {
   },
 };
 
+const proposeCheck: Tool = {
+  name: "propose_check",
+  description:
+    "Propose a project check for the human to approve: a command Symbio runs itself in a helper's folder when it reports a task " +
+    "and before its work is merged (a build, tests, a spellcheck, a link check, a render…). It must finish on its own and exit " +
+    "with 0 when all is well. Symbio runs it only once the human approves it.",
+  inputSchema: obj(
+    {
+      name: str("Short name, e.g. 'tests'"),
+      command: str("The command, run by the system shell, e.g. 'npm test'"),
+      folder: str("Optional: where it runs, relative to the helper's folder"),
+      timeout: { type: "number", description: "Optional: time limit in seconds (default 600)" },
+      why: str("Why it's worth running on every report, for the human"),
+    },
+    ["name", "command"],
+  ),
+  async run({ name, command, folder, timeout, why }, { team, project }) {
+    return team.proposeCheck(project, { name: String(name), command: String(command), folder, timeout }, why ? String(why) : undefined);
+  },
+};
+
+const requestReview: Tool = {
+  name: "request_review",
+  description:
+    "Have a reviewer check a task in review before you merge it or mark it done: a fresh, one-off helper with the review skill, in the " +
+    "folder of the helper who did it, checks the work against the task's Done when, the rules and the glossary. Findings go back " +
+    "to the helper; the verdict comes to you. Worth it for big or risky tasks.",
+  inputSchema: obj({ task_id: str("Task id, e.g. T3"), focus: str("Optional: what to look at especially") }, ["task_id"]),
+  async run({ task_id, focus }, { team, project }) {
+    return team.verifier.startReview(project, String(task_id), "coordinator", focus ? String(focus) : undefined);
+  },
+};
+
+const submitReview: Tool = {
+  name: "submit_review",
+  description:
+    "Reviewers only: your verdict on the task you were asked to review. \"pass\" when every point of its Done when is met; " +
+    "\"changes\" with findings concrete enough to fix (what, where, what you expected). Then end your turn.",
+  inputSchema: obj(
+    {
+      task_id: str("The task you reviewed, e.g. T3"),
+      verdict: { type: "string", enum: ["pass", "changes"] },
+      findings: str("What you checked and found; for changes, what's wrong and where"),
+    },
+    ["task_id", "verdict", "findings"],
+  ),
+  async run({ task_id, verdict, findings }, { team, project, agent }) {
+    return team.verifier.submitReview(project, agent, String(task_id), verdict, String(findings ?? ""));
+  },
+};
+
 const COMMON = [
   viewImageTool,
   readDocumentTool,
@@ -842,6 +894,7 @@ const COMMON = [
   checkMessages,
   listTasks,
   updateTask,
+  submitReview,
   listProcesses,
   stopProcess,
 ];
@@ -871,6 +924,8 @@ const COORDINATOR_ONLY = [
   stopProgram,
   stopAgent,
   mergeWork,
+  requestReview,
+  proposeCheck,
   cleanBuildOutputs,
   moveToProjectFolder,
   declareAsset,
@@ -929,6 +984,8 @@ export function planModeRefusal(tool: string, args: any): string | null {
         return "assigning tasks";
       case "merge_work":
         return "merging work";
+      case "request_review":
+        return "starting reviewers";
       case "move_to_project_folder":
         return "moving helpers";
       case "clean_build_outputs":

@@ -3,6 +3,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import type { CheckRun } from "./checks.js";
 import { writeFileAtomic } from "./fsutil.js";
 
 export const TASK_STATUSES = ["todo", "in-progress", "blocked", "review", "done"] as const;
@@ -19,6 +20,14 @@ export interface HumanReview {
   state: "waiting" | "approved" | "sent-back";
   at: number;
   note?: string;
+}
+
+/** A reviewer's verdict on a task's work. */
+export interface TaskReview {
+  by: string;
+  verdict: "pass" | "changes";
+  findings: string;
+  at: number;
 }
 
 export interface Task {
@@ -42,6 +51,12 @@ export interface Task {
    * the latest report), for its changes (OpenCode's session diff). One entry per session.
    */
   work?: { sessionId: string; from: string; to?: string }[];
+  /** The latest run of the project's checks on its work (checks.ts). */
+  checks?: CheckRun;
+  /** Reviewers' verdicts, oldest first (team/verify.ts). */
+  reviews?: TaskReview[];
+  /** The reviewer checking it now (agent id). */
+  reviewer?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -134,6 +149,9 @@ export class PlanStore {
         ...(old?.guide ? { guide: old.guide } : {}),
         ...(old?.humanReview ? { humanReview: old.humanReview } : {}),
         ...(old?.work ? { work: old.work } : {}),
+        ...(old?.checks ? { checks: old.checks } : {}),
+        ...(old?.reviews ? { reviews: old.reviews } : {}),
+        ...(old?.reviewer ? { reviewer: old.reviewer } : {}),
         createdAt: old?.createdAt ?? now,
         updatedAt: now,
       };
@@ -197,6 +215,11 @@ export class PlanStore {
       work?: Task["work"];
       /** New acceptance criteria; empty removes them. */
       doneWhen?: string;
+      checks?: CheckRun;
+      /** A reviewer's verdict, added to its reviews. */
+      addReview?: TaskReview;
+      /** The reviewer checking it now; null: none. */
+      reviewer?: string | null;
     },
   ) {
     const task = this.task(id);
@@ -212,6 +235,10 @@ export class PlanStore {
       else delete task.doneWhen;
     }
     if (change.work) task.work = change.work;
+    if (change.checks) task.checks = change.checks;
+    if (change.addReview) task.reviews = [...(task.reviews ?? []), change.addReview];
+    if (change.reviewer === null) delete task.reviewer;
+    else if (change.reviewer) task.reviewer = change.reviewer;
     if (change.humanReview === null) delete task.humanReview;
     else if (change.humanReview) task.humanReview = change.humanReview;
     if (change.note?.text.trim()) task.notes.push({ time: Date.now(), by: change.note.by, text: change.note.text.trim() });

@@ -5,6 +5,7 @@ import { api, type Agent, type Plan, type Project, type Task, type TaskStatus } 
 import { Md } from "./files";
 import { Avatar, Drawer, EmptyState, clock } from "./ui";
 import { ReviewActions, ReviewGuide, TaskChanges, waitingForReview } from "./Review";
+import { TaskChecks, TaskReviews } from "./Checks";
 
 const COLUMNS: { status: TaskStatus; title: string; icon: React.ReactNode }[] = [
   { status: "todo", title: "To do", icon: <Circle size={14} /> },
@@ -221,6 +222,8 @@ function TaskDetail({ project, task: t, agent, onClose }: { project: Project; ta
         <Md text={t.description || "_No description._"} projectId={projectId} agentId={t.assignee} className="" />
       </div>
       <DoneWhen projectId={projectId} task={t} />
+      {t.checks && <TaskChecks run={t.checks} />}
+      <TaskReviews task={t} reviewerName={t.reviewer ? project.agents.find((a) => a.id === t.reviewer)?.name : undefined} />
       {(t.status === "review" || t.status === "done" || t.guide) && <TaskChanges projectId={projectId} taskId={t.id} />}
       {!waitingForReview(t) && t.guide && (
         <>

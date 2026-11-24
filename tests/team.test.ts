@@ -168,6 +168,28 @@ test("in the shared project folder, each agent sees and stops only the processes
   assert.deepEqual(stopped, ["sh_w"], "stopping a helper stops only its own processes");
 });
 
+test("a reviewer in a helper's own folder stops only what it started there, not the helper's programs", async () => {
+  const { project, team, editor } = await setup();
+  const own = path.join(project.directory, "..", "editor-copy");
+  editor.directory = own;
+  editor.branch = "symbio/editor";
+  const reviewer = { id: "agt_r", name: "review-t1", role: "worker", reviewer: { taskId: "T1", of: editor.id, by: "coordinator" }, sessionId: "ses_review", directory: own, model: "p/m", status: "idle", lastActivity: 0, createdAt: 0 };
+  project.agents.push(reviewer);
+  let shells = [{ id: "sh_server", running: true, command: "serve", started: 0, sessionId: "ses_editor" }, { id: "sh_r", running: true, command: "test", started: 0, sessionId: "ses_review" }];
+  const stopped: string[] = [];
+  const runtime = (team as any).runtime;
+  runtime.shells = async () => shells;
+  runtime.stopShell = async (_dir: string, id: string) => {
+    stopped.push(id);
+    shells = shells.filter((s) => s.id !== id);
+  };
+  assert.doesNotMatch(await team.processes.list(project, reviewer as any), /sh_server/);
+  await team.stopAgent(project, reviewer as any, "its review is done");
+  assert.deepEqual(stopped, ["sh_r"]);
+  // Alone in its folder again, the helper owns everything there.
+  assert.match(await team.processes.list(project, editor), /sh_server/);
+});
+
 test("where helpers work: project setting, per-helper choice, and moving a helper into the project folder", async () => {
   const { git, initRepository } = await import("../src/server/git.js");
   const { writeFileSync, existsSync } = await import("node:fs");

@@ -132,6 +132,26 @@ being merged (unless core forces the merge).
   are queued), reminds it once, and if it stays quiet tells core it has gone quiet. Not while it
   waits for a shared asset, for the human, or for messages on their way, nor when its tasks are
   already in review or done; the human talking to the helper directly clears it.
+- **Checks** (`Project.checks`, `checks.ts`, `team/verify.ts`): commands Symbio runs itself (a build,
+  tests, a spellcheck, a link check, a render…), one after the other, in the helper's folder (a
+  check's `folder` is relative to it), at low priority, with a time limit (default 600 s; the
+  process tree is stopped past it). The human adds and approves them in the project's settings;
+  core may propose one (`propose_check`), which runs only once approved. When a helper reports a
+  task (`update_task` `review`), the checks run before core hears of it: a failure sends the task
+  back to *in progress* and gives the helper each failing check's output; a pass delivers the report
+  to core with the checks that passed. `merge_work` runs them again unless they passed on that exact
+  state of the helper's folder (its commit and uncommitted changes); failing, it refuses to merge
+  unless `force` (the human is told). The latest run shows on the task (`Task.checks`).
+- **Reviewers** (`Agent.reviewer`, `team/verify.ts`): a fresh, one-off helper (`review-t3`) that checks
+  a task in review against its *Done when*, the rules and the glossary, with the review skill. It
+  works in the folder of the helper who did the task (its own copy, or the project folder) and its
+  session denies every edit (`REVIEWER_PERMISSIONS`). core asks for one (`request_review`), or the
+  human requires one for every task (`Project.requireReviewer`): then it starts once the checks
+  passed, before core hears of the task. Its verdict (`submit_review`: *pass*, or *changes* with
+  findings) is kept on the task (`Task.reviews`). *changes* sends the task back to its helper with the
+  findings; *pass* reaches core (with the report, when required). Symbio stops the reviewer after its
+  verdict (reminding it once if it ends its turn without one). A task that comes back to its helper
+  three times in a row, from checks or reviewers, is also brought to core.
 - core reviews, calls `merge_work` (helpers with their own copy; that marks the task done) or checks
   the files in the project folder and marks the task done with `update_task` (shared helpers). Small follow-ups go in with `add_task`
   without re-approval.
@@ -154,6 +174,7 @@ All agents:
 | `check_messages` | Collect messages that arrived mid-turn (any Symbio tool call also includes them) |
 | `list_tasks` | The plan: goal, approval status, tasks with status, assignee, dependencies |
 | `update_task` | Report progress on a task: in-progress, blocked, review (core can also change its `done_when`) |
+| `submit_review` | Reviewers only: the verdict on the task they review (*pass*, or *changes* with findings) |
 | `read_document` | The text of a document: PDF by pages, Word (.docx, .odt), Excel (every sheet as rows), PowerPoint (by slide), long text files; a part at a time. Reading PDFs with the read tool is refused |
 | `view_image` | Look at an image as a scaled-down copy (1024 px by default, at most 2048), or a crop at full resolution; reading image files directly is refused |
 | `list_rules` | The rules register (when the project keeps one): areas, sources, rules, with filters |
@@ -181,7 +202,9 @@ core only:
 | `pin_model` | Pin a helper to its model (it waits and retries it when it fails, instead of switching) or unpin it; not a pin the human made |
 | `stop_agent` | Stop a helper; its assets are released |
 | `clean_build_outputs` | Delete an idle helper's git-ignored build folders (bin, obj, node_modules…) to free disk space |
-| `merge_work` | Merge a helper's committed work; refuses ungranted asset changes unless forced |
+| `merge_work` | Merge a helper's committed work; refuses ungranted asset changes, or failing checks, unless forced |
+| `request_review` | Start a reviewer on a task in review (optionally with what to look at) |
+| `propose_check` | Propose a check (name, command, folder, time limit) for the human to approve |
 | `sub_repositories` | For a project folder that is a repository holding other repositories (one an older Symbio created on top of them): check the situation, switch to working in the inner repositories (`use`) or back (`stop`). Nothing on disk changes |
 | `move_to_project_folder` | Move an idle helper whose work is merged from its own copy into the project folder (fresh session, handoff note) |
 | `declare_asset` | Declare or update a shared asset |

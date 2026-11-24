@@ -52,6 +52,8 @@ and align the rest.
 | **skill** | A packaged method (a folder with a `SKILL.md`) an agent loads when a task calls for it. Symbio's, or the human's **library** (`~/.symbio/skills`); each agent has only the ones it's given | skill (biblioteca de skills) | `skills.ts`, `Agent.skills`, `Project.coreSkills` |
 | **glossary** | A project's terms, what each means and the words not to use; core keeps it, every agent gets it (`docs/glossary.md`) | glossário | `glossaryPath`, `symbio-glossary` |
 | **Done when** | A task's acceptance criteria: what the helper reports against and the review checks | Pronto quando | `doneWhen`, `done_when` |
+| **check** | A command Symbio runs itself on a helper's work (build, tests, spellcheck…) when it reports a task and before a merge; the human approves each | verificação | `Project.checks`, `checks.ts`, `propose_check` |
+| **reviewer** | A one-off helper that checks a task's work against *Done when*, the rules and the glossary, and gives a verdict | revisor | `Agent.reviewer`, `team/verify.ts`, `request_review`, `submit_review` |
 | **shared file** | A file an agent showed the human (in the chat and the Files tab) | arquivo compartilhado | `share_file` |
 | **program** | Something an agent started that keeps running (a server, a tunnel, a build) | programa | `AgentProcess`, `list_programs` |
 
@@ -72,7 +74,5 @@ Names fixed now, before the features ([roadmap](roadmap.md)):
 
 | Term | Means | pt-BR |
 |---|---|---|
-| **check** | A command Symbio runs itself on a helper's work (build, tests, spellcheck…) | verificação |
-| **reviewer** | A one-off helper that checks a task's work against *Done when*, the rules and the glossary | revisor |
 | **briefing** | The questions about one feature, asked together before work starts; the answers become its spec | briefing |
 | **evidence** | Files that show a task's work was done (screenshots, outputs), tagged with the task | evidência |

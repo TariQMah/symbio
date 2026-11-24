@@ -13,7 +13,7 @@ import type { TeamCore } from "./core.js";
 
 /** What fresh sessions need of the Team, besides TeamCore. */
 export interface SessionsHost extends TeamCore {
-  permissionsFor(project: Project, agent: Pick<Agent, "role">): PermissionRule[];
+  permissionsFor(project: Project, agent: Pick<Agent, "role"> & Partial<Pick<Agent, "reviewer">>): PermissionRule[];
   /** The URL of Symbio's tool server for a folder. */
   toolsUrl(project: Project, directory: string): string;
   effortFor(project: Project, agent: Pick<Agent, "effort"> | null, model: string, runtime: AgentRuntime): Promise<string | undefined>;

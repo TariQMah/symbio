@@ -38,6 +38,13 @@
   another folder after reading it), and the ones other tools keep on this computer, listed to add.
   core gets the skills you choose for it, and gives each helper the ones its work needs (a front-end
   checklist for the helper building pages); you can change a helper's in its chat.
+- **Checks Symbio runs itself.** Commands you approve in the project's settings (a build, tests, a
+  spellcheck, a link check…) run on a helper's work when it reports a task, and again before it's
+  merged if it changed since. A failure goes back to the helper with the output, without taking
+  core's or your attention; core can propose checks for you to approve.
+- **A reviewer before core.** A fresh helper that didn't do the work checks it against its *Done
+  when*, the rules and the glossary, and can't change it: core asks for one on big or risky tasks,
+  or you require one for every task. Its findings go back to the helper and show on the task.
 - **Documentation you can find your way in.** core keeps the project's docs up to date, and the
   Docs tab shows them as a folder tree with search across every doc, links between docs that open
   in place, an outline of long docs, and plain-text sources (e-mails, transcripts) with line

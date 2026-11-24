@@ -20,6 +20,8 @@ export interface Agent {
   /** Its skills (helpers; core's come from the project). */
   skills?: string[];
   skillsBy?: "human" | "coordinator";
+  /** A reviewer: a one-off helper checking another helper's task. */
+  reviewer?: { taskId: string; of: string; by: "coordinator" | "required"; done?: boolean };
   /** Pinned and waiting for its model: when the next retry is. */
   modelWait?: { until: number; attempt: number; since: number; error: string } | null;
   status: AgentStatus;
@@ -86,6 +88,25 @@ export type FtpSecurity = "explicit" | "implicit" | "none";
 
 export type TaskStatus = "todo" | "in-progress" | "blocked" | "review" | "done";
 
+/** A command Symbio runs itself when a helper reports a task, and before its work is merged. */
+export interface Check {
+  id: string;
+  name: string;
+  command: string;
+  folder?: string;
+  /** Seconds. */
+  timeout?: number;
+  approved: boolean;
+  proposedBy?: "coordinator";
+}
+
+export interface CheckRun {
+  state: "running" | "passed" | "failed";
+  at: number;
+  when: "report" | "merge";
+  results: { name: string; ok: boolean; exitCode: number | null; timedOut?: boolean; seconds: number; output: string }[];
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -101,6 +122,12 @@ export interface Task {
   doneWhen?: string;
   review?: boolean;
   humanReview?: { state: "waiting" | "approved" | "sent-back"; at: number; note?: string };
+  /** The latest run of the project's checks on its work. */
+  checks?: CheckRun;
+  /** Reviewers' verdicts, oldest first. */
+  reviews?: { by: string; verdict: "pass" | "changes"; findings: string; at: number }[];
+  /** The reviewer checking it now (agent id). */
+  reviewer?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -235,6 +262,10 @@ export interface Project {
   renewSessions?: "manual" | "after-task";
   helperWorkspace?: "own" | "shared";
   rulesRegister?: boolean;
+  /** Commands Symbio runs itself on reports and before merges. */
+  checks?: Check[];
+  /** Every reported task gets a reviewer before core sees it. */
+  requireReviewer?: boolean;
   subRepositories?: boolean;
   /** How core handles the human's messages (the selector in its chat box). Unset = auto. */
   coreMode?: CoreMode;
@@ -769,8 +800,8 @@ export const api = {
   updateProject: (
     id: string,
     patch: Partial<
-      Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy" | "aiCoauthors" | "coreSkills">
-    > & { modelEfforts?: Record<string, string | null>; helperSkills?: string[] | null },
+      Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy" | "aiCoauthors" | "coreSkills" | "requireReviewer">
+    > & { checks?: (Omit<Check, "id"> & { id?: string })[]; modelEfforts?: Record<string, string | null>; helperSkills?: string[] | null },
   ) =>
     call<Project>("PATCH", `/projects/${id}`, patch),
   connections: () => call<ConnectionView[]>("GET", "/connections"),

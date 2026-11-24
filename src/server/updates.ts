@@ -307,6 +307,17 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "work needs: spawn_agent takes skills, set_skills changes them, list_skills shows the ones you may give (the human chooses " +
       "which). Agents only have the skills they're given.",
   },
+  {
+    id: "2026-11-24-checks-reviewers",
+    text:
+      "Checks and reviewers. A project can have checks: commands Symbio runs itself in a helper's folder when it reports a task " +
+      "and before merge_work (a build, tests, a spellcheck…). A failing check sends the task back to the helper with the output; " +
+      "you only get reports whose checks passed, and merge_work refuses when they fail on changed work (force overrides it, and " +
+      "the human is told). Propose useful checks with propose_check; the human approves them. For big or risky tasks, " +
+      "request_review starts a reviewer: a fresh, one-off helper that checks the task against its Done when, the rules and the " +
+      "glossary without changing anything; its findings go back to the helper, its verdict comes to you. The human can require " +
+      "a reviewer for every task; then reports reach you once it passed.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

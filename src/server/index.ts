@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { MachineMonitor } from "./machine.js";
+import { stopRunningChecks } from "./checks.js";
 import { Hono } from "hono";
 import { promises as fs, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -256,6 +257,7 @@ const installer = new RuntimeInstaller();
     team.stopWatchdog();
     machine.stop();
     updates.stop();
+    stopRunningChecks();
     await Promise.all([runtime.stop(), copilot.stop()]);
     process.exit(0);
   };

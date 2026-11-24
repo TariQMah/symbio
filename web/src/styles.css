@@ -404,6 +404,21 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .done-when-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .done-when-head h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
 .done-when textarea { width: 100%; }
+.check-row .list-title { display: flex; align-items: center; gap: 8px; }
+.check-row code.list-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-checks, .task-reviews { margin-top: 14px; }
+.task-checks h3, .task-reviews h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
+.task-checks h3 .subtle { font-weight: 400; margin-left: auto; }
+.check-result { border: 1px solid var(--border); border-radius: var(--r-sm); margin-top: 6px; }
+.check-result summary { display: flex; align-items: center; gap: 6px; padding: 6px 8px; cursor: pointer; font-size: 13px; }
+.check-result.ok summary svg { color: var(--green); }
+.check-result.failed summary svg { color: var(--red); }
+.check-output { margin: 0; padding: 8px; max-height: 260px; overflow: auto; font-size: 11.5px; white-space: pre-wrap; border-top: 1px solid var(--border); background: var(--surface-2); }
+.review-verdict { border-left: 2px solid var(--border-strong); padding: 4px 0 4px 10px; margin-top: 8px; }
+.review-verdict .row { gap: 6px; }
+.review-verdict.pass svg { color: var(--green); }
+.review-verdict.changes svg { color: var(--amber); }
+.review-findings { white-space: pre-wrap; font-size: 13px; margin-top: 4px; color: var(--text-2); }
 .msg-copy { position: absolute; top: -2px; right: -2px; opacity: 0; z-index: 2; }
 .msg-user > .msg-copy { top: 4px; right: 4px; }
 .msg-user:hover > .msg-copy, .msg-user:focus-within > .msg-copy,

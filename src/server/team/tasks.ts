@@ -8,11 +8,13 @@ import type { Agent, Project } from "../store.js";
 import { active, type TeamCore } from "./core.js";
 import type { QuietHelpers } from "./quiet-helpers.js";
 import type { Reviews } from "./review.js";
+import type { Verifier } from "./verify.js";
 
 /** What the task flow needs of the Team, besides TeamCore. */
 export interface TaskFlowHost extends TeamCore {
   readonly reviews: Reviews;
   readonly quiet: QuietHelpers;
+  readonly verifier: Verifier;
 }
 
 export class TaskFlow {
@@ -144,22 +146,12 @@ export class TaskFlow {
     });
     this.team.planChanged(project);
 
-    // A helper's review/blocked update is its report to the coordinator.
+    // A helper's review/blocked update is its report to the coordinator. A finished task goes
+    // through the project's checks (and a reviewer, when the human requires one) first.
+    if (agent.role !== "coordinator" && status === "review") return this.team.verifier.reported(project, agent, task.id, note);
     const coordinator = this.team.coordinator(project);
-    if (coordinator && agent.role !== "coordinator" && (status === "review" || status === "blocked")) {
-      await this.team.deliver(
-        project,
-        agent,
-        coordinator,
-        status === "review" ? "task-review" : "task-blocked",
-        `${task.id} "${task.title}" → ${status}${note ? `: ${note}` : ""}` +
-          (status === "review"
-            ? (agent.branch
-                ? `\nMerge with merge_work("${agent.name}") when it looks right.`
-                : `\nIts work is already in the project folder; check it there, then mark the task done (update_task) or send it back.`) +
-              (reviewed ? "\nThen it waits for the human's review, with the helper's guide." : "")
-            : ""),
-      );
+    if (coordinator && agent.role !== "coordinator" && status === "blocked") {
+      await this.team.deliver(project, agent, coordinator, "task-blocked", `${task.id} "${task.title}" → blocked${note ? `: ${note}` : ""}`);
       return `${task.id} is now ${status}. The coordinator has been notified — no separate report needed.`;
     }
     // Helpers without a branch have nothing to merge: the coordinator marking their task done
@@ -180,6 +172,14 @@ export class TaskFlow {
     if (violations.length && !force) {
       const list = violations.map((v) => `- "${v.asset.name}": ${v.files.join(", ")}`).join("\n");
       return `Not merged: ${agent.name} changed shared assets it was not granted:\n${list}\nReview the changes, then grant the asset and merge again, ask ${agent.name} to revert them, or merge with force=true.`;
+    }
+    // Symbio's own checks, on this state of the helper's work (skipped when they passed on it already).
+    const gate = await this.team.verifier.beforeMerge(project, agent);
+    if (!gate.ok && !force) {
+      return `Not merged: ${gate.reason}\nSend it back to ${agent.name} with what to fix, or merge with force=true if the failure isn't its work's fault.`;
+    }
+    if (!gate.ok) {
+      await this.team.log(project, { from: "symbio", to: "human", kind: "system", text: `${agent.name}'s work was merged with force, although the project's checks failed.` });
     }
     const result = await mergeWorkspace(project, agent);
     if (!result.ok) return `Not merged: ${result.reason}${result.files?.length ? `\nFiles: ${result.files.join(", ")}` : ""}`;
@@ -207,6 +207,7 @@ export class TaskFlow {
     }
     return (
       `${result.summary}\n${result.files.map((f) => `- ${f}`).join("\n")}` +
+      (gate.ok && gate.note ? `\n${gate.note}` : "") +
       (completed.length ? `\nMarked done: ${completed.join(", ")}.` : "") +
       (waiting.length ? `\nWaiting for the human's review: ${waiting.join(", ")} (done when they approve).` : "")
     );

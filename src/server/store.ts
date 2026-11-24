@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { writeFileAtomic } from "./fsutil.js";
+import type { Check } from "./checks.js";
 import type { RuntimeKind } from "./runtime/types.js";
 
 export type AgentRole = "coordinator" | "worker";
@@ -61,6 +62,11 @@ export interface Agent {
   skills?: string[];
   /** Who set a helper's skills: core can't change the ones the human set. */
   skillsBy?: "human" | "coordinator";
+  /**
+   * A reviewer: a one-off helper checking another helper's task (team/verify.ts). It works in that
+   * helper's folder, can't edit files, and is stopped once it gives its verdict.
+   */
+  reviewer?: { taskId: string; of: string; by: "coordinator" | "required"; done?: boolean };
   /** How big its current conversation is (tokens the model reads on its next step), and the model's limit when known. */
   context?: { tokens: number; limit: number | null; at: number } | null;
   /** Usage of earlier sessions, for agents that predate usageByModel. */
@@ -162,6 +168,13 @@ export interface Project {
   reviewBy?: ReviewBy;
   /** Keep a rules register (rules.json next to the docs, shown in the Docs tab). Unset = off. */
   rulesRegister?: boolean;
+  /** Commands Symbio runs itself when a helper reports a task and before its work is merged (checks.ts). */
+  checks?: Check[];
+  /**
+   * Every reported task gets a reviewer (a one-off helper) before core sees it. Unset/false: core
+   * decides when one is worth it (request_review). See team/verify.ts.
+   */
+  requireReviewer?: boolean;
   /** Agent-facing Symbio updates (updates.ts) the coordinator has been told about. */
   updatesSeen?: string[];
   /** When the daily housekeeping check last ran (and told the human/coordinator). */
