@@ -105,6 +105,10 @@ opening the right section, like the update badge opening Updates (#35). The Expl
    that come later.
 15. **Filters for a project's skills.** ([#60](https://github.com/linkzy/symbio/issues/60)) Project settings → Skills
    gets the library's search and categories, and Select all / Clear for the skills shown.
+16. **Share remote access in one step.** ([#61](https://github.com/linkzy/symbio/issues/61)) Copy puts the link and the
+   access code on the clipboard together, and a Share button sends them (the system share sheet, or e-mail).
+17. **Settings you can find your way in.** ([#62](https://github.com/linkzy/symbio/issues/62)) The sections grouped
+   (agents, connections, usage and costs, this computer, help) as tabs or a side menu, each with its own address.
 
 ## Ideas
 
