@@ -109,6 +109,8 @@ opening the right section, like the update badge opening Updates (#35). The Expl
    access code on the clipboard together, and a Share button sends them (the system share sheet, or e-mail).
 17. **Settings you can find your way in.** ([#62](https://github.com/linkzy/symbio/issues/62)) The sections grouped
    (agents, connections, usage and costs, this computer, help) as tabs or a side menu, each with its own address.
+18. **Which skills were used.** ([#63](https://github.com/linkzy/symbio/issues/63)) Loading a skill shows as a step in
+   the chat, and each agent's skills chip says which it used, so you can see whether skills pay off.
 
 ## Ideas
 
