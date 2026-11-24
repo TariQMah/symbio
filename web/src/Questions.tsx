@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { History, MessageCircleQuestion, Send } from "lucide-react";
-import { api, subscribe, type Project, type Question } from "./api";
+import { History, ListChecks, MessageCircleQuestion, Send } from "lucide-react";
+import { api, subscribe, type Briefing, type Project, type Question } from "./api";
 import { AttachButton, PendingFiles, usePendingFiles } from "./Attachments";
 import { Md } from "./files";
 import { Avatar, timeAgo } from "./ui";
@@ -21,6 +21,20 @@ export function useQuestions(projectId: string | undefined): Question[] {
     });
   }, [projectId]);
   return questions;
+}
+
+/** A project's briefings, kept current (they change with its questions). */
+export function useBriefings(projectId: string | undefined): Briefing[] {
+  const [briefings, setBriefings] = useState<Briefing[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    const load = () => api.briefings(projectId).then(setBriefings).catch(() => {});
+    load();
+    return subscribe((e) => {
+      if (e.type === "questions.updated" && e.projectId === projectId) load();
+    });
+  }, [projectId]);
+  return briefings;
 }
 
 /** Drafts survive closing the drawer (and a reload), until sent. */
@@ -59,7 +73,14 @@ function AnswerFiles(props: {
 }
 
 export function OpenQuestions({ project, questions }: { project: Project; questions: Question[] }) {
+  const briefings = useBriefings(project.id);
   const open = questions.filter((q) => q.state === "open");
+  // A briefing's questions together under its feature; the others after them.
+  const groups = briefings
+    .filter((b) => b.state === "open")
+    .map((b) => ({ briefing: b, questions: open.filter((q) => q.briefing === b.id) }))
+    .filter((g) => g.questions.length);
+  const loose = open.filter((q) => !groups.some((g) => g.questions.includes(q)));
   const closed = questions.filter((q) => q.state !== "open").slice(-15).reverse();
   const [drafts, setDrafts] = useState<Record<string, string>>(() => loadDrafts(project.id));
   const [sending, setSending] = useState(false);
@@ -99,6 +120,44 @@ export function OpenQuestions({ project, questions }: { project: Project; questi
     await api.setAsideQuestion(project.id, q.id, note || undefined).catch((e) => alert(e.message));
   }
 
+  const card = (q: Question) => (
+    <div key={q.id} className={`question-card${drafts[q.id]?.trim() ? " answered" : ""}`}>
+      <div className="question-meta">
+        <span className="question-id">{q.id}</span>
+        <Avatar name={nameOf(q.askedBy)} size="sm" />
+        <span className="small">{nameOf(q.askedBy)}</span>
+        {q.taskId && <span className="tag">{q.taskId}</span>}
+        {q.blocking && (
+          <span className="tag amber" title="Work waits on this answer">
+            Blocking
+          </span>
+        )}
+        <span className="when">{timeAgo(q.askedAt)}</span>
+      </div>
+      <div className="question-text">{q.question}</div>
+      {q.context && (
+        <div className="question-context md">
+          <Md text={q.context} projectId={project.id} agentId={q.askedBy} className="" />
+        </div>
+      )}
+      {q.options && (
+        <div className="question-options">
+          {q.options.map((o) => (
+            <button key={o} className={`chip${drafts[q.id] === o ? " on" : ""}`} onClick={() => setDraft(q.id, drafts[q.id] === o ? "" : o)}>
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
+      <textarea rows={2} placeholder={q.options ? "Pick an option, or write your answer" : "Your answer"} value={drafts[q.id] ?? ""} onChange={(e) => setDraft(q.id, e.target.value)} />
+      <AnswerFiles projectId={project.id} questionId={q.id} onChange={onFiles}>
+        <button className="btn ghost sm" onClick={() => setAside(q)}>
+          Set aside
+        </button>
+      </AnswerFiles>
+    </div>
+  );
+
   if (open.length === 0 && closed.length === 0) return null;
   return (
     <div className="questions">
@@ -114,43 +173,25 @@ export function OpenQuestions({ project, questions }: { project: Project; questi
           </button>
         </div>
       )}
-      {open.map((q) => (
-        <div key={q.id} className={`question-card${drafts[q.id]?.trim() ? " answered" : ""}`}>
-          <div className="question-meta">
-            <span className="question-id">{q.id}</span>
-            <Avatar name={nameOf(q.askedBy)} size="sm" />
-            <span className="small">{nameOf(q.askedBy)}</span>
-            {q.taskId && <span className="tag">{q.taskId}</span>}
-            {q.blocking && (
-              <span className="tag amber" title="Work waits on this answer">
-                Blocking
+      {groups.map(({ briefing: b, questions: qs }) => (
+        <div key={b.id} className="briefing" data-briefing={b.id}>
+          <div className="briefing-head">
+            <div className="row">
+              <ListChecks size={14} />
+              <strong className="grow">
+                {b.id} · {b.feature}
+              </strong>
+              <span className="subtle small">
+                {b.questions.length - qs.length + qs.filter((q) => drafts[q.id]?.trim()).length} of {b.questions.length} answered
               </span>
-            )}
-            <span className="when">{timeAgo(q.askedAt)}</span>
+            </div>
+            {b.why && <div className="small">{b.why}</div>}
+            <div className="hint">{nameOf(b.askedBy)} gets the answers together once all are in; they become this feature's spec.</div>
           </div>
-          <div className="question-text">{q.question}</div>
-          {q.context && (
-            <div className="question-context md">
-              <Md text={q.context} projectId={project.id} agentId={q.askedBy} className="" />
-            </div>
-          )}
-          {q.options && (
-            <div className="question-options">
-              {q.options.map((o) => (
-                <button key={o} className={`chip${drafts[q.id] === o ? " on" : ""}`} onClick={() => setDraft(q.id, drafts[q.id] === o ? "" : o)}>
-                  {o}
-                </button>
-              ))}
-            </div>
-          )}
-          <textarea rows={2} placeholder={q.options ? "Pick an option, or write your answer" : "Your answer"} value={drafts[q.id] ?? ""} onChange={(e) => setDraft(q.id, e.target.value)} />
-          <AnswerFiles projectId={project.id} questionId={q.id} onChange={onFiles}>
-            <button className="btn ghost sm" onClick={() => setAside(q)}>
-              Set aside
-            </button>
-          </AnswerFiles>
+          {qs.map(card)}
         </div>
       ))}
+      {loose.map(card)}
       {closed.length > 0 && (
         <div className="questions-closed">
           <button className="btn ghost sm" onClick={() => setShowClosed((s) => !s)}>

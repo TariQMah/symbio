@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { CheckCircle2, Circle, CircleDashed, ClipboardList, Eye, Link2, ListChecks, Lock, MessageSquare, OctagonAlert, Pencil } from "lucide-react";
+import { CheckCircle2, Circle, CircleDashed, ClipboardList, Eye, FileText, Link2, ListChecks, Lock, MessageSquare, OctagonAlert, Pencil } from "lucide-react";
 import { api, type Agent, type Plan, type Project, type Task, type TaskStatus } from "./api";
 import { Md } from "./files";
 import { Avatar, Drawer, EmptyState, clock } from "./ui";
@@ -221,6 +221,12 @@ function TaskDetail({ project, task: t, agent, onClose }: { project: Project; ta
       <div className="md">
         <Md text={t.description || "_No description._"} projectId={projectId} agentId={t.assignee} className="" />
       </div>
+      {t.spec && (
+        <div className="task-spec">
+          <FileText size={14} />
+          <Md text={`Spec: ${t.spec}`} projectId={projectId} agentId={t.assignee} className="" />
+        </div>
+      )}
       <DoneWhen projectId={projectId} task={t} />
       {t.checks && <TaskChecks run={t.checks} />}
       <TaskReviews task={t} reviewerName={t.reviewer ? project.agents.find((a) => a.id === t.reviewer)?.name : undefined} />

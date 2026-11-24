@@ -36,6 +36,8 @@ export interface Task {
   description: string;
   /** Done when: how the work will be judged finished (acceptance criteria), checkable by someone who didn't do it. */
   doneWhen?: string;
+  /** The feature's spec it implements (a doc, relative to the project folder; often a briefing's result). */
+  spec?: string;
   assignee: string | null; // agent id
   status: TaskStatus;
   dependsOn: string[];
@@ -76,6 +78,8 @@ export interface TaskInput {
   title: string;
   description?: string;
   done_when?: string;
+  /** The spec it implements (a project doc). */
+  spec?: string;
   depends_on?: string[];
   assets?: string[];
   /** The human reviews it before it's done (Project.reviewBy "marked"). */
@@ -83,6 +87,9 @@ export interface TaskInput {
 }
 
 const MAX_DONE_WHEN = 4000;
+/** A spec path as written by core: relative to the project folder, forward slashes. */
+const cleanSpec = (p: string) => p.trim().replace(/\\/g, "/").replace(/^\.\//, "").slice(0, 300);
+const specOf = (p: string | undefined) => (p?.trim() ? { spec: cleanSpec(p) } : {});
 const doneWhen = (text: string | undefined) => (text?.trim() ? { doneWhen: text.trim().slice(0, MAX_DONE_WHEN) } : {});
 
 const emptyPlan = (): Plan => ({ goal: "", status: "none", revision: 0, feedback: null, tasks: [], updatedAt: Date.now() });
@@ -140,6 +147,7 @@ export class PlanStore {
         title: input.title.trim(),
         description: (input.description ?? "").trim(),
         ...doneWhen(input.done_when ?? old?.doneWhen),
+        ...specOf(input.spec ?? old?.spec),
         assignee: old?.assignee ?? null,
         status: old?.status ?? "todo",
         dependsOn,
@@ -187,6 +195,7 @@ export class PlanStore {
       title: input.title.trim(),
       description: (input.description ?? "").trim(),
       ...doneWhen(input.done_when),
+      ...specOf(input.spec),
       assignee: null,
       status: "todo",
       dependsOn: (input.depends_on ?? []).map((d) => this.task(d).id),
@@ -215,6 +224,8 @@ export class PlanStore {
       work?: Task["work"];
       /** New acceptance criteria; empty removes them. */
       doneWhen?: string;
+      /** The spec it implements; empty removes it. */
+      spec?: string;
       checks?: CheckRun;
       /** A reviewer's verdict, added to its reviews. */
       addReview?: TaskReview;
@@ -233,6 +244,10 @@ export class PlanStore {
     if (change.doneWhen !== undefined) {
       if (change.doneWhen.trim()) task.doneWhen = change.doneWhen.trim().slice(0, MAX_DONE_WHEN);
       else delete task.doneWhen;
+    }
+    if (change.spec !== undefined) {
+      if (change.spec.trim()) task.spec = cleanSpec(change.spec);
+      else delete task.spec;
     }
     if (change.work) task.work = change.work;
     if (change.checks) task.checks = change.checks;
@@ -275,5 +290,6 @@ export function describeTask(t: Task, assigneeName: (id: string) => string | und
   const who = t.assignee ? (assigneeName(t.assignee) ?? "?") : "unassigned";
   const deps = t.dependsOn.length ? ` · after ${t.dependsOn.join(", ")}` : "";
   const assets = t.assets.length ? ` · assets: ${t.assets.join(", ")}` : "";
-  return `${t.id} [${t.status}] ${t.title} — ${who}${deps}${assets}`;
+  const spec = t.spec ? ` · spec: ${t.spec}` : "";
+  return `${t.id} [${t.status}] ${t.title} — ${who}${deps}${assets}${spec}`;
 }

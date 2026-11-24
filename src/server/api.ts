@@ -948,6 +948,12 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     return c.json((await team.questions.store(project)).questions);
   });
 
+  // Briefings: the questions about one feature, asked together (team/questions.ts).
+  api.get("/projects/:id/briefings", async (c) => {
+    const project = withProject(c.req.param("id"));
+    return c.json((await team.questions.store(project)).briefings);
+  });
+
   // Answers to several questions at once; each agent that asked gets its answers in one message.
   api.post("/projects/:id/questions/answers", async (c) => {
     const project = withProject(c.req.param("id"));

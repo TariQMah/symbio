@@ -280,6 +280,7 @@ function reviewAssignment(task: Task, helper: Agent, focus?: string): string {
   return [
     `Symbio: review ${task.id} "${task.title}", done by ${helper.name}. Its work is in this folder${helper.branch ? ` (branch ${helper.branch})` : ""}.`,
     task.description ? `\nThe task:\n${task.description}` : "",
+    task.spec ? `\nIts spec (what the human decided; read it): ${task.spec}` : "",
     task.doneWhen ? `\nDone when:\n${task.doneWhen}` : "\nIt has no Done when: judge it by the task and what the human asked.",
     report ? `\n${helper.name}'s report:\n${report}` : "",
     task.guide ? `\nIts guide for checking it:\n${task.guide}` : "",

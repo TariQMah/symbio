@@ -40,6 +40,19 @@ export class TaskFlow {
     }
   }
 
+  /** Links a task to the spec it implements (core); the helper working on it is told. */
+  async setSpec(project: Project, taskId: string, spec: string): Promise<void> {
+    const store = await this.team.plan(project);
+    const before = store.task(taskId);
+    const task = await store.update(before.id, { spec });
+    if ((task.spec ?? "") === (before.spec ?? "")) return;
+    this.team.planChanged(project);
+    const helper = task.assignee ? project.agents.find((a) => a.id === task.assignee) : undefined;
+    if (helper && active(helper) && task.status !== "done" && task.spec) {
+      await this.team.system(project, helper, `Symbio: ${task.id} now has a spec, ${task.spec}: read it before going on.`, false);
+    }
+  }
+
   async submitPlan(project: Project, coordinator: Agent, goal: string, tasks: TaskInput[]): Promise<string> {
     const store = await this.team.plan(project);
     const plan = await store.propose(goal, tasks);
@@ -98,7 +111,8 @@ export class TaskFlow {
       coordinator,
       helper,
       "request",
-      `Task ${task.id}: ${task.title}\n\n${task.description}${task.doneWhen ? `\n\nDone when:\n${task.doneWhen}` : ""}${assets}${extra ? `\n\n${extra}` : ""}\n\n` +
+      `Task ${task.id}: ${task.title}\n\n${task.description}${task.spec ? `\n\nSpec: ${task.spec} (read it first: it's what the human decided)` : ""}` +
+        `${task.doneWhen ? `\n\nDone when:\n${task.doneWhen}` : ""}${assets}${extra ? `\n\n${extra}` : ""}\n\n` +
         `When it's done, ${helper.branch ? "commit your work and " : ""}call update_task("${task.id}", "review", <summary>) — that is your report` +
         `${task.doneWhen ? ", saying for each point of Done when whether it's met and how you checked" : ""}. ` +
         `If you get stuck, update_task("${task.id}", "blocked", <why>).`,

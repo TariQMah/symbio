@@ -86,7 +86,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `team/fallback.ts` | Failing providers: switch to the next allowed model (or, for a pinned agent, wait and retry its own), a fresh session when the conversation is too large, resuming stuck agents |
 | `team/review.ts` | The human's review of finished tasks (`reviewBy`): the gate on done, approve, send back |
 | `team/verify.ts` | Between a helper's report and core: the project's checks (on reports and before merges) and reviewers (one-off helpers, by core's request or on every task); what fails goes back to the helper |
-| `team/questions.ts` | The team's open questions for the human: asking (repeats refused), answering several at once, setting aside |
+| `team/questions.ts` | The team's open questions for the human: asking (repeats refused), answering several at once, setting aside; briefings (answered together, written as the feature's spec) |
 | `team/quiet-helpers.ts` | Helpers that end their turn without reporting: reminded once, then core is told |
 | `team/permissions.ts` | OpenCode permission requests: answered from known rules, or held for the human |
 | `team/housekeeper.ts` | The hourly and daily housekeeping run (see `housekeeping.ts`) and its reports |
@@ -99,7 +99,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `housekeeping.ts` | Daily: backups of Symbio's state (`~/.symbio/backups`), commits no remote has, build outputs piling up in helpers' folders |
 | `plan.ts` | The plan and its tasks (`plan.json`) |
 | `checks.ts` | Project checks: validating the human's, running them in a folder (shell, low priority, time limit, process tree stopped past it), what a helper is told when they fail |
-| `questions.ts` | The team's questions for the human and their answers (`questions.json`) |
+| `questions.ts` | The team's questions for the human and their answers (`questions.json`), and briefings (`briefings.json`) |
 | `costs.ts` | Token usage per agent and model, model prices (`~/.symbio/prices.json`) and estimated cost |
 | `assets.ts` | Shared-asset register: holders, queues, history, merge-time checks (`assets.json`) |
 | `workspaces.ts` | Where helpers work: git worktrees (create, merge, sync, remove, restore) or the shared project folder |
@@ -248,6 +248,7 @@ bar), from the same pieces.
 | Agents, settings, allowed models | `.symbio/project.json` | no |
 | Every message (from, to, kind, text, time) | `.symbio/messages.jsonl` | no |
 | Plan and tasks | `.symbio/plan.json` | no |
+| Briefings | `.symbio/briefings.json` (their questions in `questions.json`; their specs in the docs, `specs/`) | no |
 | Shared-asset register | `.symbio/assets.json` | no |
 | Private docs (if chosen) | `.symbio/docs/` | no |
 | Files attached in chats, and their index | `.symbio/attachments/`, `.symbio/attachments.json` | no |

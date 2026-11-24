@@ -57,7 +57,8 @@ const askHuman: Tool = {
   description:
     "Add a question to the human's open questions (Needs you): a decision or information only they can give. One question per call; " +
     "they answer when they can, often several at once, and the answer arrives as a message. Asking what's already open is refused. " +
-    "Not for reviews of finished work (that's update_task review) or approving the plan.",
+    "Not for reviews of finished work (that's update_task review) or approving the plan. Several questions about one feature or " +
+    "request go together in a briefing (start_briefing, the coordinator's).",
   inputSchema: obj(
     {
       question: str("One question, short and answerable on its own (e.g. \"Should a blank field in the generated form warn or block?\")"),
@@ -76,6 +77,48 @@ const askHuman: Tool = {
       taskId: task_id ? String(task_id) : undefined,
       blocking: blocking === true,
     });
+  },
+};
+
+const startBriefing: Tool = {
+  name: "start_briefing",
+  description:
+    "Ask the human the questions about one feature or request together, before work on it starts (your briefing skill has the method). " +
+    "They're grouped in Needs you, answered in one sitting; the answers arrive together once all are in, written by Symbio as the " +
+    "feature's spec (docs/specs/), which you complete and link from its tasks (spec). Propose one when a request is new, big, risky " +
+    "or vague, and when the human asks for one.",
+  inputSchema: obj(
+    {
+      feature: str("The feature or request it's about, in the human's words (also the spec's title)"),
+      why: str("Why these questions, in a sentence, for the human"),
+      questions: {
+        type: "array",
+        description: "The questions (2 to 15), each answerable on its own",
+        items: obj(
+          {
+            question: str("One question, short and answerable on its own"),
+            context: str("What they need to know to answer it (markdown)"),
+            options: { type: "array", items: { type: "string" }, description: "Suggested answers, when there are clear ones" },
+          },
+          ["question"],
+        ),
+      },
+    },
+    ["feature", "questions"],
+  ),
+  run({ feature, why, questions }, { team, project, agent }) {
+    if (!Array.isArray(questions)) throw new Error("questions must be a list");
+    return team.questions.brief(
+      project,
+      agent,
+      String(feature ?? ""),
+      why ? String(why) : undefined,
+      questions.map((q: any) => ({
+        question: String(q?.question ?? ""),
+        context: q?.context ? String(q.context) : undefined,
+        options: Array.isArray(q?.options) ? q.options.map(String) : undefined,
+      })),
+    );
   },
 };
 
@@ -322,6 +365,7 @@ const taskShape = {
       "Done when: how the work will be judged finished, as checks someone who didn't do it can verify (what must exist, what it " +
         "must do or say, what must not break), one per line. The helper reports against it and the review checks it.",
     ),
+    spec: str("The feature's spec it implements: a doc's path relative to the project folder (e.g. a briefing's docs/specs/…)"),
     depends_on: { type: "array", items: { type: "string" }, description: "Keys/ids of tasks that must be done first" },
     assets: { type: "array", items: { type: "string" }, description: "Shared assets this task will change" },
     review: { type: "boolean", description: "The human reviews this task before it's done (when they review the tasks marked in the plan)" },
@@ -399,14 +443,21 @@ const updateTask: Tool = {
           "and whether you already ran them. Required when the human reviews the project's work.",
       ),
       done_when: str("Coordinator only: replace the task's Done when (its acceptance criteria)"),
+      spec: str("Coordinator only: the spec it implements (a doc's path relative to the project folder; empty removes it)"),
     },
     ["task_id"],
   ),
-  async run({ task_id, status, note, summary, guide, done_when }, { team, project, agent }) {
+  async run({ task_id, status, note, summary, guide, done_when, spec }, { team, project, agent }) {
+    if (spec !== undefined) {
+      if (agent.role !== "coordinator") throw new Error("Only the coordinator links a task to its spec.");
+      await team.tasks.setSpec(project, String(task_id), String(spec));
+    }
     if (done_when !== undefined) {
       if (agent.role !== "coordinator") throw new Error("Only the coordinator changes a task's Done when; ask it if it should change.");
       await team.tasks.setDoneWhen(project, String(task_id), String(done_when), agent.name);
-      if (status === undefined && note === undefined && summary === undefined && guide === undefined) return `${String(task_id).toUpperCase()}'s Done when is updated.`;
+    }
+    if ((spec !== undefined || done_when !== undefined) && status === undefined && note === undefined && summary === undefined && guide === undefined) {
+      return `${String(task_id).toUpperCase()} is updated.`;
     }
     // Agents often call it "summary"; dropping it silently lost their review notes.
     const text = note ?? summary;
@@ -914,6 +965,7 @@ const COORDINATOR_ONLY = [
   subRepositories,
   submitPlan,
   addTask,
+  startBriefing,
   assignTask,
   spawnAgent,
   listSkillsTool,

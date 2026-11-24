@@ -43,3 +43,24 @@ test("asking what's already open is spotted, whatever the case, accents or punct
   await store.close("Q1", { answer: "Avisar", answeredIn: "chat" });
   assert.equal(store.duplicateOf("No TCE gerado, o Plano de Atividades em branco deve só avisar, impedir ou ficar livre?"), undefined, "closed questions can be asked again");
 });
+
+test("a briefing asks its questions together (blocking unless said), is kept with them, and is answered once all are closed", async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "sym-b-"));
+  const store = await QuestionStore.load(dir);
+  await assert.rejects(store.startBriefing("core", "Form", undefined, [{ question: "Only one?" }]), /at least two/);
+  await assert.rejects(store.startBriefing("core", " ", undefined, [{ question: "a" }, { question: "b" }]), /Name the feature/);
+  const { briefing, questions } = await store.startBriefing("core", "Order form", "Before planning.", [
+    { question: "Who fills it in?" },
+    { question: "Is it printed?", blocking: false },
+  ]);
+  assert.equal(briefing.id, "B1");
+  assert.deepEqual(questions.map((q) => [q.id, q.briefing, q.blocking]), [["Q1", "B1", true], ["Q2", "B1", false]]);
+  await store.close("Q1", { answer: "Customers", answeredIn: "human" });
+  assert.equal(store.briefingAnswered(briefing), false);
+  await store.close("Q2", { setAside: true, note: "Not now" });
+  assert.equal(store.briefingAnswered(briefing), true);
+  await store.finishBriefing("b1", "docs/specs/order-form.md");
+  const again = await QuestionStore.load(dir);
+  assert.deepEqual([again.briefing("B1").state, again.briefing("B1").spec], ["done", "docs/specs/order-form.md"]);
+  assert.equal(again.get("Q2").answer, "Not now");
+});

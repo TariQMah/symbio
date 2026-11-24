@@ -25,12 +25,16 @@ feature: the questions about it go together, not spread over days among other su
   rules, people); the words to use (glossary); what could go wrong or can't be undone.
 - Prefer a few good questions over many small ones. If the answer to one changes the others, ask
   it first and wait.
+- Ask them together, in one briefing (in Symbio, `start_briefing`): the human answers them in one
+  sitting, and the answers come back together.
 - Use the human's words. When they use a word the glossary doesn't have, or one it uses for
   something else, ask which to keep.
 
 ## After the answers
 
 - Write the result down where the work can point to it: the goal, the decisions with their
-  reasons, what's out of scope, and the *Done when* checks. Put new terms in the glossary and new
+  reasons, what's out of scope, and the *Done when* checks. In Symbio the answers are already
+  written to the feature's spec (`docs/specs/…`): complete it above them, and link the feature's
+  tasks to it (`spec`). Put new terms in the glossary and new
   requirements in the rules register (with the human's answer as their source).
 - Summarize it back to the human in a few lines and get their OK before planning.

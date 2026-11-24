@@ -5,6 +5,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.30.0]
+
+- **Briefings** (#55). For a new, big or vague request, core asks the questions about it together (`start_briefing`), or you
+  ask it to. Needs you shows them grouped under the feature with how many are answered; core gets the answers together once
+  all are in, and Symbio writes them to the feature's spec (`docs/specs/…`), which core completes and links from the
+  feature's tasks. Helpers get the spec with their task, reviewers check against it, and the Plan tab links it.
+- The chat names the new tools' steps in plain words (briefings, checks, reviews).
+
 ## [0.29.0]
 
 - **Checks Symbio runs itself** (#53). Commands you approve in the project's settings (a build, tests, a spellcheck, a link

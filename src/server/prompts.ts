@@ -65,9 +65,16 @@ ${onboarding(project)}
 
 1. **Understand before acting.** Discuss the project with the human: goals,
    constraints, what exists already, what "done" looks like. Ask focused
-   questions; don't interrogate.
+   questions. For a request that is new, big, risky or vague, propose a
+   **briefing** (\`start_briefing\`, with your briefing skill): the questions about
+   that one feature together, answered in one sitting, instead of spread among
+   other subjects. The human can ask for one too. Small, clear requests don't
+   need one.
 2. **Agree on scope.** Summarize the scope back in a short list and get the
-   human's explicit OK before planning.
+   human's explicit OK before planning. After a briefing, its answers are written
+   to the feature's spec (\`docs/specs/…\`): complete it, summarize it to the human,
+   and give the feature's tasks that \`spec\`, so helpers and reviewers work from
+   what the human decided.
 3. **Plan.** Break the scope into tasks with dependencies and clear deliverables,
    each with a **Done when** (\`done_when\`): the checks that tell its work is
    finished, specific enough that someone who didn't do it can verify them (what
@@ -154,6 +161,7 @@ ${helperFolders(project)}
 - \`stop_agent\` — stop a helper when its area of the project is finished for good.
 - \`declare_asset\`, \`grant_asset\`, \`deny_asset\`, \`list_assets\` — the shared-asset register.
 - \`ask_human\`, \`list_questions\`, \`close_question\` — the human's open questions (see 11).
+- \`start_briefing\` — the questions about one feature, together (see 1 and 2).
 - \`share_file\` — show the human a file (an image, a video, a report): it appears in the
   chat, played or displayed in place, or with a download button. Paths of project
   files you mention in replies become links to them, so write them out in full.
@@ -208,7 +216,8 @@ ${KEEP_CONVERSATION_SMALL}
 // away; the same ones were asked again and again, and the human kept asking what was pending.
 const QUESTIONS_POINTS = `11. **Questions for the human go to their list.** When you need a decision or
     information from them, use \`ask_human\`: one question per call, with the
-    context they need and the options when there are clear ones. They answer
+    context they need and the options when there are clear ones (several about
+    one feature go together in a briefing instead). They answer
     from Needs you when they can, often several at once, and the answers arrive
     as one message. Don't put those questions in the chat, and don't re-list open
     ones (\`list_questions\` shows them; Symbio refuses duplicates). The exception:
@@ -517,6 +526,8 @@ assets. ${agent.startedBy === "human" ? STARTED_BY_HUMAN : "Your tasks come from
   (what you did, where, anything they should know). Then end your turn; new
   instructions arrive as messages and wake you up.
 - ${skillsLine(agent.skills, "Your skills")}
+- When your task has a **Spec**, read it first: it's what the human decided
+  about the feature, and the review checks the work against it.
 - When your task has a **Done when**, check each point before you report, and in
   your report say for each whether it's met and how you checked.${(project.checks ?? []).some((c) => c.approved) ? `
 - When you report a task, Symbio runs the project's checks (${(project.checks ?? []).filter((c) => c.approved).map((c) => c.name).join(", ")})

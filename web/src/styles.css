@@ -876,6 +876,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .questions-head { display: flex; align-items: center; gap: 8px; font-size: 13px; position: sticky; top: 0; z-index: 1; background: var(--panel); padding: 4px 0; }
 .question-card { border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .question-card.answered { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.briefing { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--r-lg); border: 1px dashed var(--border-strong); background: var(--accent-soft); }
+.briefing-head { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.briefing-head .row { gap: 6px; }
+.briefing-head .hint { font-size: 12px; color: var(--text-3); }
+.task-spec { margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .question-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .question-meta .when { margin-left: auto; font-size: 11px; color: var(--text-3); }
 .question-id { font-family: var(--mono); font-size: 11px; color: var(--accent-text); background: var(--accent-soft); border-radius: var(--r-sm); padding: 1px 6px; }

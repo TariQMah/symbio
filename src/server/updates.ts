@@ -318,6 +318,15 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "glossary without changing anything; its findings go back to the helper, its verdict comes to you. The human can require " +
       "a reviewer for every task; then reports reach you once it passed.",
   },
+  {
+    id: "2026-11-24-briefings",
+    text:
+      "Briefings: for a request that is new, big, risky or vague, ask the questions about it together with start_briefing (your " +
+      "briefing skill has the method) instead of one by one among other subjects; the human can ask for one too. They're grouped " +
+      "in Needs you, and the answers arrive together once all are in, written by Symbio to the feature's spec (docs/specs/). " +
+      "Complete the spec, summarize it to the human, and link the feature's tasks to it with spec (submit_plan, add_task, " +
+      "update_task): helpers get it with the task, and reviewers check against it.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

@@ -1,11 +1,16 @@
 // The team's open questions for the human (questions.ts keeps them). Agents ask with ask_human;
 // the human answers from Needs you, several at once, and each asker gets its answers in one message
 // (a helper's go to the helper, and core is told). Asking what's already open is refused, so the
-// same question doesn't come back again and again.
+// same question doesn't come back again and again. A briefing (start_briefing) asks the questions
+// about one feature together: the human sees them grouped, and the asker gets the answers together,
+// once all are in, written down as the feature's spec.
 
+import { existsSync, promises as fs } from "node:fs";
+import path from "node:path";
 import { bus } from "../bus.js";
 import { attachmentNote, getAttachments, markSent, type Attachment } from "../attachments.js";
-import { QuestionStore, type Question, type QuestionInput } from "../questions.js";
+import { docsPaths } from "../docs.js";
+import { QuestionStore, type Briefing, type Question, type QuestionInput } from "../questions.js";
 import type { Agent, Project } from "../store.js";
 import { active, type TeamCore } from "./core.js";
 
@@ -47,6 +52,32 @@ export class Questions {
     );
   }
 
+  /** A briefing: the questions about one feature, asked together (core's start_briefing). */
+  async brief(project: Project, agent: Agent, feature: string, why: string | undefined, inputs: QuestionInput[]): Promise<string> {
+    const store = await this.store(project);
+    const repeated = inputs.map((q) => store.duplicateOf(String(q?.question ?? ""))).filter((q): q is Question => !!q);
+    if (repeated.length) {
+      throw new Error(
+        `Already open: ${repeated.map((q) => `${q.id} ("${q.question}")`).join(", ")}. Leave those out of the briefing (their answers arrive as messages), ` +
+          "or close them with close_question first.",
+      );
+    }
+    for (const q of inputs) if (q?.taskId) (await this.team.plan(project)).task(q.taskId);
+    const { briefing, questions } = await store.startBriefing(agent.id, feature, why, inputs);
+    await this.team.log(project, {
+      from: agent.id,
+      to: "human",
+      kind: "question",
+      text: `${briefing.id}: a briefing about ${briefing.feature} (${questions.length} questions, ${questions[0].id}–${questions.at(-1)!.id}).`,
+    });
+    this.changed(project);
+    return (
+      `Briefing ${briefing.id} recorded: ${questions.map((q) => q.id).join(", ")}, grouped in the human's Needs you. The answers arrive ` +
+      "together, once all are answered or set aside, with the spec Symbio writes from them. Don't repeat the questions in the chat. " +
+      "Meanwhile, continue with work that doesn't depend on it, or end your turn."
+    );
+  }
+
   /** The human's answers, several at once (each may bring files): one message per agent that asked. */
   async answer(project: Project, answers: { id: string; answer: string; attachments?: string[] }[]): Promise<Question[]> {
     const store = await this.store(project);
@@ -64,8 +95,11 @@ export class Questions {
     }
     this.changed(project);
 
+    // A briefing's answers go together, once all of its questions are closed.
+    const briefings = new Set(closed.filter((q) => q.briefing).map((q) => q.briefing!));
+    for (const id of briefings) await this.finishIfAnswered(project, id, filesOf);
     const byAsker = new Map<string, Question[]>();
-    for (const q of closed) byAsker.set(q.askedBy, [...(byAsker.get(q.askedBy) ?? []), q]);
+    for (const q of closed.filter((x) => !x.briefing)) byAsker.set(q.askedBy, [...(byAsker.get(q.askedBy) ?? []), q]);
     const core = this.team.coordinator(project);
     for (const [askerId, qs] of byAsker) {
       const asker = project.agents.find((x) => x.id === askerId);
@@ -87,8 +121,12 @@ export class Questions {
   /** The human doesn't want to answer it (no longer relevant, or decided elsewhere). */
   async setAside(project: Project, id: string, note?: string): Promise<Question> {
     const store = await this.store(project);
-    const q = await store.close(id, { setAside: true });
+    const q = await store.close(id, { setAside: true, ...(note?.trim() ? { note: note.trim() } : {}) });
     this.changed(project);
+    if (q.briefing) {
+      await this.finishIfAnswered(project, q.briefing, new Map());
+      return q;
+    }
     const asker = project.agents.find((x) => x.id === q.askedBy);
     const target = asker && active(asker) ? asker : this.team.coordinator(project);
     if (target && active(target)) {
@@ -109,7 +147,41 @@ export class Questions {
     if (agent.role !== "coordinator" && q.askedBy !== agent.id) throw new Error(`${q.id} was asked by someone else; only they or the coordinator can close it.`);
     await store.close(q.id, answer?.trim() ? { answer, answeredIn: "chat" } : { setAside: true });
     this.changed(project);
+    if (q.briefing) await this.finishIfAnswered(project, q.briefing, new Map());
     return answer?.trim() ? `${q.id} closed with the answer the human gave in the chat.` : `${q.id} closed: no longer needed.`;
+  }
+
+  /**
+   * A briefing whose questions are all closed: its answers are written as the feature's spec, and
+   * the asker gets them together (from the human), with where the spec is.
+   */
+  private async finishIfAnswered(project: Project, id: string, filesOf: Map<string, Attachment[]>) {
+    const store = await this.store(project);
+    const briefing = store.briefing(id);
+    if (briefing.state !== "open" || !store.briefingAnswered(briefing)) return;
+    const questions = briefing.questions.map((q) => store.get(q));
+    const spec = await writeSpec(project, briefing, questions);
+    await store.finishBriefing(briefing.id, spec);
+    this.changed(project);
+    await this.team.log(project, { from: "symbio", to: "human", kind: "system", text: `${briefing.id} (${briefing.feature}) is answered; its spec is ${spec}.` });
+
+    const list = questions
+      .map((q) => `${q.id}: ${q.question}\n→ ${q.state === "answered" ? q.answer : `set aside${q.answer ? ` (${q.answer})` : ""}`}${q.files?.length ? ` (attached: ${q.files.join(", ")})` : ""}`)
+      .join("\n\n");
+    const files = questions.flatMap((q) => filesOf.get(q.id) ?? []);
+    const asker = project.agents.find((a) => a.id === briefing.askedBy);
+    const target = asker && active(asker) ? asker : this.team.coordinator(project);
+    if (!target || !active(target)) return;
+    await this.team.system(
+      project,
+      target,
+      `Symbio: the answers to briefing ${briefing.id} (${briefing.feature}) are written to ${spec}. Complete that spec (your briefing skill ` +
+        "says how: the goal, the decisions and their reasons, what's out of scope, the Done when checks), summarize it to the human, " +
+        `and give the feature's tasks spec "${spec}" (submit_plan, add_task or update_task).`,
+      false,
+    );
+    await this.team.sendFromHuman(project, target, `My answers to briefing ${briefing.id} (${briefing.feature}):\n\n${list}` + attachmentNote(files));
+    if (files.length) await markSent(project, files.map((f) => f.id), target.id);
   }
 
   async describe(project: Project): Promise<string> {
@@ -119,8 +191,12 @@ export class Questions {
     const who = (id: string) => this.team.agentName(project, id) ?? "?";
     const lines = [
       open.length ? "Open (waiting for the human):" : "No open questions.",
-      ...open.map((q) => `- ${q.id}${q.blocking ? " [blocking]" : ""}${q.taskId ? ` (${q.taskId})` : ""} by ${who(q.askedBy)}: ${q.question}`),
+      ...open.map((q) => `- ${q.id}${q.briefing ? ` [${q.briefing}]` : ""}${q.blocking ? " [blocking]" : ""}${q.taskId ? ` (${q.taskId})` : ""} by ${who(q.askedBy)}: ${q.question}`),
     ];
+    const briefings = store.briefings.filter((b) => b.state === "open");
+    if (briefings.length) lines.push("", "Open briefings:", ...briefings.map((b) => `- ${b.id}: ${b.feature} (${b.questions.join(", ")})`));
+    const specs = store.briefings.filter((b) => b.state === "done").slice(-5);
+    if (specs.length) lines.push("", "Answered briefings:", ...specs.map((b) => `- ${b.id}: ${b.feature} → ${b.spec}`));
     if (recent.length) {
       lines.push("", "Recently closed:");
       for (const q of recent) lines.push(`- ${q.id}: ${q.question} → ${q.state === "answered" ? q.answer : "set aside"}`);
@@ -131,4 +207,34 @@ export class Questions {
   private changed(project: Project) {
     bus.publish({ type: "questions.updated", projectId: project.id });
   }
+}
+
+/** The briefing's answers as the start of its feature's spec (docs/specs/<feature>.md), for its asker to complete. */
+async function writeSpec(project: Project, briefing: Briefing, questions: Question[]): Promise<string> {
+  const folder = path.join(docsPaths(project).folder, "specs");
+  const slug =
+    briefing.feature
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || briefing.id.toLowerCase();
+  let file = path.join(folder, `${slug}.md`);
+  for (let n = 2; existsSync(file); n++) file = path.join(folder, `${slug}-${n}.md`);
+  const day = new Date().toISOString().slice(0, 10);
+  const answers = questions
+    .map((q) => {
+      const answer = q.state === "answered" ? q.answer! : `*Set aside${q.answer ? `: ${q.answer}` : ""}.*`;
+      return `### ${q.question}\n\n${answer}${q.files?.length ? `\n\nAttached: ${q.files.join(", ")}` : ""}`;
+    })
+    .join("\n\n");
+  const text =
+    `# ${briefing.feature}\n\n` +
+    `*From briefing ${briefing.id}, answered by the human on ${day}.*${briefing.why ? ` ${briefing.why}` : ""}\n\n` +
+    "<!-- To complete: the goal, the decisions and their reasons, what's out of scope, and the Done when checks, above the answers. -->\n\n" +
+    `## The human's answers\n\n${answers}\n`;
+  await fs.mkdir(folder, { recursive: true });
+  await fs.writeFile(file, text);
+  return path.relative(project.directory, file).split(path.sep).join("/");
 }

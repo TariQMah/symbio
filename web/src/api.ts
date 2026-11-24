@@ -120,6 +120,8 @@ export interface Task {
   guide?: string;
   /** Done when: how the work will be judged finished. */
   doneWhen?: string;
+  /** The feature's spec it implements (a doc, relative to the project folder). */
+  spec?: string;
   review?: boolean;
   humanReview?: { state: "waiting" | "approved" | "sent-back"; at: number; note?: string };
   /** The latest run of the project's checks on its work. */
@@ -147,6 +149,20 @@ export interface Question {
   answer?: string;
   answeredIn?: "human" | "chat";
   closedAt?: number;
+  /** The briefing it belongs to (its questions are answered together). */
+  briefing?: string;
+}
+
+/** The questions about one feature, asked together; answered, they become its spec. */
+export interface Briefing {
+  id: string;
+  feature: string;
+  why?: string;
+  askedBy: string;
+  askedAt: number;
+  questions: string[];
+  state: "open" | "done";
+  spec?: string;
 }
 
 export interface TaskChange {
@@ -888,6 +904,7 @@ export const api = {
     call<{ path: string; where: string; entries: DirEntry[]; truncated: boolean }>("GET", `/projects/${projectId}/files/tree?${fileQuery(dir, agentId)}`),
   sharedFiles: (projectId: string) => call<SharedFile[]>("GET", `/projects/${projectId}/shared-files`),
   questions: (projectId: string) => call<Question[]>("GET", `/projects/${projectId}/questions`),
+  briefings: (projectId: string) => call<Briefing[]>("GET", `/projects/${projectId}/briefings`),
   answerQuestions: (projectId: string, answers: { id: string; answer: string; attachments?: string[] }[]) =>
     call<Question[]>("POST", `/projects/${projectId}/questions/answers`, { answers }),
   setAsideQuestion: (projectId: string, id: string, note?: string) => call<Question[]>("POST", `/projects/${projectId}/questions/${id}/set-aside`, { note }),

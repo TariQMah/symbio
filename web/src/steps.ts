@@ -69,6 +69,14 @@ function toolLabel(tool: string, i: Record<string, unknown>): StepLabel {
       return { label: "Checked for messages", weight: 1 };
     case "ask_human":
       return { label: "Added a question for you", detail: firstLine(i.question), weight: 3 };
+    case "start_briefing":
+      return { label: "Started a briefing for you", detail: firstLine(i.feature), weight: 3 };
+    case "propose_check":
+      return { label: `Proposed a check: ${s(i.name)}`, detail: firstLine(i.command), weight: 3 };
+    case "request_review":
+      return { label: `Asked for a review of ${task}`, detail: firstLine(i.focus), weight: 3 };
+    case "submit_review":
+      return { label: `Reviewed ${task}: ${s(i.verdict) === "pass" ? "it passes" : "changes needed"}`, detail: firstLine(i.findings), weight: 3 };
     case "list_questions":
       return { label: "Checked your open questions", weight: 1 };
     case "close_question":

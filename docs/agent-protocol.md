@@ -104,6 +104,15 @@ being merged (unless core forces the merge).
   told). *marked*: only the tasks marked for the human (`review: true` in `submit_plan` /
   `add_task`, which core sets when it proposes the plan; the human ticks or unticks them in the Plan
   tab, `POST …/plan/tasks/:id/mark`) wait; the others work as with *core*.
+- **Briefings** (`start_briefing`, core only; `.symbio/briefings.json`): the questions about one
+  feature or request, asked together before work on it starts (2 to 15, blocking unless said),
+  numbered like other questions and tagged with the briefing (`B1`). Needs you groups them under
+  the feature. The asker gets nothing until all are answered or set aside; then Symbio writes the
+  answers to the feature's spec (`docs/specs/<feature>.md`, or `specs/` in private docs), gives the
+  asker the answers together as one message from the human, with a note to complete the spec and
+  link the feature's tasks to it. A task's `spec` (`submit_plan`, `add_task`, `update_task`, core
+  only) is a doc path relative to the project folder: its helper gets it with the task ("read it
+  first"), a reviewer with its review, and the Plan tab links it.
 - **Open questions** (`team/questions.ts`, `.symbio/questions.json`). Questions for the human go to
   their list instead of the chat: `ask_human` adds one, numbered Q1, Q2… Asking what's already open
   (near-identical wording, any case or accents) is refused with the open one's number. The human
@@ -163,6 +172,7 @@ All agents:
 | Tool | What it does |
 |---|---|
 | `send_message` | Message another agent by name (`core` is the coordinator); wakes the recipient |
+| `start_briefing` | core: the questions about one feature together (feature, why, questions with context and options); answered, they become its spec |
 | `ask_human` | Add a question to the human's open questions (Needs you): one per call, with context, options, the task and whether work is blocked; the answer arrives later as a message |
 | `list_questions` | The open questions, and the ones closed recently with their answers |
 | `close_question` | Close an open question: with the answer the human gave in the chat, or without one when it's no longer needed |
