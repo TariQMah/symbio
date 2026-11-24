@@ -64,8 +64,10 @@ const WINDOWS_LISTING = {
   options: { encoding: "utf8" as const, windowsHide: true, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 },
 };
 
-function parseWindowsListing(stdout: string): ProcessInfo[] {
-  const rows = JSON.parse(stdout || "[]");
+export function parseWindowsListing(stdout: string): ProcessInfo[] {
+  // Windows PowerShell's ConvertTo-Json leaves some control characters raw in strings (a program's
+  // command line can hold one), which JSON.parse refuses: the whole listing failed. They become spaces.
+  const rows = JSON.parse((stdout || "[]").replace(/[\u0000-\u001f]/g, " "));
   return (Array.isArray(rows) ? rows : [rows]).map((r: any) => ({
     pid: Number(r.p),
     parent: Number(r.q),

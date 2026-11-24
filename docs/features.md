@@ -33,15 +33,25 @@
 - **One word per thing.** Every project has a glossary core keeps: the project's terms, what each
   means and the words not to use. Every agent gets it, so the work, the reports and what you read
   use the same words; when two words are used for one thing, core asks you which to keep.
-- **Skills.** Packaged methods agents load when a task calls for one: Symbio's for leading (a
-  briefing, keeping the glossary, a handoff, a review), yours (write one, or add a copy of one from
-  another folder after reading it), and the ones other tools keep on this computer, listed to add.
-  core gets the skills you choose for it, and gives each helper the ones its work needs (a front-end
-  checklist for the helper building pages); you can change a helper's in its chat.
-- **Briefings.** For a new, big or vague request, core asks the questions about it together (or
+- **Runs on its own, or asks: your choice per project.** *Decide and tell me* (new projects): core
+  picks the option it would recommend, keeps going, and shows it in Needs you as a decision you keep
+  or change; it approves its own plan, and waits only for what can't be undone, costs more than you
+  allow, legal or safety matters, or contradictory requirements. *Ask me and wait*: core asks and
+  waits, and the plan waits for your approval. You also write what the team may do without asking
+  (spending, deploying, deleting…), and whether it may install packages.
+- **Skills.** Packaged methods agents load when a task calls for one, in a library grouped by
+  category (planning, software, design, writing, data, operations, media…): Symbio's own, a few
+  popular ones by other authors (Matt Pocock, Jesse Vincent, Anthropic, Addy Osmani and others,
+  credited with a link and their license, each a reviewed copy), yours (write one, or add a copy of
+  one from another folder after reading it), and the ones other tools keep on this computer, listed
+  to add. core gives each helper the ones its work needs, and writes one when none fits; you can
+  change a helper's in its chat.
+- **Briefings, or grilling.** For a new, big or vague request, core asks the questions about it together (or
   you ask it to): Needs you shows them grouped under the feature, you answer them in one sitting,
   and the answers become the feature's spec, which its tasks link to and helpers and reviewers
-  work from.
+  work from. If you prefer more
+  questions and fewer surprises, choose *grilling*: rounds of questions, each with core's
+  recommended answer, until nothing is open.
 - **Evidence you can find.** Files a helper shares to show its work (a screenshot, an output, a
   test result) are tagged with their task: the task lists them, reviewers get them, and the Files
   tab filters by kind (evidence, reports, yours) and task.

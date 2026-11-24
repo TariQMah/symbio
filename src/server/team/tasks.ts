@@ -55,7 +55,22 @@ export class TaskFlow {
 
   async submitPlan(project: Project, coordinator: Agent, goal: string, tasks: TaskInput[]): Promise<string> {
     const store = await this.team.plan(project);
-    const plan = await store.propose(goal, tasks);
+    let plan = await store.propose(goal, tasks);
+    // The human lets core decide: the plan is approved as it's made; they can still ask for changes.
+    if (project.autonomy === "decide") {
+      plan = await store.decide(true, null);
+      this.team.planChanged(project);
+      await this.team.log(project, {
+        from: coordinator.id,
+        to: "human",
+        kind: "plan",
+        text: `Started on a plan (revision ${plan.revision}, ${plan.tasks.length} tasks) — it's in the Plan tab; tell core if you want changes.\n\n**Goal:** ${plan.goal}`,
+      });
+      return (
+        `Plan recorded (revision ${plan.revision}): ${plan.tasks.map((t) => t.id).join(", ")}. The human lets you decide, so it's approved: ` +
+        "start assigning the work now. They see it in the Plan tab and tell you if they want changes."
+      );
+    }
     this.team.planChanged(project);
     await this.team.log(project, {
       from: coordinator.id,

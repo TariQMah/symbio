@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { AssetRegister } from "./assets.js";
-import { AGENT_PERMISSIONS, PLAN_MODE_PERMISSIONS, REVIEWER_PERMISSIONS } from "./guard.js";
+import { AGENT_PERMISSIONS, PLAN_MODE_PERMISSIONS, REVIEWER_PERMISSIONS, withoutInstallAsks } from "./guard.js";
 import { bus } from "./bus.js";
 import { glossaryInstruction, privateDocsInstruction } from "./docs.js";
 import type { McpResolver } from "./mcp.js";
@@ -16,7 +16,7 @@ import { PlanStore, type Task, type TaskInput, type TaskStatus } from "./plan.js
 import type { RemoteOps } from "./remote.js";
 import { coordinatorBrief, kickoffMessage, modeNote, reviewerBrief, workerBrief } from "./prompts.js";
 import { git } from "./git.js";
-import { defaultModel, globalDir, modelsFor, newId, type Agent, type CoreMode, type HelperWorkspace, type ReviewBy, type LoggedMessage, type MessageKind, type Project, type Store } from "./store.js";
+import { defaultModel, globalDir, modelsFor, newId, type Agent, type Autonomy, type CoreMode, type HelperWorkspace, type ReviewBy, type LoggedMessage, type MessageKind, type Project, type Store } from "./store.js";
 import { accountUsage, emptyUsage } from "./costs.js";
 import { AGENT_UPDATES, unseenUpdates, updatesNote } from "./updates.js";
 import { coordinatorTools, workerTools, type ToolContext } from "./tools.js";
@@ -36,7 +36,7 @@ import { Usage } from "./team/usage.js";
 import { Watchdog } from "./team/watchdog.js";
 import { handoffRequest, Switches, type SwitchOptions } from "./team/switch.js";
 import { Sessions } from "./team/sessions.js";
-import { DEFAULT_CORE_SKILLS, listSkills } from "./skills.js";
+import { createSkill, DEFAULT_CORE_SKILLS, listSkills, QUESTION_STYLE_SKILLS, SKILL_CATEGORIES, type QuestionStyle } from "./skills.js";
 import { TaskFlow } from "./team/tasks.js";
 import { Verifier } from "./team/verify.js";
 import { normalizeChecks, type Check } from "./checks.js";
@@ -285,8 +285,41 @@ export class Team implements TeamCore {
 
   /** An agent's session rules: the guard for everyone, plus Plan mode's for core, and no edits for reviewers. */
   permissionsFor(project: Project, agent: Pick<Agent, "role"> & Partial<Pick<Agent, "reviewer">>) {
-    if (agent.reviewer) return [...AGENT_PERMISSIONS, ...REVIEWER_PERMISSIONS];
-    return agent.role === "coordinator" && project.coreMode === "plan" ? [...AGENT_PERMISSIONS, ...PLAN_MODE_PERMISSIONS] : AGENT_PERMISSIONS;
+    const base = project.allowInstalls ? withoutInstallAsks(AGENT_PERMISSIONS) : AGENT_PERMISSIONS;
+    if (agent.reviewer) return [...base, ...REVIEWER_PERMISSIONS];
+    return agent.role === "coordinator" && project.coreMode === "plan" ? [...base, ...PLAN_MODE_PERMISSIONS] : base;
+  }
+
+  /**
+   * How core runs the project (the human's settings): how much it decides on its own, how it
+   * questions them, what the team may do without asking. Every agent's brief and rules follow.
+   */
+  async setLeadSettings(
+    project: Project,
+    change: { autonomy?: Autonomy; questionStyle?: QuestionStyle; standingPermissions?: string; allowInstalls?: boolean },
+  ): Promise<void> {
+    if (change.autonomy) project.autonomy = change.autonomy;
+    if (change.questionStyle) {
+      const style = QUESTION_STYLE_SKILLS[change.questionStyle];
+      if (!listSkills().some((s) => s.name === style)) throw new Error(`The ${style} skill isn't in the library.`);
+      project.questionStyle = change.questionStyle;
+      // core's skills (what the settings show) follow: the other style's skill is swapped for this one.
+      const styles = Object.values(QUESTION_STYLE_SKILLS) as string[];
+      const current = project.coreSkills ?? DEFAULT_CORE_SKILLS;
+      project.coreSkills = [...new Set(current.some((s) => styles.includes(s)) ? current.map((s) => (styles.includes(s) ? style : s)) : [...current, style])];
+    }
+    if (change.standingPermissions !== undefined) {
+      const text = change.standingPermissions.trim().slice(0, 4000);
+      if (text) project.standingPermissions = text;
+      else delete project.standingPermissions;
+    }
+    if (change.allowInstalls !== undefined) {
+      if (change.allowInstalls) project.allowInstalls = true;
+      else delete project.allowInstalls;
+    }
+    await this.store.update(project);
+    bus.publish({ type: "project.updated", projectId: project.id });
+    for (const agent of project.agents.filter(active)) await this.refreshInstructions(project, agent).catch(() => {});
   }
 
 /** Who reviews the team's work (team/review.ts). Briefs change with it. */
@@ -1071,7 +1104,7 @@ export class Team implements TeamCore {
     await this.wake(project, agent, body, urgent ? "steer" : "queue");
   }
 
-  async askHuman(project: Project, from: Agent, input: QuestionInput): Promise<string> {
+  async askHuman(project: Project, from: Agent, input: QuestionInput & { waitReason?: string }): Promise<string> {
     if (from.role === "worker") this.quiet.reported(from); // it's waiting on the human, not quiet
     return this.questions.ask(project, from, input);
   }
@@ -1287,7 +1320,7 @@ export class Team implements TeamCore {
   skillsFor(project: Project, agent: Pick<Agent, "role"> & Partial<Pick<Agent, "skills">>): string[] {
     const have = new Set(listSkills().map((s) => s.name));
     const wanted = agent.role === "coordinator" ? (project.coreSkills ?? DEFAULT_CORE_SKILLS) : (agent.skills ?? []);
-    return wanted.filter((s) => have.has(s));
+    return [...new Set(wanted)].filter((s) => have.has(s));
   }
 
   /** The skills core may give helpers: the project's choice, or the whole library. */
@@ -1332,6 +1365,23 @@ export class Team implements TeamCore {
     const coordinator = this.coordinator(project);
     if (by === "human" && coordinator && active(coordinator)) await this.system(project, coordinator, `Symbio: the human set ${agent.name}'s skills: ${list}.`, false);
     return `${agent.name}'s skills: ${list}.`;
+  }
+
+  /**
+   * core writes a skill for its team: instructions only (no files to run), into the library, where
+   * the human sees who wrote it. It may then give it to helpers like any other.
+   */
+  async coreCreatesSkill(project: Project, input: { name: string; description: string; instructions: string; category?: string }): Promise<string> {
+    if (input.category && !SKILL_CATEGORIES.some((c) => c.id === input.category)) {
+      throw new Error(`category is one of: ${SKILL_CATEGORIES.map((c) => c.id).join(", ")}.`);
+    }
+    const skill = await createSkill({ ...input, author: `core, in ${project.name}` });
+    // The project may limit the skills helpers get: one core wrote for it belongs there.
+    if (project.helperSkills && !project.helperSkills.includes(skill.name)) project.helperSkills = [...project.helperSkills, skill.name];
+    await this.store.update(project);
+    this.skillLibraryChanged();
+    await this.log(project, { from: this.coordinator(project)?.id ?? "symbio", to: "human", kind: "system", text: `Wrote a skill, "${skill.name}": ${skill.description}` });
+    return `Wrote "${skill.name}" into the library. Give it to the helpers whose work it fits (spawn_agent skills, or set_skills).`;
   }
 
   /** A skill was added to or removed from the library: every runtime keeps sessions to their own skills. */

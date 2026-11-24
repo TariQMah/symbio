@@ -239,6 +239,12 @@ Thanks to everyone who has contributed to Symbio:
   computer (#36) and the interface in Portuguese (Brazil) (#37).
 - [Veeramanikandan R (@Veeramanikandanr48)](https://github.com/Veeramanikandanr48): copy buttons in the chat (#42).
 
+Symbio ships a few skills by other authors, each credited in Settings → Skills with its license:
+[Matt Pocock](https://github.com/mattpocock/skills), [Jesse Vincent](https://github.com/obra/superpowers),
+[Anthropic](https://github.com/anthropics/skills), [Addy Osmani](https://github.com/addyosmani/agent-skills),
+[GitHub](https://github.com/github/awesome-copilot), [Siqi Chen](https://github.com/blader/humanizer) and
+[Corey Haines](https://github.com/coreyhaines31/marketingskills) (details in `skills/catalog.json`).
+
 <a href="https://github.com/linkzy/symbio/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=linkzy/symbio&max=99" alt="Contributors" />
 </a>

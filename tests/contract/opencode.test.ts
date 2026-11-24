@@ -24,6 +24,7 @@ process.env.SYMBIO_HOME = path.join(root, "symbio");
 const { OpencodeRuntime } = await import("../../src/server/opencode/runtime.js");
 const { OpencodeClient } = await import("../../src/server/opencode/client.js");
 const { handleMcp } = await import("../../src/server/mcp.js");
+const { listSkills } = await import("../../src/server/skills.js");
 
 const runtime = new OpencodeRuntime(path.join(root, "opencode.pid"));
 let client: InstanceType<typeof OpencodeClient>;
@@ -133,7 +134,8 @@ test("skills: Symbio's folders are in OpenCode's config (skills.paths) and liste
     ids = await listed();
     await new Promise((r) => setTimeout(r, 500));
   }
-  for (const name of ["briefing", "glossary", "handoff", "review"]) assert.ok(ids.includes(name), `Symbio's ${name} skill is listed`);
+  // Every skill Symbio ships loads (their frontmatter varies: quoted, block and nested values).
+  for (const { name } of listSkills().filter((s) => s.source === "builtin")) assert.ok(ids.includes(name), `Symbio's ${name} skill is listed`);
   // A session's skills are permission rules on the skill tool (skillRules): accepted like any rule.
   const id = await runtime.createSession({ title: "contract · skills", directory: work, model: `${model.providerID}/${model.id}`, permissions: [], toolsUrl: "http://127.0.0.1:1/mcp/none", skills: ["glossary"] });
   try {

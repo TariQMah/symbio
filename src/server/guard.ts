@@ -35,8 +35,10 @@ export interface PermissionRule {
   effect: "allow" | "deny" | "ask";
 }
 
-// Installing software on the machine needs the human's OK (asked in the UI).
-const INSTALL_PATTERNS = [
+// Installing software on the machine needs the human's OK (asked in the UI). A project can let its
+// team install packages without asking (Project.allowInstalls, withoutInstallAsks): only the package
+// managers' installs, never "download and run" or system installers (RUN_DOWNLOADED_PATTERNS).
+const PACKAGE_INSTALL_PATTERNS = [
   "winget install*",
   "winget upgrade*",
   "choco install*",
@@ -57,9 +59,11 @@ const INSTALL_PATTERNS = [
   "cargo install*",
   "go install*",
   "dotnet tool install*",
-  "msiexec*",
   "*Install-Module*",
   "*Install-Package*",
+];
+const RUN_DOWNLOADED_PATTERNS = [
+  "msiexec*",
   "*Add-AppxPackage*",
   // "download and run" installers
   "*| iex*",
@@ -78,6 +82,7 @@ const INSTALL_PATTERNS = [
   "*| pwsh*",
   "*| powershell*",
 ];
+const INSTALL_PATTERNS = [...PACKAGE_INSTALL_PATTERNS, ...RUN_DOWNLOADED_PATTERNS];
 
 // Agents never read private keys, Symbio's secret store, the UI key (which would let
 // them approve their own actions), their approvals or OpenCode's provider logins.
@@ -221,6 +226,14 @@ const PLAN_MODE_SHELL = [
   "Clear-Content*",
 ];
 export const PLAN_MODE_PERMISSIONS: PermissionRule[] = [...rules("edit", "deny", ["*"]), ...rules("shell", "deny", PLAN_MODE_SHELL)];
+
+/**
+ * Session rules without the asks for installing packages (the project lets its team install). The
+ * asks for running downloaded scripts, system installers and sudo stay.
+ */
+export function withoutInstallAsks(list: PermissionRule[]): PermissionRule[] {
+  return list.filter((r) => !(r.action === "shell" && r.effect === "ask" && PACKAGE_INSTALL_PATTERNS.includes(r.resource)));
+}
 
 // A reviewer checks another helper's work in that helper's folder: it reads and runs things, but
 // doesn't change the work it judges (team/verify.ts).

@@ -1,0 +1,258 @@
+{
+  "brainstorming": {
+    "category": "planning",
+    "author": "Jesse Vincent",
+    "authorUrl": "https://github.com/obra",
+    "source": "https://github.com/obra/superpowers/tree/22f0b463e7a5e579904dd6211a520321035526f7/skills/brainstorming",
+    "repo": "obra/superpowers",
+    "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "a description that doesn't ask to be used before all creative work",
+      "points to Symbio's plan instead of another skill",
+      "without the visual companion (a browser server and its scripts)"
+    ]
+  },
+  "briefing": {
+    "category": "leading",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "code-review": {
+    "category": "software",
+    "author": "Matt Pocock",
+    "authorUrl": "https://github.com/mattpocock",
+    "source": "https://github.com/mattpocock/skills/tree/abeeaf95660ba9e8b7c753eb38f441ca707a8823/skills/engineering/code-review",
+    "repo": "mattpocock/skills",
+    "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "without another tool's config file (agents/openai.yaml)"
+    ]
+  },
+  "copywriting": {
+    "category": "writing",
+    "author": "Corey Haines",
+    "authorUrl": "https://github.com/coreyhaines31",
+    "source": "https://github.com/coreyhaines31/marketingskills/tree/8fd2fcade2fd6629026e9dfe6d133b55b36968b9/skills/copywriting",
+    "repo": "coreyhaines31/marketingskills",
+    "commit": "8fd2fcade2fd6629026e9dfe6d133b55b36968b9",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "without its test cases (evals/)"
+    ]
+  },
+  "explore-data": {
+    "category": "data",
+    "author": "Anthropic",
+    "authorUrl": "https://github.com/anthropics",
+    "source": "https://github.com/anthropics/knowledge-work-plugins/tree/5e504ae11498f2b8daa30d86b7dab97b2ecd8092/data/skills/explore-data",
+    "repo": "anthropics/knowledge-work-plugins",
+    "commit": "5e504ae11498f2b8daa30d86b7dab97b2ecd8092",
+    "license": "Apache-2.0",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "removed the pointer to a connectors file it doesn't ship with"
+    ]
+  },
+  "frontend-design": {
+    "category": "design",
+    "author": "Anthropic",
+    "authorUrl": "https://github.com/anthropics",
+    "source": "https://github.com/anthropics/skills/tree/e4bb5d960d87126ff3b3a8af1a104b7db67560ba/skills/frontend-design",
+    "repo": "anthropics/skills",
+    "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+    "license": "Apache-2.0",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  },
+  "glossary": {
+    "category": "leading",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "grilling": {
+    "category": "planning",
+    "author": "Matt Pocock",
+    "authorUrl": "https://github.com/mattpocock",
+    "source": "https://github.com/mattpocock/skills/tree/abeeaf95660ba9e8b7c753eb38f441ca707a8823/skills/productivity/grilling",
+    "repo": "mattpocock/skills",
+    "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "without another tool's config file (agents/openai.yaml)"
+    ]
+  },
+  "handoff": {
+    "category": "leading",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "humanizer": {
+    "category": "writing",
+    "author": "Siqi Chen",
+    "authorUrl": "https://github.com/blader",
+    "source": "https://github.com/blader/humanizer/tree/a32f24407364c74c812b43c15926d638bee1e072",
+    "repo": "blader/humanizer",
+    "commit": "a32f24407364c74c812b43c15926d638bee1e072",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  },
+  "incident-postmortem": {
+    "category": "operations",
+    "author": "GitHub",
+    "authorUrl": "https://github.com/github",
+    "source": "https://github.com/github/awesome-copilot/tree/f10fdb8b2660ce85c98f220b2f1ca24653768a5c/skills/incident-postmortem",
+    "repo": "github/awesome-copilot",
+    "commit": "f10fdb8b2660ce85c98f220b2f1ca24653768a5c",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  },
+  "incident-response": {
+    "category": "operations",
+    "author": "Anthropic",
+    "authorUrl": "https://github.com/anthropics",
+    "source": "https://github.com/anthropics/knowledge-work-plugins/tree/5e504ae11498f2b8daa30d86b7dab97b2ecd8092/engineering/skills/incident-response",
+    "repo": "anthropics/knowledge-work-plugins",
+    "commit": "5e504ae11498f2b8daa30d86b7dab97b2ecd8092",
+    "license": "Apache-2.0",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "removed the pointer to a connectors file it doesn't ship with"
+    ]
+  },
+  "long-form-writing": {
+    "category": "writing",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "project-planning": {
+    "category": "planning",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "research-method": {
+    "category": "data",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "review": {
+    "category": "leading",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "security-and-hardening": {
+    "category": "software",
+    "author": "Addy Osmani",
+    "authorUrl": "https://github.com/addyosmani",
+    "source": "https://github.com/addyosmani/agent-skills/tree/8c99fa36d90068c82d547f7c12a9d67a3e95f4ee/skills/security-and-hardening",
+    "repo": "addyosmani/agent-skills",
+    "commit": "8c99fa36d90068c82d547f7c12a9d67a3e95f4ee",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  },
+  "server-administration": {
+    "category": "operations",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "systematic-debugging": {
+    "category": "software",
+    "author": "Jesse Vincent",
+    "authorUrl": "https://github.com/obra",
+    "source": "https://github.com/obra/superpowers/tree/22f0b463e7a5e579904dd6211a520321035526f7/skills/systematic-debugging",
+    "repo": "obra/superpowers",
+    "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  },
+  "tdd": {
+    "category": "software",
+    "author": "Matt Pocock",
+    "authorUrl": "https://github.com/mattpocock",
+    "source": "https://github.com/mattpocock/skills/tree/abeeaf95660ba9e8b7c753eb38f441ca707a8823/skills/engineering/tdd",
+    "repo": "mattpocock/skills",
+    "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "without another tool's config file (agents/openai.yaml)"
+    ]
+  },
+  "verification-before-completion": {
+    "category": "software",
+    "author": "Jesse Vincent",
+    "authorUrl": "https://github.com/obra",
+    "source": "https://github.com/obra/superpowers/tree/22f0b463e7a5e579904dd6211a520321035526f7/skills/verification-before-completion",
+    "repo": "obra/superpowers",
+    "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  },
+  "video-production": {
+    "category": "media",
+    "author": "Symbio",
+    "authorUrl": "https://github.com/linkzy/symbio",
+    "license": "MIT"
+  },
+  "webapp-testing": {
+    "category": "software",
+    "author": "Anthropic",
+    "authorUrl": "https://github.com/anthropics",
+    "source": "https://github.com/anthropics/skills/tree/e4bb5d960d87126ff3b3a8af1a104b7db67560ba/skills/webapp-testing",
+    "repo": "anthropics/skills",
+    "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+    "license": "Apache-2.0",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  },
+  "write-spec": {
+    "category": "planning",
+    "author": "Anthropic",
+    "authorUrl": "https://github.com/anthropics",
+    "source": "https://github.com/anthropics/knowledge-work-plugins/tree/5e504ae11498f2b8daa30d86b7dab97b2ecd8092/product-management/skills/write-spec",
+    "repo": "anthropics/knowledge-work-plugins",
+    "commit": "5e504ae11498f2b8daa30d86b7dab97b2ecd8092",
+    "license": "Apache-2.0",
+    "changes": [
+      "a note on how it maps to Symbio",
+      "removed the pointer to a connectors file it doesn't ship with"
+    ]
+  },
+  "writing-plans": {
+    "category": "planning",
+    "author": "Jesse Vincent",
+    "authorUrl": "https://github.com/obra",
+    "source": "https://github.com/obra/superpowers/tree/22f0b463e7a5e579904dd6211a520321035526f7/skills/writing-plans",
+    "repo": "obra/superpowers",
+    "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+    "license": "MIT",
+    "changes": [
+      "a note on how it maps to Symbio"
+    ]
+  }
+}

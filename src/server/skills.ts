@@ -7,6 +7,10 @@
 // core or the human); the runtimes are told which (opencode/runtime.ts, copilot/runtime.ts).
 // Skills found elsewhere on this computer (other tools' folders) are listed so the human can add
 // a copy; agents never see them directly.
+//
+// Symbio's skills come from two places: its own, and a few vetted third-party ones, each a copy
+// pinned to one commit of its repository, with its license, adapted only by a note on how it maps
+// to Symbio. skills/catalog.json gives each its category and credit (author, source, license).
 
 import { existsSync, promises as fs, readdirSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
@@ -14,9 +18,37 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { globalDir } from "./store.js";
 
+/** Categories of the library, in the order shown. */
+export const SKILL_CATEGORIES = [
+  { id: "leading", label: "Leading the team" },
+  { id: "planning", label: "Planning and specs" },
+  { id: "software", label: "Software development" },
+  { id: "design", label: "Design" },
+  { id: "writing", label: "Writing" },
+  { id: "data", label: "Data and research" },
+  { id: "operations", label: "Operations and servers" },
+  { id: "media", label: "Video and media" },
+  { id: "other", label: "Other" },
+] as const;
+export type SkillCategory = (typeof SKILL_CATEGORIES)[number]["id"];
+const isCategory = (c: string | undefined): c is SkillCategory => SKILL_CATEGORIES.some((x) => x.id === c);
+
+/** Who wrote a skill, and where it comes from (Symbio's third-party skills carry their license). */
+export interface SkillCredit {
+  author: string;
+  authorUrl?: string;
+  /** The skill's folder in its repository, at the commit Symbio copied. */
+  source?: string;
+  license?: string;
+  /** What Symbio changed in its copy. */
+  changes?: string[];
+}
+
 export interface SkillInfo {
   name: string;
   description: string;
+  category: SkillCategory;
+  credit?: SkillCredit;
   /** builtin: ships with Symbio · library: the human's · computer: another tool's folder (add a copy to use it) */
   source: "builtin" | "library" | "computer";
   /** The skill's folder. */
@@ -45,17 +77,49 @@ const computerSkillDirs = () =>
 const NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export const validSkillName = (name: string) => NAME.test(name);
 
-/** `name` and `description` from a SKILL.md's frontmatter (simple `key: value` lines). */
-export function parseSkill(text: string): { name: string; description: string; body: string } | null {
+/**
+ * A SKILL.md's frontmatter: top-level `key: value` lines, with quoted values ("…" with escapes, '…')
+ * and block values (`|` or `>`, the indented lines after). Nested keys are skipped.
+ */
+export function parseSkill(text: string): { name: string; description: string; body: string; meta: Record<string, string> } | null {
   const m = text.replace(/^\uFEFF/, "").match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!m) return null;
   const meta: Record<string, string> = {};
-  for (const line of m[1].split(/\r?\n/)) {
-    const kv = line.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
-    if (kv) meta[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, "");
+  const lines = m[1].split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const kv = lines[i].match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    if (!kv) continue;
+    let value = kv[2].trim();
+    if (/^[|>][+-]?$/.test(value)) {
+      const block: string[] = [];
+      while (i + 1 < lines.length && (/^\s+\S/.test(lines[i + 1]) || lines[i + 1].trim() === "")) block.push(lines[++i].trim());
+      value = value.startsWith("|") ? block.join("\n").trim() : block.join(" ").replace(/\s+/g, " ").trim();
+    } else if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
+      try {
+        value = JSON.parse(value);
+      } catch {
+        value = value.slice(1, -1);
+      }
+    } else if (value.startsWith("'") && value.endsWith("'") && value.length > 1) {
+      value = value.slice(1, -1).replace(/''/g, "'");
+    }
+    meta[kv[1]] = value;
   }
   if (!meta.name || !meta.description) return null;
-  return { name: meta.name, description: meta.description, body: m[2] };
+  return { name: meta.name, description: meta.description.replace(/\s+/g, " ").trim(), body: m[2], meta };
+}
+
+/** Categories and credits of Symbio's skills (skills/catalog.json). */
+let catalogCache: Record<string, { category: string } & SkillCredit> | null = null;
+function catalog(): Record<string, { category: string } & SkillCredit> {
+  if (!catalogCache) {
+    try {
+      catalogCache = JSON.parse(readFileSync(path.join(builtinSkillsDir(), "catalog.json"), "utf8"));
+    } catch {
+      catalogCache = {};
+    }
+  }
+  return catalogCache!;
 }
 
 function filesOf(dir: string): string[] {
@@ -86,7 +150,28 @@ function readRoot(root: string, source: SkillInfo["source"]): SkillInfo[] {
     if (!existsSync(file)) continue;
     const parsed = parseSkill(readFileSync(file, "utf8"));
     if (!parsed || !validSkillName(parsed.name)) continue;
-    out.push({ name: parsed.name, description: parsed.description, source, dir, files: filesOf(dir) });
+    const listed = source === "builtin" ? catalog()[parsed.name] : undefined;
+    const category = listed?.category ?? parsed.meta.category;
+    const author = listed?.author ?? parsed.meta.author;
+    out.push({
+      name: parsed.name,
+      description: parsed.description,
+      category: isCategory(category) ? category : "other",
+      ...(author
+        ? {
+            credit: {
+              author,
+              ...(listed?.authorUrl ? { authorUrl: listed.authorUrl } : {}),
+              ...(listed?.source ? { source: listed.source } : {}),
+              ...((listed?.license ?? parsed.meta.license) ? { license: listed?.license ?? parsed.meta.license } : {}),
+              ...(listed?.changes ? { changes: listed.changes } : {}),
+            },
+          }
+        : {}),
+      source,
+      dir,
+      files: filesOf(dir),
+    });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -125,8 +210,8 @@ export function skillText(name: string): string {
 
 const MAX_SKILL_BYTES = 2_000_000;
 
-/** A new skill in the library, written by the human. */
-export async function createSkill(input: { name: string; description: string; instructions: string }): Promise<SkillInfo> {
+/** A new skill in the library: written by the human, or by core for its team (instructions only). */
+export async function createSkill(input: { name: string; description: string; instructions: string; category?: string; author?: string }): Promise<SkillInfo> {
   const name = input.name.trim().toLowerCase();
   if (!validSkillName(name)) throw new Error("A skill's name is lowercase letters, digits and dashes (e.g. front-end-review).");
   const description = input.description.replace(/\s+/g, " ").trim();
@@ -134,7 +219,10 @@ export async function createSkill(input: { name: string; description: string; in
   if (listSkills().some((s) => s.name === name)) throw new Error(`There is already a skill named "${name}".`);
   const dir = path.join(librarySkillsDir(), name);
   await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\n\n${input.instructions.trim()}\n`);
+  if (!input.instructions.trim()) throw new Error("Write the skill's instructions.");
+  const category = isCategory(input.category) ? `category: ${input.category}\n` : "";
+  const author = input.author?.trim() ? `author: ${JSON.stringify(input.author.trim())}\n` : "";
+  await fs.writeFile(path.join(dir, "SKILL.md"), `---\nname: ${name}\ndescription: ${JSON.stringify(description)}\n${category}${author}---\n\n${input.instructions.trim()}\n`);
   return listSkills().find((s) => s.name === name)!;
 }
 
@@ -177,3 +265,7 @@ export async function removeSkill(name: string): Promise<void> {
 
 /** The skills Symbio gives core in a new project. */
 export const DEFAULT_CORE_SKILLS = ["briefing", "glossary", "handoff", "review"];
+
+/** How core questions the human about a feature (Project.questionStyle): the skill it uses for it. */
+export const QUESTION_STYLE_SKILLS = { briefing: "briefing", grill: "grilling" } as const;
+export type QuestionStyle = keyof typeof QUESTION_STYLE_SKILLS;

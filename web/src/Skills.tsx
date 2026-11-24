@@ -11,7 +11,7 @@ import { Dialog } from "./ui";
 // shows its skills, which the human can change.
 
 function useSkills() {
-  const [data, setData] = useState<{ skills: SkillInfo[]; computer: SkillInfo[] } | null>(null);
+  const [data, setData] = useState<{ skills: SkillInfo[]; computer: SkillInfo[]; categories: { id: string; label: string }[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = () =>
     api.skills().then(
@@ -22,6 +22,34 @@ function useSkills() {
     void reload();
   }, []);
   return { data, error, reload };
+}
+
+/** Who wrote a skill: Symbio's own, or its author (linked), its license and where it comes from. */
+function Credit({ skill }: { skill: SkillInfo }) {
+  const c = skill.credit;
+  if (!c) return null;
+  if (c.author === "Symbio") return <span className="tag">Symbio's</span>;
+  return (
+    <span className="skill-credit subtle small">
+      by{" "}
+      {c.authorUrl ? (
+        <a href={c.authorUrl} target="_blank" rel="noreferrer">
+          {c.author}
+        </a>
+      ) : (
+        c.author
+      )}
+      {c.license && ` · ${c.license}`}
+      {c.source && (
+        <>
+          {" · "}
+          <a href={c.source} target="_blank" rel="noreferrer">
+            source
+          </a>
+        </>
+      )}
+    </span>
+  );
 }
 
 /** A skill's SKILL.md, to read before adding or giving it. */
@@ -35,6 +63,12 @@ function SkillView({ skill, onClose, footer }: { skill: SkillInfo; onClose: () =
   }, [skill.name]);
   return (
     <Dialog title={skill.name} subtitle={skill.description} onClose={onClose} wide footer={footer}>
+      {skill.credit && skill.credit.author !== "Symbio" && (
+        <div className="skill-credit-box small">
+          <Credit skill={skill} />
+          {skill.credit.changes?.length ? <div className="subtle">Symbio's copy: {skill.credit.changes.join("; ")}.</div> : null}
+        </div>
+      )}
       <div className="skill-source subtle small">
         {skill.dir}
         {skill.files.length > 0 && ` · also ${skill.files.length} file${skill.files.length === 1 ? "" : "s"}: ${skill.files.slice(0, 8).join(", ")}${skill.files.length > 8 ? "…" : ""}`}
@@ -51,6 +85,14 @@ export function SkillsSection() {
   const [creating, setCreating] = useState(false);
   const [fromFolder, setFromFolder] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const q = query.trim().toLowerCase();
+  const shown = (data?.skills ?? []).filter(
+    (s) => (category === "all" || s.category === category) && (!q || `${s.name} ${s.description} ${s.credit?.author ?? ""}`.toLowerCase().includes(q)),
+  );
+  const groups = (data?.categories ?? []).map((c) => ({ ...c, skills: shown.filter((s) => s.category === c.id) })).filter((g) => g.skills.length);
+  const present = (data?.categories ?? []).filter((c) => data?.skills.some((s) => s.category === c.id));
 
   async function act(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -82,12 +124,26 @@ export function SkillsSection() {
       </div>
       <div className="section-body">
         {error && <div className="error">{error}</div>}
-        {data?.skills.map((s) => (
+        <div className="skill-filters">
+          <input placeholder="Search skills" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search skills" />
+          <div className="chips">
+            {[{ id: "all", label: "All" }, ...present].map((c) => (
+              <button key={c.id} className={`chip${category === c.id ? " on" : ""}`} onClick={() => setCategory(c.id)}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {data && shown.length === 0 && <div className="subtle small" style={{ padding: "8px 4px" }}>No skills match.</div>}
+        {groups.map((g) => (
+          <div key={g.id} className="skill-category" data-category={g.id}>
+            <div className="skill-group-title">{g.label}</div>
+            {g.skills.map((s) => (
           <div key={s.name} className="list-row skill-row">
             <Sparkles size={15} className="subtle" />
             <div className="grow" style={{ minWidth: 0 }}>
               <div className="list-title">
-                {s.name} {s.source === "builtin" && <span className="tag">Symbio's</span>}
+                {s.name} <Credit skill={s} />
               </div>
               <div className="list-sub" title={s.description}>{s.description}</div>
             </div>
@@ -106,6 +162,8 @@ export function SkillsSection() {
                 <Trash2 size={13} />
               </button>
             )}
+          </div>
+            ))}
           </div>
         ))}
 
@@ -225,10 +283,28 @@ function NewSkillDialog({ onClose, onCreated }: { onClose: () => void; onCreated
 }
 
 /** Checkboxes over the library: which skills are chosen. */
+/** The library's categories, in order (as skills.ts lists them). */
+const CATEGORY_ORDER = ["leading", "planning", "software", "design", "writing", "data", "operations", "media", "other"];
+const CATEGORY_LABEL: Record<string, string> = {
+  leading: "Leading the team",
+  planning: "Planning and specs",
+  software: "Software development",
+  design: "Design",
+  writing: "Writing",
+  data: "Data and research",
+  operations: "Operations and servers",
+  media: "Video and media",
+  other: "Other",
+};
+
 export function SkillChecklist({ skills, chosen, onChange, disabled }: { skills: SkillInfo[]; chosen: string[]; onChange: (next: string[]) => void; disabled?: boolean }) {
+  const order = (s: SkillInfo) => CATEGORY_ORDER.indexOf(s.category) + (CATEGORY_ORDER.includes(s.category) ? 0 : 99);
+  const sorted = [...skills].sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
   return (
     <div className="skill-checklist">
-      {skills.map((s) => (
+      {sorted.map((s, i) => (
+        <div key={s.name}>
+          {(i === 0 || sorted[i - 1].category !== s.category) && <div className="skill-group-title">{CATEGORY_LABEL[s.category] ?? s.category}</div>}
         <label key={s.name} className="check skill-check">
           <input
             type="checkbox"
@@ -241,6 +317,7 @@ export function SkillChecklist({ skills, chosen, onChange, disabled }: { skills:
             <span className="hint" title={s.description}>{s.description}</span>
           </span>
         </label>
+        </div>
       ))}
       {skills.length === 0 && <span className="subtle small">No skills in the library yet (Settings → Skills).</span>}
     </div>

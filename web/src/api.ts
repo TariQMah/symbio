@@ -151,6 +151,8 @@ export interface Question {
   closedAt?: number;
   /** The briefing it belongs to (its questions are answered together). */
   briefing?: string;
+  /** What the asker decided meanwhile (the team decides on its own): the human keeps it or changes it. */
+  decided?: string;
 }
 
 /** The questions about one feature, asked together; answered, they become its spec. */
@@ -243,6 +245,10 @@ export const RUNTIME_LABEL: Record<RuntimeKind, string> = { opencode: "OpenCode"
 export interface SkillInfo {
   name: string;
   description: string;
+  /** Its category in the library (SkillCategory ids). */
+  category: string;
+  /** Who wrote it; Symbio's third-party skills also say where from, under which license, and what Symbio changed. */
+  credit?: { author: string; authorUrl?: string; source?: string; license?: string; changes?: string[] };
   source: "builtin" | "library" | "computer";
   dir: string;
   files: string[];
@@ -280,6 +286,14 @@ export interface Project {
   rulesRegister?: boolean;
   /** Commands Symbio runs itself on reports and before merges. */
   checks?: Check[];
+  /** How much core decides on its own: ask and wait (unset), or decide and tell. */
+  autonomy?: "ask" | "decide";
+  /** How core questions the human about a feature. */
+  questionStyle?: "briefing" | "grill";
+  /** What the team may do without asking, in the human's words. */
+  standingPermissions?: string;
+  /** Installing software without asking. */
+  allowInstalls?: boolean;
   /** Every reported task gets a reviewer before core sees it. */
   requireReviewer?: boolean;
   subRepositories?: boolean;
@@ -820,7 +834,7 @@ export const api = {
   updateProject: (
     id: string,
     patch: Partial<
-      Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy" | "aiCoauthors" | "coreSkills" | "requireReviewer">
+      Pick<Project, "name" | "allowedModels" | "coordinatorModel" | "connections" | "allowedPatterns" | "messageLimit" | "renewSessions" | "helperWorkspace" | "rulesRegister" | "subRepositories" | "coreMode" | "reviewBy" | "aiCoauthors" | "coreSkills" | "requireReviewer" | "autonomy" | "questionStyle" | "standingPermissions" | "allowInstalls">
     > & { checks?: (Omit<Check, "id"> & { id?: string })[]; modelEfforts?: Record<string, string | null>; helperSkills?: string[] | null },
   ) =>
     call<Project>("PATCH", `/projects/${id}`, patch),
@@ -912,7 +926,7 @@ export const api = {
   answerQuestions: (projectId: string, answers: { id: string; answer: string; attachments?: string[] }[]) =>
     call<Question[]>("POST", `/projects/${projectId}/questions/answers`, { answers }),
   setAsideQuestion: (projectId: string, id: string, note?: string) => call<Question[]>("POST", `/projects/${projectId}/questions/${id}/set-aside`, { note }),
-  skills: () => call<{ skills: SkillInfo[]; computer: SkillInfo[] }>("GET", "/skills"),
+  skills: () => call<{ skills: SkillInfo[]; computer: SkillInfo[]; categories: { id: string; label: string }[] }>("GET", "/skills"),
   skillText: (name: string) => call<{ text: string }>("GET", `/skills/${encodeURIComponent(name)}`),
   createSkill: (skill: { name: string; description: string; instructions: string }) => call<SkillInfo>("POST", "/skills", skill),
   importSkill: (from: string) => call<SkillInfo>("POST", "/skills", { from }),

@@ -14,6 +14,9 @@ import { QuestionStore, type Briefing, type Question, type QuestionInput } from 
 import type { Agent, Project } from "../store.js";
 import { active, type TeamCore } from "./core.js";
 
+/** When a question may stop the work in a project that lets the team decide. */
+export const WAIT_REASONS = ["irreversible", "cost", "legal-or-safety", "contradiction", "needs-information"] as const;
+
 export class Questions {
   private stores = new Map<string, Promise<QuestionStore>>();
 
@@ -32,7 +35,21 @@ export class Questions {
     this.stores.delete(projectId);
   }
 
-  async ask(project: Project, agent: Agent, input: QuestionInput): Promise<string> {
+  async ask(project: Project, agent: Agent, input: QuestionInput & { waitReason?: string }): Promise<string> {
+    // The human lets the team decide: a question doesn't stop the work unless it must.
+    if (project.autonomy === "decide") {
+      if (input.blocking && !WAIT_REASONS.includes(input.waitReason as any)) {
+        throw new Error(
+          "The human lets the team decide what can be undone: don't wait. Decide (decided: what you'll do meanwhile, your recommended " +
+            `option) and go on; they keep it or change it. Wait only when it can't be undone, costs more than they allow, is a legal or ` +
+            `safety matter, the requirements contradict each other, or only they have what's needed (an account, a credential, a file): ` +
+            `then give wait_reason (${WAIT_REASONS.join(", ")}).`,
+        );
+      }
+      if (!input.blocking && !input.decided?.trim()) {
+        throw new Error("The human lets the team decide: give decided (what you'll do meanwhile, your recommended option), then go on with it.");
+      }
+    }
     const store = await this.store(project);
     const same = store.duplicateOf(input.question);
     if (same) {
@@ -45,6 +62,12 @@ export class Questions {
     const q = await store.ask(agent.id, input);
     await this.team.log(project, { from: agent.id, to: "human", kind: "question", text: `${q.id}: ${q.question}` });
     this.changed(project);
+    if (q.decided) {
+      return (
+        `Recorded as ${q.id} in the human's Needs you, as decided: "${q.decided}". Go on with it now. If they change it, you'll get a ` +
+        "message with what they want instead; if they keep it, a note. Don't repeat it in the chat."
+      );
+    }
     return (
       `Recorded as ${q.id} in the human's open questions (Needs you), with its context${q.options ? " and options" : ""}. ` +
       "Their answer arrives as a message. Don't repeat it or list open questions in the chat: Symbio shows them. " +
@@ -98,12 +121,20 @@ export class Questions {
     // A briefing's answers go together, once all of its questions are closed.
     const briefings = new Set(closed.filter((q) => q.briefing).map((q) => q.briefing!));
     for (const id of briefings) await this.finishIfAnswered(project, id, filesOf);
+    // Decisions the human kept: the asker is told without being woken.
+    const kept = closed.filter((q) => !q.briefing && q.decided && q.answer === q.decided && !filesOf.get(q.id)?.length);
+    for (const q of kept) {
+      const asker = project.agents.find((x) => x.id === q.askedBy);
+      if (asker && active(asker)) await this.team.system(project, asker, `Symbio: the human kept your decision on ${q.id} ("${q.question}"): ${q.decided}.`, false);
+    }
     const byAsker = new Map<string, Question[]>();
-    for (const q of closed.filter((x) => !x.briefing)) byAsker.set(q.askedBy, [...(byAsker.get(q.askedBy) ?? []), q]);
+    for (const q of closed.filter((x) => !x.briefing && !kept.includes(x))) byAsker.set(q.askedBy, [...(byAsker.get(q.askedBy) ?? []), q]);
     const core = this.team.coordinator(project);
     for (const [askerId, qs] of byAsker) {
       const asker = project.agents.find((x) => x.id === askerId);
-      const list = qs.map((q) => `${q.id}: ${q.question}\n→ ${q.answer}${q.files?.length ? ` (attached: ${q.files.join(", ")})` : ""}`).join("\n\n");
+      const list = qs
+        .map((q) => `${q.id}: ${q.question}${q.decided ? `\n(you had decided: ${q.decided}; change the work that depends on it, with a follow-up task if needed)` : ""}\n→ ${q.answer}${q.files?.length ? ` (attached: ${q.files.join(", ")})` : ""}`)
+        .join("\n\n");
       const files = qs.flatMap((q) => filesOf.get(q.id) ?? []);
       if (asker && active(asker)) {
         await this.team.sendFromHuman(project, asker, `My answer${qs.length > 1 ? "s" : ""} to your question${qs.length > 1 ? "s" : ""}:\n\n${list}` + attachmentNote(files));

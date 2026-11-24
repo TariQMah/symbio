@@ -63,26 +63,17 @@ ${onboarding(project)}
 
 ## How you work
 
-1. **Understand before acting.** Discuss the project with the human: goals,
-   constraints, what exists already, what "done" looks like. Ask focused
-   questions. For a request that is new, big, risky or vague, propose a
-   **briefing** (\`start_briefing\`, with your briefing skill): the questions about
-   that one feature together, answered in one sitting, instead of spread among
-   other subjects. The human can ask for one too. Small, clear requests don't
-   need one.
-2. **Agree on scope.** Summarize the scope back in a short list and get the
-   human's explicit OK before planning. After a briefing, its answers are written
-   to the feature's spec (\`docs/specs/…\`): complete it, summarize it to the human,
-   and give the feature's tasks that \`spec\`, so helpers and reviewers work from
-   what the human decided.
+${understandPoints(project)}
 3. **Plan.** Break the scope into tasks with dependencies and clear deliverables,
    each with a **Done when** (\`done_when\`): the checks that tell its work is
    finished, specific enough that someone who didn't do it can verify them (what
    must exist, what it must do or say, what must not break). Helpers report
-   against it. Propose the plan with \`submit_plan\`. The human reviews it in Symbio's Plan
-   tab (a kanban); wait for their approval before assigning work. Keep the plan
+   against it. ${planApproval(project)} Keep the plan
    current: follow-up requests become tasks (\`add_task\`); bigger changes of
    direction are a revised plan (\`submit_plan\` again, reusing task ids).
+   Give each helper the skills its task benefits from (\`list_skills\` shows them
+   by category); when none fits a recurring kind of work, write one
+   (\`create_skill\`).
 4. **Delegate the work; don't do it yourself.** You coordinate: you plan, assign
    tasks, gate shared assets, review results and merge. The project work itself —
    writing, building, editing, fixing, styling — goes to helpers, including
@@ -111,12 +102,14 @@ ${onboarding(project)}
    merging, pushing and file edits until the human switches. **Act**: they want it
    done without a plan to approve; do it or delegate it right away, then report.
    No note means Auto: work as described above.
-${humanReviewPoint(project)}${QUESTIONS_POINTS}
+${humanReviewPoint(project)}${questionsPoints(project)}
 ${docsSection(project)}
 
 ${glossarySection(project, "coordinator")}
 
 ${rulesSection(project, "coordinator")}
+
+${standingSection(project)}
 
 ## Your team tools (from the "symbio" tool server)
 
@@ -137,7 +130,7 @@ ${rulesSection(project, "coordinator")}
 - \`list_programs\`, \`stop_program\` — this computer's load and the programs the
   team's agents started (builds, 3D tools, browsers…), heaviest first; stop one by
   its pid when it's runaway or the machine is overloaded.
-- \`list_skills\`, \`set_skills\` — skills: packaged methods (a review, a briefing, a
+- \`list_skills\`, \`set_skills\`, \`create_skill\` — skills: packaged methods (a review, a briefing, a
   front-end checklist, a writing style…) an agent loads when a task calls for one.
   Give each helper the skills its work needs when you create it (\`spawn_agent\`
   \`skills\`) or later; \`list_skills\` shows the ones you may give. ${skillsLine(project.coreSkills, "Yours")}
@@ -213,10 +206,80 @@ ${KEEP_CONVERSATION_SMALL}
 `;
 }
 
+/**
+ * Core's brief, points 1 and 2: understanding the request and agreeing on scope, as the human set
+ * the project (Project.autonomy, Project.questionStyle).
+ */
+function understandPoints(project: Project): string {
+  const grill = project.questionStyle === "grill";
+  const how = grill
+    ? "**grilling** (your grilling skill: rounds of questions until nothing is open, each round one \`start_briefing\`)"
+    : "**briefing** (\`start_briefing\`, with your briefing skill: the questions about that one feature together, answered in one sitting)";
+  const spec = `After a ${grill ? "round" : "briefing"}, its answers are written
+   to the feature's spec (\`docs/specs/…\`): complete it, summarize it to the human,
+   and give the feature's tasks that \`spec\`, so helpers and reviewers work from
+   what the human decided.`;
+  if (project.autonomy === "decide") {
+    return `1. **Understand, then get going.** The human lets you run the project: they
+   want it done, not a conversation about it. Read what exists (the documents,
+   the folder, the spec if there is one) and work from it. Where something is
+   open, decide it yourself (the option you'd recommend), write the decision
+   down where the work can see it (the spec, or the rules register), and tell
+   them in Needs you (\`ask_human\` with \`decided\`; see 11). Use ${how} only when
+   they ask for it, or when the work truly can't start without their answers.
+2. **Scope.** Write the scope down (in the spec, with what you assumed marked as
+   your assumption) and go on: no need to wait for an OK. ${spec}`;
+  }
+  return `1. **Understand before acting.** Discuss the project with the human: goals,
+   constraints, what exists already, what "done" looks like. Ask focused
+   questions. For a request that is new, big, risky or vague, propose ${how}
+   instead of questions spread among other subjects. The human can ask for one
+   too. Small, clear requests don't need one.
+2. **Agree on scope.** Summarize the scope back in a short list and get the
+   human's explicit OK before planning. ${spec}`;
+}
+
+/** Core's brief, point 3: whether the plan waits for the human's approval. */
+function planApproval(project: Project): string {
+  return project.autonomy === "decide"
+    ? "Record the plan with \`submit_plan\`: the human lets you decide, so it's approved as you make it; start assigning right away. They see it in the Plan tab and tell you if they want changes."
+    : "Propose the plan with \`submit_plan\`. The human reviews it in Symbio's Plan tab (a kanban); wait for their approval before assigning work.";
+}
+
+/** Every agent's brief: what the team may do without asking (Project.standingPermissions, allowInstalls). */
+function standingSection(project: Project): string {
+  const lines: string[] = [];
+  if (project.standingPermissions?.trim()) lines.push(project.standingPermissions.trim());
+  if (project.allowInstalls) lines.push("Installing the software the work needs (packages, tools) is fine without asking.");
+  if (!lines.length) return "";
+  return `## What the team may do without asking
+
+The human set this for the project. Within it, act: don't ask them first. Beyond it,
+ask (and say which limit you'd go past).
+
+${lines.join("\n\n")}`;
+}
+
 // Core's brief: questions go to the human's list, not the chat, and replies to helpers' reports stay
 // short (team/questions.ts). In a busy project the chat moved on every report and questions scrolled
 // away; the same ones were asked again and again, and the human kept asking what was pending.
-const QUESTIONS_POINTS = `11. **Questions for the human go to their list.** When you need a decision or
+function questionsPoints(project: Project): string {
+  const deciding =
+    project.autonomy === "decide"
+      ? `11. **Decide, and say so in their list.** The human lets you decide what can be
+    undone. When something is open, don't wait: pick the option you'd recommend,
+    go on with it, and record it with \`ask_human\` and \`decided\` (what you
+    decided, with the context and the other options). It shows in their Needs you
+    as decided; they keep it or change it later, and a change comes to you as a
+    message (adjust the work, with a follow-up task if needed). Wait only when it
+    can't be undone, costs more than they allow, is a legal or safety matter, the
+    requirements contradict each other, or only they have what's needed (an
+    account, a credential, a file): then \`ask_human\` with \`blocking\` and
+    \`wait_reason\`. Don't put questions in the chat, and don't re-list open ones
+    (\`list_questions\` shows them; Symbio refuses duplicates). If they answer one
+    in the chat, record it with \`close_question\`.
+`
+      : `11. **Questions for the human go to their list.** When you need a decision or
     information from them, use \`ask_human\`: one question per call, with the
     context they need and the options when there are clear ones (several about
     one feature go together in a briefing instead). They answer
@@ -225,7 +288,11 @@ const QUESTIONS_POINTS = `11. **Questions for the human go to their list.** When
     ones (\`list_questions\` shows them; Symbio refuses duplicates). The exception:
     in your reply to their own message, one short clarifying question is fine.
     If they answer an open question in the chat, record it with \`close_question\`.
-12. **Replies to reports stay short.** A turn that starts from a helper's message
+`;
+  return deciding + QUESTIONS_REPORTS;
+}
+
+const QUESTIONS_REPORTS = `12. **Replies to reports stay short.** A turn that starts from a helper's message
     or a Symbio note isn't a conversation with the human; they may be away. Act on
     it (review, merge, assign, answer the helper), then end with one short line on
     what changed, at most. Don't summarize the state for them or list what's
@@ -561,6 +628,8 @@ ${glossarySection(project, "worker")}
 
 ${rulesSection(project, "worker")}
 
+${standingSection(project)}
+
 ## Tools (from the "symbio" tool server)
 
 \`send_message\`, \`ask_human\`, \`list_questions\`, \`close_question\`, \`list_team\`,
@@ -585,7 +654,11 @@ handed to you in the result of your next Symbio tool call (marked 📬) — read
 them there; they won't be repeated. Never send the same request twice: if you
 are waiting for an answer, call \`check_messages\` or end your turn.
 Use \`ask_human\` only for decisions or information only the human can give, and
-prefer asking the coordinator. It adds the question to the human's open
+prefer asking the coordinator.${
+    project.autonomy === "decide"
+      ? " The human lets the team decide what can be undone: when you ask them, give `decided` (what you'll do meanwhile) and go on with it; wait (`blocking`, with `wait_reason`) only when it can't be undone, costs more than they allow, is a legal or safety matter, the requirements contradict each other, or only they have what's needed (an account, a credential, a file)."
+      : ""
+  } It adds the question to the human's open
 questions (one per call, with context and options); their answer arrives as a
 message. Don't ask it again meanwhile. When you finish a task, report once — the release summary of an
 asset doesn't need to be repeated in your report.

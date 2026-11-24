@@ -120,8 +120,18 @@ export function OpenQuestions({ project, questions }: { project: Project; questi
     await api.setAsideQuestion(project.id, q.id, note || undefined).catch((e) => alert(e.message));
   }
 
+  /** A decision the team made meanwhile, kept as it is. */
+  async function keep(q: Question) {
+    try {
+      await api.answerQuestions(project.id, [{ id: q.id, answer: q.decided! }]);
+      setDrafts((d) => Object.fromEntries(Object.entries(d).filter(([id]) => id !== q.id)));
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  }
+
   const card = (q: Question) => (
-    <div key={q.id} className={`question-card${drafts[q.id]?.trim() ? " answered" : ""}`}>
+    <div key={q.id} className={`question-card${q.decided ? " decided" : ""}${drafts[q.id]?.trim() ? " answered" : ""}`}>
       <div className="question-meta">
         <span className="question-id">{q.id}</span>
         <Avatar name={nameOf(q.askedBy)} size="sm" />
@@ -130,6 +140,11 @@ export function OpenQuestions({ project, questions }: { project: Project; questi
         {q.blocking && (
           <span className="tag amber" title="Work waits on this answer">
             Blocking
+          </span>
+        )}
+        {q.decided && (
+          <span className="tag green" title="The team went on with this; keep it or change it">
+            Decided
           </span>
         )}
         <span className="when">{timeAgo(q.askedAt)}</span>
@@ -149,7 +164,18 @@ export function OpenQuestions({ project, questions }: { project: Project; questi
           ))}
         </div>
       )}
-      <textarea rows={2} placeholder={q.options ? "Pick an option, or write your answer" : "Your answer"} value={drafts[q.id] ?? ""} onChange={(e) => setDraft(q.id, e.target.value)} />
+      {q.decided && (
+        <div className="question-decided">
+          <div className="grow">
+            <span className="subtle small">{nameOf(q.askedBy)} decided, and went on with it:</span>
+            <div>{q.decided}</div>
+          </div>
+          <button className="btn sm" onClick={() => keep(q)}>
+            Keep it
+          </button>
+        </div>
+      )}
+      <textarea rows={2} placeholder={q.decided ? "Or write what to do instead" : q.options ? "Pick an option, or write your answer" : "Your answer"} value={drafts[q.id] ?? ""} onChange={(e) => setDraft(q.id, e.target.value)} />
       <AnswerFiles projectId={project.id} questionId={q.id} onChange={onFiles}>
         <button className="btn ghost sm" onClick={() => setAside(q)}>
           Set aside

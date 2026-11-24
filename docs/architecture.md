@@ -112,7 +112,7 @@ Browser UI (React)  ⇄  Symbio server (Node, Hono)  ⇄  opencode serve (OpenCo
 | `images.ts` | `view_image`: scaled-down copies of images (or full-resolution crops) for agents |
 | `rules.ts` | The rules register (`docs/rules.json`, or `rules.json` in private docs): validated writes, one at a time, ids that are never reused |
 | `docs.ts` | Project documentation (in the project, or private under `.symbio/docs`): list, read, write, search; the glossary |
-| `skills.ts` | Skills: Symbio's (`skills/` in the package) and the human's library (`~/.symbio/skills`), others found on this computer (to add a copy of), creating, importing and removing. Each runtime is told an agent's skills (`setSkills`): OpenCode as permission rules on its skill tool, Copilot as the session's skill folders and turned-off skills |
+| `skills.ts` | Skills: Symbio's (`skills/` in the package: its own and vetted third-party copies, with categories and credits in `skills/catalog.json`) and the human's library (`~/.symbio/skills`), others found on this computer (to add a copy of), creating, importing and removing. Each runtime is told an agent's skills (`setSkills`): OpenCode as permission rules on its skill tool, Copilot as the session's skill folders and turned-off skills |
 | `guard.ts` | OpenCode permission rules for every agent (kill/secret denies, install asks) |
 | `connections.ts`, `secrets.ts` | GitHub, Azure DevOps, server (SSH) and FTP connections, and the encrypted secret vault |
 | `remote.ts`, `ssh.ts`, `ftp.ts` | Running remote actions for agents (SSH exec/upload, FTP upload, git push/pull, GitHub and Azure DevOps APIs) with approvals |

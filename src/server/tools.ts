@@ -10,7 +10,7 @@ import { DEFAULT_IMAGE_SIZE, viewImage } from "./images.js";
 import { readDocument } from "./documents.js";
 import { describeOuterRepository, gitRepoFor } from "./repos.js";
 import { startedBy } from "./machine.js";
-import { listSkills } from "./skills.js";
+import { listSkills, SKILL_CATEGORIES } from "./skills.js";
 import { listShared, type SharedTag } from "./files.js";
 import type { Team } from "./team.js";
 
@@ -67,16 +67,27 @@ const askHuman: Tool = {
       options: { type: "array", items: { type: "string" }, description: "Suggested answers to pick from, when there are clear ones" },
       task_id: str("The task it's about, if any (e.g. T12)"),
       blocking: { type: "boolean", description: "Work can't go on without the answer" },
+      decided: str(
+        "When the human lets the team decide: what you decided meanwhile (your recommended option); you go on with it, and they keep it or change it",
+      ),
+      wait_reason: {
+        type: "string",
+        enum: ["irreversible", "cost", "legal-or-safety", "contradiction", "needs-information"],
+        description:
+          "When the human lets the team decide and you must still wait (blocking): why. needs-information: only they have it (an account, a credential, a file)",
+      },
     },
     ["question"],
   ),
-  run({ question, context, options, task_id, blocking }, { team, project, agent }) {
+  run({ question, context, options, task_id, blocking, decided, wait_reason }, { team, project, agent }) {
     return team.askHuman(project, agent, {
       question: String(question),
       context: context ? String(context) : undefined,
       options: Array.isArray(options) ? options.map(String) : undefined,
       taskId: task_id ? String(task_id) : undefined,
       blocking: blocking === true,
+      decided: decided ? String(decided) : undefined,
+      waitReason: wait_reason ? String(wait_reason) : undefined,
     });
   },
 };
@@ -297,10 +308,38 @@ const listSkillsTool: Tool = {
     const mine = new Set(team.skillsFor(project, agent));
     const line = (s: (typeof all)[number]) => `- ${s.name}: ${s.description}`;
     const forHelpers = all.filter((s) => allowed.has(s.name));
+    const byCategory = SKILL_CATEGORIES.map((c) => ({ label: c.label, skills: forHelpers.filter((s) => s.category === c.id) })).filter((g) => g.skills.length);
     return [
       `Yours: ${[...mine].join(", ") || "none"}.`,
-      forHelpers.length ? `For helpers:\n${forHelpers.map(line).join("\n")}` : "No skills are available for helpers (the human chooses them in the project's settings).",
+      forHelpers.length
+        ? `For helpers, by category:\n\n${byCategory.map((g) => `${g.label}:\n${g.skills.map(line).join("\n")}`).join("\n\n")}`
+        : "No skills are available for helpers (the human chooses them in the project's settings).",
+      "None fits? Write one with create_skill.",
     ].join("\n\n");
+  },
+};
+
+const createSkillTool: Tool = {
+  name: "create_skill",
+  description:
+    "Write a skill for your team when none in the library fits a recurring kind of work (the project's own method for something). " +
+    "Instructions only, in Markdown; it goes into the human's library with you as its author. Then give it to helpers.",
+  inputSchema: obj(
+    {
+      name: str("Lowercase letters, digits and dashes, e.g. 'invoice-check'"),
+      description: str("What it's for and when to use it: agents decide from this when to load it"),
+      instructions: str("The method, step by step (Markdown)"),
+      category: { type: "string", enum: SKILL_CATEGORIES.map((c) => c.id), description: "Where it goes in the library" },
+    },
+    ["name", "description", "instructions"],
+  ),
+  async run({ name, description, instructions, category }, { team, project }) {
+    return team.coreCreatesSkill(project, {
+      name: String(name),
+      description: String(description),
+      instructions: String(instructions),
+      category: category ? String(category) : undefined,
+    });
   },
 };
 
@@ -1002,6 +1041,7 @@ const COORDINATOR_ONLY = [
   assignTask,
   spawnAgent,
   listSkillsTool,
+  createSkillTool,
   setSkills,
   pinModel,
   setEffort,

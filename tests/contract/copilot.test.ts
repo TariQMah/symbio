@@ -21,6 +21,7 @@ delete process.env.SYMBIO_COPILOT_SDK; // the real SDK
 const { CopilotRuntime } = await import("../../src/server/copilot/runtime.js");
 const { AGENT_PERMISSIONS } = await import("../../src/server/guard.js");
 const { handleMcp } = await import("../../src/server/mcp.js");
+const { listSkills } = await import("../../src/server/skills.js");
 
 const runtime = new CopilotRuntime(path.join(root, "copilot"));
 const work = path.join(root, "work");
@@ -126,6 +127,8 @@ test("skills: a session has exactly its skills (Symbio's folders, every other sk
   const on = (skills: { name: string; enabled?: boolean }[]) => skills.filter((s) => s.enabled !== false).map((s) => s.name);
   const first = await list();
   console.log(`# Copilot skills: ${first.map((s) => `${s.name}${s.enabled === false ? " (off)" : ""} [${s.source}]`).join(", ")}`);
+  // Every skill Symbio ships loads (their frontmatter varies: quoted, block and nested values).
+  for (const { name } of listSkills().filter((s) => s.source === "builtin")) assert.ok(first.some((s) => s.name === name), `Symbio's ${name} skill is known`);
   assert.ok(on(first).includes("glossary"), "its skill is on");
   assert.ok(!on(first).includes("briefing"), "Symbio's other skills are off");
   assert.deepEqual(on(first), ["glossary"], "and Copilot's own skills too: exactly its skills");

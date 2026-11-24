@@ -104,6 +104,17 @@ being merged (unless core forces the merge).
   told). *marked*: only the tasks marked for the human (`review: true` in `submit_plan` /
   `add_task`, which core sets when it proposes the plan; the human ticks or unticks them in the Plan
   tab, `POST …/plan/tasks/:id/mark`) wait; the others work as with *core*.
+- **How core runs the project** (Project settings; `Project.autonomy`, `questionStyle`,
+  `standingPermissions`, `allowInstalls`). *decide* (new projects): `submit_plan` is approved as it's
+  made (the human is told and can ask for changes); `ask_human` needs `decided` (what the asker does
+  meanwhile), or, to wait (`blocking`), a `wait_reason` (irreversible, cost, legal-or-safety,
+  contradiction, needs-information). A decided question shows in Needs you as decided: *Keep it* closes it and the asker
+  gets a note (no turn); another answer wakes the asker with what to do instead. *ask* (unset): as
+  before. Briefs change with it (core's points 1 to 3 and 11, the helpers' `ask_human` line).
+  `questionStyle` *grill* gives core the `grilling` skill instead of `briefing` (each round one
+  `start_briefing`). `standingPermissions` (the human's words) and `allowInstalls` go into every
+  agent's brief ("What the team may do without asking"); `allowInstalls` also drops the install asks
+  from the session rules (`withoutInstallAsks` in `guard.ts`).
 - **Briefings** (`start_briefing`, core only; `.symbio/briefings.json`): the questions about one
   feature or request, asked together before work on it starts (2 to 15, blocking unless said),
   numbered like other questions and tagged with the briefing (`B1`). Needs you groups them under
@@ -177,7 +188,7 @@ All agents:
 |---|---|
 | `send_message` | Message another agent by name (`core` is the coordinator); wakes the recipient |
 | `start_briefing` | core: the questions about one feature together (feature, why, questions with context and options); answered, they become its spec |
-| `ask_human` | Add a question to the human's open questions (Needs you): one per call, with context, options, the task and whether work is blocked; the answer arrives later as a message |
+| `ask_human` | Add a question to the human's open questions (Needs you): one per call, with context, options, the task and whether work is blocked; the answer arrives later as a message. When the project lets the team decide: `decided` (or `blocking` with `wait_reason`) |
 | `list_questions` | The open questions, and the ones closed recently with their answers |
 | `close_question` | Close an open question: with the answer the human gave in the chat, or without one when it's no longer needed |
 | `share_file` | Show the human a file (image, video, report…): a card in the chat, shown in place or with a download button, and in the Files tab. `tag` (evidence, report, other) and `task_id`: evidence without a task goes to the agent's one task in progress or review |
@@ -212,7 +223,8 @@ core only:
 | `add_task` | Add a task to the approved plan, with its `done_when` |
 | `assign_task` | Give a task to an existing helper |
 | `spawn_agent` | Create a helper with a name, purpose, first task, and optionally a model (and `pin_model` to keep it on that model), where it works (`workspace`: own / shared) and, in a folder of several repositories, which one (`repo`); its `skills` |
-| `list_skills` | The skills core may give helpers (name and what each is for), and its own |
+| `list_skills` | The skills core may give helpers, by category (name and what each is for), and its own |
+| `create_skill` | Write a skill (instructions only) into the library, with core as its author, to give helpers |
 | `set_skills` | Set a helper's skills (from the ones the project allows); not skills the human chose |
 | `pin_model` | Pin a helper to its model (it waits and retries it when it fails, instead of switching) or unpin it; not a pin the human made |
 | `stop_agent` | Stop a helper; its assets are released |

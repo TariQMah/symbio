@@ -68,7 +68,11 @@ function toolLabel(tool: string, i: Record<string, unknown>): StepLabel {
     case "check_messages":
       return { label: "Checked for messages", weight: 1 };
     case "ask_human":
-      return { label: "Added a question for you", detail: firstLine(i.question), weight: 3 };
+      return i.decided
+        ? { label: "Decided, and told you", detail: `${firstLine(i.question)} → ${firstLine(i.decided)}`, weight: 3 }
+        : { label: "Added a question for you", detail: firstLine(i.question), weight: 3 };
+    case "create_skill":
+      return { label: `Wrote a skill: ${s(i.name)}`, detail: firstLine(i.description), weight: 3 };
     case "start_briefing":
       return { label: "Started a briefing for you", detail: firstLine(i.feature), weight: 3 };
     case "propose_check":

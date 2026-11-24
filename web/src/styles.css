@@ -389,6 +389,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .skill-row .list-sub { white-space: normal; }
 .skill-check .hint { white-space: normal; }
 .skill-group-title { margin: 14px 0 6px; font-size: 12px; color: var(--text-3); }
+.skill-filters { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 2px; }
+.skill-filters .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.skill-category .skill-group-title { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
+.skill-credit { font-weight: 400; margin-left: 4px; }
+.skill-credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.skill-credit-box { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.skill-checklist .skill-group-title { margin: 8px 0 2px; }
 .skill-import { gap: 8px; margin-top: 12px; }
 .skill-import input { flex: 1; min-width: 0; }
 .skill-source { margin-bottom: 10px; word-break: break-all; }
@@ -876,6 +883,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); margi
 .questions-head { display: flex; align-items: center; gap: 8px; font-size: 13px; position: sticky; top: 0; z-index: 1; background: var(--panel); padding: 4px 0; }
 .question-card { border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .question-card.answered { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.question-card.decided { border-color: color-mix(in srgb, var(--green) 40%, var(--border-strong)); }
+.question-decided { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r); background: var(--green-soft); font-size: 13px; }
 .briefing { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--r-lg); border: 1px dashed var(--border-strong); background: var(--accent-soft); }
 .briefing-head { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .briefing-head .row { gap: 6px; }

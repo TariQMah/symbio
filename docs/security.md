@@ -90,7 +90,7 @@ Every agent session gets permission rules from `src/server/guard.ts`:
 | **Deny** killing processes by name or PID (`taskkill`, `Stop-Process`, `kill`, `pkill`, `killall`, `wmic … process`…) | Your terminals, editors and Symbio itself run the same executables. An agent once ran `taskkill /F /IM node.exe /T` and closed all of them. Agents stop what they started with `stop_process`; core can stop a program any agent started with `stop_program`, and you from the machine view in the top bar. Those stop by process id, and only processes Symbio recognizes as agents' programs (under a runtime's shells, or seen there before), never the rest of the machine. |
 | **Deny** reading or editing `~/.ssh`, Symbio's secret store, the UI key, the approvals store, Symbio's backups and OpenCode's provider logins (`auth.json`), and shell commands that mention them or private key files | Servers, GitHub and Azure DevOps are reached through Symbio's connection tools instead |
 | **Deny** editing what decides which programs Symbio runs: its settings and state (`runtime-settings.json`, `config.json`, `connections.json`, `machine.json`, `updates.json`, `opencode.pid`, and each project's `.symbio/project.json`, which holds its checks), the runtimes it installed (`runtimes/`), the downloaded `cloudflared` (`bin/`), its own Copilot folder, and OpenCode shims anywhere (`opencode.cmd`, `.ps1`, `.bat`, `.exe`); shell commands that mention them are refused too. Reading them is allowed | Otherwise an agent could turn on "OpenCode from the PATH", put its own `opencode.cmd` there, and Symbio would run it as the runtime, outside these rules, with the runtime's server password. Shell commands are matched on their text, so for shell writes this is best effort, as for the secrets |
-| **Ask** before installing software (`winget`, `choco`, `npm -g`, `pip install`…) and "download and run" commands (`… \| sh`, `… \| bash -s`, `… \| sudo bash`, `… \| iex`) | You approve installs from the *Needs you* inbox |
+| **Ask** before installing software (`winget`, `choco`, `npm -g`, `pip install`…) and "download and run" commands (`… \| sh`, `… \| bash -s`, `… \| sudo bash`, `… \| iex`) | You approve installs from the *Needs you* inbox. A project can let its team install packages without asking (Project settings → *Install software without asking*): only the package managers' installs stop asking; running downloaded scripts, system installers (`msiexec`) and `| sudo` still ask, and every deny stays |
 | **Refuse** reading image files (png, jpg, gif, webp, bmp) and PDFs with the read tool; Symbio answers with a pointer to `view_image` or `read_document` | The read tool puts the whole file in the conversation, re-sent every turn; a few large ones made one too big to send |
 
 **Plan mode** (core's chat) adds `PLAN_MODE_PERMISSIONS` to core's session: every edit denied, and
@@ -208,6 +208,13 @@ else. Symbio treats them that way:
   allowed, under the same rules as any command.
 - **core gives only what the project allows.** You choose which skills core may give helpers
   (Project settings → Skills); skills you give a helper yourself, core can't change.
+- **Third-party skills Symbio ships are reviewed copies.** Each is pinned to one commit of its
+  repository, permissively licensed (MIT or Apache-2.0, its license file kept next to it), credited
+  (author, link, source) and adapted only by a note on how it maps to Symbio. Ones that bundle
+  servers, hooks, telemetry or many scripts were left out. They never update themselves; a new
+  version comes with a Symbio release.
+- **Skills core writes are instructions only.** `create_skill` writes a `SKILL.md`, no files to run,
+  into your library with core as its author, where you can read or remove it.
 
 ## Checks
 

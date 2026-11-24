@@ -334,6 +334,24 @@ export const AGENT_UPDATES: AgentUpdate[] = [
       "as evidence; the task lists it, reviewers get it, and the human filters the Files tab by it. list_shared_files finds the " +
       "team's shared files by task and tag.",
   },
+  {
+    id: "2026-11-24-skills-library",
+    text:
+      "More skills: the library now has categories (planning, software, design, writing, data, operations, media) and about 25 " +
+      "skills, Symbio's own and popular ones by other authors (grilling, brainstorming, writing-plans, write-spec, tdd, code-review, " +
+      "systematic-debugging, frontend-design, server-administration, video-production, research-method…). list_skills shows them " +
+      "by category. After a briefing or when planning, give each helper the skills its task benefits from, without asking the " +
+      "human; when none fits a recurring kind of work, write one with create_skill.",
+  },
+  {
+    id: "2026-11-24-autonomy",
+    text:
+      "How you run the project is now a setting the human chooses: 'Decide and tell me' or 'Ask me and wait' (your instructions say " +
+      "which applies). When you decide: submit_plan is approved as you make it; ask_human takes decided (what you do meanwhile, " +
+      "shown to the human as a decision to keep or change), and waiting needs a wait_reason. The human can also write what the team " +
+      "may do without asking, and whether it may install software; it's in your instructions. They may also choose grilling instead " +
+      "of briefings: then you have the grilling skill.",
+  },
 ];
 
 /** Entries a project hasn't been told about yet. */

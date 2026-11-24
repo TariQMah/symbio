@@ -56,6 +56,10 @@ and align the rest.
 | **spec** | A feature's document of what the human decided (often a briefing's result, in `docs/specs/`); its tasks link to it | especificação | `Task.spec` |
 | **check** | A command Symbio runs itself on a helper's work (build, tests, spellcheck…) when it reports a task and before a merge; the human approves each | verificação | `Project.checks`, `checks.ts`, `propose_check` |
 | **reviewer** | A one-off helper that checks a task's work against *Done when*, the rules and the glossary, and gives a verdict | revisor | `Agent.reviewer`, `team/verify.ts`, `request_review`, `submit_review` |
+| **autonomy** | How much core decides on its own (a project setting): *Decide and tell me*, or *Ask me and wait* | autonomia (*Decida e me avise* / *Pergunte e espere*) | `Project.autonomy` (`"decide"` / `"ask"`) |
+| **decision** | What an agent decided meanwhile, shown in Needs you for the human to keep or change | decisão | `Question.decided` |
+| **what the team may do without asking** | The human's standing permissions for a project (spending, deploying, deleting…) | o que a equipe pode fazer sem pedir | `standingPermissions`, `allowInstalls` |
+| **grilling** | Questioning in rounds, each with a recommended answer, until nothing is open; the alternative to a briefing | sabatina | `questionStyle: "grill"`, the `grilling` skill |
 | **shared file** | A file an agent showed the human (in the chat and the Files tab), tagged with what it is and its task | arquivo compartilhado | `share_file` |
 | **evidence** | Shared files that show a task's work was done (screenshots, outputs, results), tied to the task | evidência | `share_file` `tag: "evidence"`, `list_shared_files` |
 | **program** | Something an agent started that keeps running (a server, a tunnel, a build) | programa | `AgentProcess`, `list_programs` |

@@ -16,6 +16,11 @@ export interface Question {
   taskId?: string;
   /** Work waits on the answer. */
   blocking: boolean;
+  /**
+   * What the asker decided meanwhile, when the project lets core decide (Project.autonomy "decide"):
+   * work goes on with it, and the human keeps it or changes it.
+   */
+  decided?: string;
   askedBy: string; // agent id
   askedAt: number;
   state: "open" | "answered" | "set-aside";
@@ -54,6 +59,7 @@ export interface QuestionInput {
   options?: string[];
   taskId?: string;
   blocking?: boolean;
+  decided?: string;
 }
 
 const MAX_TEXT = 4000;
@@ -165,6 +171,7 @@ export class QuestionStore {
       ...(options.length ? { options } : {}),
       ...(input.taskId ? { taskId: input.taskId.trim().toUpperCase() } : {}),
       blocking: !!input.blocking,
+      ...(input.decided?.trim() && !input.blocking ? { decided: input.decided.trim().slice(0, MAX_TEXT) } : {}),
       askedBy,
       askedAt: Date.now(),
       state: "open",

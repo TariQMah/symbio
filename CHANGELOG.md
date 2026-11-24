@@ -5,6 +5,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.32.0]
+
+- **Runs on its own, or asks: a project setting** (Project settings → How core runs the project).
+  - *Decide and tell me* (the default for new projects): core picks the option it would recommend and keeps going. The
+    question shows in Needs you as a decision with **Keep it**, or you write what to do instead (that reaches core as a
+    change to make). Its plan is approved as it makes it. It waits only for what can't be undone, costs more than you allow,
+    legal or safety matters, or requirements that contradict each other. *Ask me and wait* keeps the previous behavior;
+    existing projects stay on it.
+  - **What the team may do without asking**, in your words (spending, deploying, deleting…): every agent gets it.
+  - **Install software without asking**: package installs (pip, npm -g, winget…) stop asking in that project; running
+    downloaded scripts, system installers and `| sudo` still ask, and every other guard stays.
+  - **Briefing or grilling**: how core questions you about a feature. Grilling asks in rounds, each with core's recommended
+    answer, until nothing is open.
+- **A bigger skill library, by category.** About 25 skills grouped as planning, software, design, writing, data, operations
+  and media, searchable:
+  - Symbio's own, now with project planning, long-form writing, research method, server administration and video production.
+  - Popular skills by other authors, each a reviewed copy pinned to a commit, with its license and a credit linking the
+    author and the source: grilling, tdd and code-review (Matt Pocock); brainstorming, writing-plans, systematic-debugging
+    and verification-before-completion (Jesse Vincent); write-spec, explore-data, incident-response, frontend-design and
+    webapp-testing (Anthropic); security-and-hardening (Addy Osmani); incident-postmortem (GitHub); humanizer (Siqi Chen);
+    copywriting (Corey Haines).
+  - core gives helpers the skills their work needs on its own, and can write one for its team (`create_skill`,
+    instructions only, credited to core in the library).
+- The machine view (and stopping agents' programs) failed on Windows when any program's command line held a control
+  character.
+- GitHub Copilot CLI skips a skill whose frontmatter isn't valid YAML without saying so; Symbio's skills are checked for it.
+
 ## [0.31.0]
 
 - **Evidence** (#56). Files agents share (`share_file`) carry a tag (evidence, report) and the task they belong to; evidence

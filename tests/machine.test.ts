@@ -2,7 +2,7 @@
 // programs seen that way before whose parent has exited since.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agentProcesses, descendants, type ProcessInfo } from "../src/server/machine.js";
+import { agentProcesses, descendants, parseWindowsListing, type ProcessInfo } from "../src/server/machine.js";
 
 const p = (pid: number, parent: number, name: string, started = 1): ProcessInfo => ({ pid, parent, name, command: name, memory: 1, cpuTime: 0, started });
 
@@ -41,4 +41,10 @@ test("a process whose parent id now belongs to an agent's shell isn't the agent'
   ];
   assert.deepEqual(agentProcesses(list, [10], new Map()).map((x) => x.pid), [13]);
   assert.deepEqual(descendants(list, 12).map((x) => x.pid), [13]);
+});
+
+test("a Windows listing with a raw control character in a command line still parses", () => {
+  const out = '[{"p":10,"q":1,"n":"odd.exe","c":"odd.exe --title \u0007bell\u001b[0m","m":1,"t":0,"s":0},{"p":11,"q":1,"n":"ok.exe","c":null,"m":2,"t":0,"s":0}]';
+  const list = parseWindowsListing(out);
+  assert.deepEqual(list.map((p) => [p.pid, p.command]), [[10, "odd.exe --title  bell [0m"], [11, "ok.exe"]]);
 });

@@ -28,6 +28,9 @@ carries over between sessions and runtimes.
 4. ✅ **Briefings** (done in 0.30.0). The questions about one feature, asked together, becoming its spec
    ([#55](https://github.com/linkzy/symbio/issues/55)).
 5. ✅ **Evidence** (done in 0.31.0). Files tagged by kind and task, easy to find ([#56](https://github.com/linkzy/symbio/issues/56)).
+6. ✅ **Autopilot and skills** (done in 0.32.0). core decides on its own when the project lets it (decisions the
+   human keeps or changes, what the team may do without asking), briefing or grilling, and a skill library by
+   category with popular third-party skills core gives helpers by itself.
 
 Later: how risky a change is to merge (can it be undone, how much it affects) deciding how closely
 it's reviewed; a retro that turns review comments into rules and checks.
@@ -164,6 +167,7 @@ Collected, not sorted or promised yet.
 
 Newest first; details per version in [CHANGELOG.md](../CHANGELOG.md).
 
+- **0.32.0** — Runs on its own or asks, per project (decisions to keep or change, plans approved as made, what the team may do without asking, briefing or grilling), and a skill library by category with popular third-party skills, credited.
 - **0.31.0** — Evidence: shared files tagged by kind and task, filtered in the Files tab, listed on their task and given to reviewers. *Core as lead* phases 0–5 are done.
 - **0.30.0** — Briefings: the questions about one feature asked together, grouped in Needs you, answered into the feature's spec that its tasks link to.
 - **0.29.0** — The quality gate: checks Symbio runs itself on every report and before merges (core proposes, you approve), and reviewers, one-off helpers that check a task against its *Done when* without changing it, by core's request or on every task.

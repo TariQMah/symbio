@@ -9,7 +9,7 @@ import { findOnPath, hasInstalledCopy, isInstalled, locate, NotInstalledError, R
 import { loadRuntimeSettings, saveRuntimeSettings } from "./runtime/settings.js";
 import { CopilotRuntime } from "./copilot/runtime.js";
 import { validCommandPattern, type Approval } from "./remote.js";
-import type { CoreMode, ReviewBy, Store, Project, DocsLocation, HelperWorkspace, ProjectConnection } from "./store.js";
+import type { Autonomy, CoreMode, ReviewBy, Store, Project, DocsLocation, HelperWorkspace, ProjectConnection } from "./store.js";
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -19,7 +19,7 @@ import { pickFolder } from "./folder-picker.js";
 import { beginOauth, cancelOauth, completeOauth, connectWithKey, listProviders, oauthStatus, removeLogin } from "./providers.js";
 import { docsRoot, listDocs, rawDoc, readDoc, searchDocs, writeDoc } from "./docs.js";
 import { normalizeChecks } from "./checks.js";
-import { computerSkills, createSkill, DEFAULT_CORE_SKILLS, importSkill, listSkills, removeSkill, skillText } from "./skills.js";
+import { computerSkills, createSkill, DEFAULT_CORE_SKILLS, importSkill, listSkills, removeSkill, SKILL_CATEGORIES, skillText } from "./skills.js";
 import { readRegister } from "./rules.js";
 import { addAttachment, attachmentNote, getAttachments, listAttachments, markSent, removeAttachment } from "./attachments.js";
 import { fileResponse, listDir, listShared, resolveFile, type ResolvedFile } from "./files.js";
@@ -284,7 +284,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
   api.get("/machine", (c) => c.json(machineOf().state()));
 
   // ---- Skills (skills.ts): Symbio's and the human's, and others found on this computer (to add a copy of)
-  api.get("/skills", (c) => c.json({ skills: listSkills(), computer: computerSkills() }));
+  api.get("/skills", (c) => c.json({ skills: listSkills(), computer: computerSkills(), categories: SKILL_CATEGORIES }));
   api.get("/skills/:name", (c) => {
     try {
       return c.json({ text: skillText(c.req.param("name")) });
@@ -526,6 +526,7 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       coreModels?: string[];
       coreOnlyModels?: string[];
       runtime?: RuntimeKind;
+      autonomy?: Autonomy;
     }>();
     if (!body.name?.trim() || !body.directory?.trim()) return c.json({ error: "name and directory are required" }, 400);
     if (body.runtime !== undefined && !team.runtimes.has(body.runtime)) return c.json({ error: `Unknown runtime "${body.runtime}"` }, 400);
@@ -566,6 +567,11 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
     // A new project's core starts with Symbio's skills for leading (a reopened one keeps its own).
     if (!project.coreSkills && !project.agents.length) {
       project.coreSkills = DEFAULT_CORE_SKILLS.filter((s) => listSkills().some((x) => x.name === s));
+      await store.update(project);
+    }
+    // New projects decide on their own unless created otherwise (a reopened one keeps its setting).
+    if (body.autonomy === "ask" && !project.agents.length && project.autonomy === "decide") {
+      project.autonomy = "ask";
       await store.update(project);
     }
     if (roles.coreModels || roles.coreOnlyModels) {
@@ -682,7 +688,25 @@ export function createApi(store: Store, runtime: OpencodeRuntime, team: Team, co
       helperSkills?: string[] | null;
       checks?: unknown;
       requireReviewer?: boolean;
+      autonomy?: Autonomy;
+      questionStyle?: "briefing" | "grill";
+      standingPermissions?: string;
+      allowInstalls?: boolean;
     }>();
+    if (body.autonomy !== undefined || body.questionStyle !== undefined || body.standingPermissions !== undefined || body.allowInstalls !== undefined) {
+      if (body.autonomy !== undefined && body.autonomy !== "ask" && body.autonomy !== "decide") return c.json({ error: 'autonomy is "ask" or "decide".' }, 400);
+      if (body.questionStyle !== undefined && body.questionStyle !== "briefing" && body.questionStyle !== "grill") return c.json({ error: 'questionStyle is "briefing" or "grill".' }, 400);
+      try {
+        await team.setLeadSettings(project, {
+          ...(body.autonomy ? { autonomy: body.autonomy } : {}),
+          ...(body.questionStyle ? { questionStyle: body.questionStyle } : {}),
+          ...(typeof body.standingPermissions === "string" ? { standingPermissions: body.standingPermissions } : {}),
+          ...(typeof body.allowInstalls === "boolean" ? { allowInstalls: body.allowInstalls } : {}),
+        });
+      } catch (err) {
+        return c.json({ error: (err as Error).message }, 400);
+      }
+    }
     if (body.checks !== undefined || typeof body.requireReviewer === "boolean") {
       try {
         await team.setVerification(project, {

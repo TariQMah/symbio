@@ -168,6 +168,17 @@ export interface Project {
   reviewBy?: ReviewBy;
   /** Keep a rules register (rules.json next to the docs, shown in the Docs tab). Unset = off. */
   rulesRegister?: boolean;
+  /**
+   * How much core decides on its own. "ask" (unset): it asks the human and waits. "decide": it
+   * decides what it can undo, says so, and keeps going; the human can change any decision later.
+   */
+  autonomy?: Autonomy;
+  /** How core questions the human about a feature: a briefing (unset) or grilling (rounds until nothing is open). */
+  questionStyle?: "briefing" | "grill";
+  /** What the team may do without asking (spending, deploying, deleting…), in the human's words; every agent gets it. */
+  standingPermissions?: string;
+  /** Installing software (pip, npm -g, winget…) without asking the human first. Unset = ask. */
+  allowInstalls?: boolean;
   /** Commands Symbio runs itself when a helper reports a task and before its work is merged (checks.ts). */
   checks?: Check[];
   /**
@@ -190,6 +201,8 @@ export type HelperWorkspace = "own" | "shared";
 export type CoreMode = "auto" | "plan" | "act";
 
 export type ReviewBy = "core" | "every" | "marked";
+
+export type Autonomy = "ask" | "decide";
 
 export interface ProjectConnection {
   id: string;
@@ -349,6 +362,8 @@ export class Store {
           allowedPatterns: [],
           // Helpers start each task from a clean conversation; what carries over is in documents.
           renewSessions: "after-task",
+          // New projects run on their own: core decides what it can undo, and the human can change it.
+          autonomy: "decide",
           agents: [],
           createdAt: Date.now(),
         };

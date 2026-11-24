@@ -21,6 +21,7 @@ export function ProjectSettings({ project, onChanged }: { project: Project; onCh
     <div className="settings-scroll">
       <div className="settings-inner">
         <General project={project} onChanged={onChanged} />
+        <Lead project={project} onChanged={onChanged} />
         <Connections project={project} onChanged={onChanged} />
         <RuntimeSection project={project} />
         <Models project={project} onChanged={onChanged} />
@@ -125,6 +126,81 @@ function General({ project, onChanged }: { project: Project; onChanged: (p: Proj
           setRules(!!project.rulesRegister);
         }}
       />
+    </section>
+  );
+}
+
+/** How core runs the project: how much it decides on its own, how it questions the human, what the team may do without asking. */
+function Lead({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
+  const { t } = useI18n();
+  const saved = {
+    autonomy: project.autonomy ?? "ask",
+    questionStyle: project.questionStyle ?? "briefing",
+    standingPermissions: project.standingPermissions ?? "",
+    allowInstalls: !!project.allowInstalls,
+  };
+  const [value, setValue] = useState(saved);
+  const [saving, setSaving] = useState(false);
+  const key = JSON.stringify(saved);
+  useEffect(() => setValue(saved), [key]);
+  const dirty = JSON.stringify(value) !== key;
+  async function save() {
+    setSaving(true);
+    try {
+      onChanged(await api.updateProject(project.id, value));
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <section className="section" id="lead">
+      <div className="section-head">
+        <div>
+          <h2>{t("lead.title")}</h2>
+          <p>{t("lead.desc")}</p>
+        </div>
+      </div>
+      <div className="stack" style={{ padding: 16, gap: 14 }}>
+        <div className="field">
+          <span>{t("lead.autonomy.title")}</span>
+          <div className="seg">
+            <button className={value.autonomy === "decide" ? "on" : ""} onClick={() => setValue({ ...value, autonomy: "decide" })}>
+              {t("lead.autonomy.decide")}
+            </button>
+            <button className={value.autonomy === "ask" ? "on" : ""} onClick={() => setValue({ ...value, autonomy: "ask" })}>
+              {t("lead.autonomy.ask")}
+            </button>
+          </div>
+          <span className="hint">{value.autonomy === "decide" ? t("lead.autonomy.hint.decide") : t("lead.autonomy.hint.ask")}</span>
+        </div>
+        <div className="field">
+          <span>{t("lead.style.title")}</span>
+          <div className="seg">
+            <button className={value.questionStyle === "briefing" ? "on" : ""} onClick={() => setValue({ ...value, questionStyle: "briefing" })}>
+              {t("lead.style.briefing")}
+            </button>
+            <button className={value.questionStyle === "grill" ? "on" : ""} onClick={() => setValue({ ...value, questionStyle: "grill" })}>
+              {t("lead.style.grill")}
+            </button>
+          </div>
+          <span className="hint">{value.questionStyle === "grill" ? t("lead.style.hint.grill") : t("lead.style.hint.briefing")}</span>
+        </div>
+        <label className="field">
+          <span>{t("lead.standing.title")}</span>
+          <textarea rows={4} value={value.standingPermissions} placeholder={t("lead.standing.placeholder")} onChange={(e) => setValue({ ...value, standingPermissions: e.target.value })} />
+          <span className="hint">{t("lead.standing.hint")}</span>
+        </label>
+        <label className="choice">
+          <input type="checkbox" checked={value.allowInstalls} onChange={(e) => setValue({ ...value, allowInstalls: e.target.checked })} />
+          <span className="choice-body">
+            <span className="choice-title">{t("lead.installs.title")}</span>
+            <span className="choice-desc">{t("lead.installs.desc")}</span>
+          </span>
+        </label>
+      </div>
+      <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={() => setValue(saved)} />
     </section>
   );
 }
