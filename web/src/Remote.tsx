@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Globe, Power } from "lucide-react";
-import { CopyButton } from "./ui";
+import { Check, Globe, Power, Share2 } from "lucide-react";
+import { CopyButton, copyToClipboard } from "./ui";
 import { api, subscribe, type RemoteStatus } from "./api";
 
 /** Remote access status, kept current. */
@@ -17,6 +17,47 @@ export function useRemote(): [RemoteStatus | null, () => void] {
 }
 
 const formatCode = (code: string) => `${code.slice(0, 4)}-${code.slice(4)}`;
+
+/** The link and the access code together, as they read when pasted into a message. */
+function remoteShareText(status: RemoteStatus): string {
+  if (!status.url) return "";
+  return status.code ? `Symbio: ${status.url}\nAccess code: ${formatCode(status.code)}` : status.url;
+}
+
+/** Shares the remote link and code: the system share sheet where the browser has one, otherwise a copy of the same text. */
+function ShareButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className={`btn ghost icon xs ${copied ? "copied" : ""}`}
+      title={copied ? "Link and code copied" : "Share"}
+      aria-label={copied ? "Link and code copied" : "Share"}
+      onClick={async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof navigator.share === "function") {
+          try {
+            await navigator.share({ text });
+          } catch {
+            // The user closed the share sheet; nothing to do.
+          }
+          return;
+        }
+        // No share sheet here: fall back to copying the same text.
+        try {
+          await copyToClipboard(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          // Copying failed; nothing to show.
+        }
+      }}
+    >
+      {copied ? <Check size={13} /> : <Share2 size={13} />}
+    </button>
+  );
+}
 
 /** The banner at the top while remote access is on, with the button to turn it off. */
 export function RemoteBanner() {
@@ -68,7 +109,6 @@ export function RemoteSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const local = status?.code !== undefined;
-
   async function toggle() {
     setBusy(true);
     setError(null);
@@ -82,7 +122,6 @@ export function RemoteSection() {
       setBusy(false);
     }
   }
-
   return (
     <section className="section">
       <div className="section-head">
@@ -111,13 +150,17 @@ export function RemoteSection() {
                 <a href={status.url!} target="_blank" rel="noreferrer" className="mono small">
                   {status.url}
                 </a>
-                <CopyButton text={status.url!} />
+                <CopyButton text={remoteShareText(status)} label="Copy link and code" copiedLabel="Link and code copied" />
+                <ShareButton text={remoteShareText(status)} />
               </div>
             </div>
             {status.code && (
               <div className="field">
                 <span>Access code</span>
-                <code className="remote-code big">{formatCode(status.code)}</code>
+                <div className="row" style={{ gap: 8 }}>
+                  <code className="remote-code big">{formatCode(status.code)}</code>
+                  <CopyButton text={formatCode(status.code)} label="Copy access code" copiedLabel="Access code copied" />
+                </div>
               </div>
             )}
             <div className="small subtle">
